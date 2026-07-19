@@ -9,7 +9,7 @@ type Props = {
 function HomeScreen({ onRegister }: Props) {
   return (
     <motion.main
-      className="home screen"
+      className="home screen screen--tabbar"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}

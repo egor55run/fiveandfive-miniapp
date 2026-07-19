@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import './App.css';
 import HomeScreen from './components/HomeScreen';
+import ProfileScreen from './components/ProfileScreen';
 import RegistrationScreen, {
   type Participant,
 } from './components/RegistrationScreen';
 import RegistrationSuccessScreen from './components/RegistrationSuccessScreen';
+import TabBar from './components/TabBar';
 
-type Screen = 'home' | 'registration' | 'success';
+type Screen = 'home' | 'profile' | 'registration' | 'success';
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
@@ -17,6 +19,7 @@ function App() {
     setCurrentScreen('success');
   };
 
+  // Флоу регистрации — со своей кнопкой "Назад", без таб-бара.
   if (currentScreen === 'registration') {
     return (
       <RegistrationScreen
@@ -35,7 +38,24 @@ function App() {
     );
   }
 
-  return <HomeScreen onRegister={() => setCurrentScreen('registration')} />;
+  // Основные экраны — с нижним таб-баром.
+  return (
+    <>
+      {currentScreen === 'profile' ? (
+        <ProfileScreen
+          participant={participant}
+          onViewRaces={() => setCurrentScreen('home')}
+        />
+      ) : (
+        <HomeScreen onRegister={() => setCurrentScreen('registration')} />
+      )}
+
+      <TabBar
+        active={currentScreen === 'profile' ? 'profile' : 'home'}
+        onNavigate={(tab) => setCurrentScreen(tab)}
+      />
+    </>
+  );
 }
 
 export default App;
