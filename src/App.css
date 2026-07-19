@@ -463,12 +463,14 @@
 }
 
 .tabbar {
+  /* Центрируем через left/right + margin, а НЕ через transform:
+     motion.nav анимирует y и пишет свой transform, затирая translateX. */
   position: fixed;
   bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  margin-inline: auto;
   z-index: 50;
-  width: 100%;
   max-width: 480px;
   display: grid;
   grid-template-columns: 1fr 1fr;
