@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Trophy, TrendingUp, TrendingDown, CalendarX2, ArrowRight } from 'lucide-react';
-import type { Participant } from './RegistrationScreen';
+import type { UserDto } from '../lib/api';
+// TODO: результаты пока из моков. Заменить на GET /results/:userId с бэкенда,
+// когда появится админ-функциональность для внесения финишных протоколов.
 import { results, personalBest, progress } from '../data/results';
 
 type Props = {
-  participant: Participant | null;
+  participant: UserDto | null;
   onViewRaces: () => void;
 };
 
@@ -20,7 +22,7 @@ function ProfileTab({
   participant,
   onViewRaces,
 }: {
-  participant: Participant | null;
+  participant: UserDto | null;
   onViewRaces: () => void;
 }) {
   if (!participant) {
@@ -66,8 +68,13 @@ function ProfileTab({
   );
 }
 
-// Спарклайн истории финишного времени. Меньше время = выше точка.
-function Sparkline() {
+// TODO: данные результатов — мок (src/data/results.ts). Подключить реальный
+// эндпоинт, когда бэкенд начнёт отдавать финишные протоколы участника.
+function ResultsTab() {
+  const history = [...results].reverse(); // новые сверху
+  const percentLabel = progress.percent.toFixed(1).replace('.', ',');
+  const TrendIcon = progress.improved ? TrendingUp : TrendingDown;
+
   const W = 100;
   const H = 30;
   const padX = 3;
@@ -76,14 +83,12 @@ function Sparkline() {
   const min = Math.min(...times);
   const max = Math.max(...times);
   const n = results.length;
-
   const points = results.map((race, i) => {
     const x = n === 1 ? W / 2 : padX + (i / (n - 1)) * (W - padX * 2);
     const norm = max === min ? 0.5 : (race.timeSeconds - min) / (max - min);
     const y = padY + norm * (H - padY * 2);
     return { x, y, best: race.timeSeconds === min };
   });
-
   const lineD = points
     .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
     .join(' ');
@@ -91,46 +96,6 @@ function Sparkline() {
     `M ${points[0].x.toFixed(1)} ${H} ` +
     points.map((p) => `L ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ') +
     ` L ${points[n - 1].x.toFixed(1)} ${H} Z`;
-
-  return (
-    <div className="pr__chart">
-      <div className="pr__chart-head">
-        <span>Финишное время · 5 км</span>
-        <span>{n} стартов</span>
-      </div>
-      <div
-        className="sparkline"
-        role="img"
-        aria-label="История финишного времени: улучшается от старта к старту"
-      >
-        <svg
-          className="sparkline__svg"
-          viewBox={`0 0 ${W} ${H}`}
-          preserveAspectRatio="none"
-        >
-          <path className="sparkline__area" d={areaD} />
-          <path className="sparkline__line" d={lineD} />
-        </svg>
-        {points.map((p, i) => (
-          <span
-            key={results[i].date}
-            className={`sparkline__dot${p.best ? ' sparkline__dot--best' : ''}`}
-            style={{ left: `${p.x}%`, top: `${(p.y / H) * 100}%` }}
-          />
-        ))}
-      </div>
-      <div className="pr__chart-head" style={{ margin: '10px 0 0' }}>
-        <span>{results[0].date}</span>
-        <span>{results[n - 1].date}</span>
-      </div>
-    </div>
-  );
-}
-
-function ResultsTab() {
-  const history = [...results].reverse(); // новые сверху
-  const percentLabel = progress.percent.toFixed(1).replace('.', ',');
-  const TrendIcon = progress.improved ? TrendingUp : TrendingDown;
 
   return (
     <div className="results">
@@ -161,7 +126,37 @@ function ResultsTab() {
           </span>
         </div>
 
-        <Sparkline />
+        <div className="pr__chart">
+          <div className="pr__chart-head">
+            <span>Финишное время · 5 км</span>
+            <span>{n} стартов</span>
+          </div>
+          <div
+            className="sparkline"
+            role="img"
+            aria-label="История финишного времени: улучшается от старта к старту"
+          >
+            <svg
+              className="sparkline__svg"
+              viewBox={`0 0 ${W} ${H}`}
+              preserveAspectRatio="none"
+            >
+              <path className="sparkline__area" d={areaD} />
+              <path className="sparkline__line" d={lineD} />
+            </svg>
+            {points.map((p, i) => (
+              <span
+                key={results[i].date}
+                className={`sparkline__dot${p.best ? ' sparkline__dot--best' : ''}`}
+                style={{ left: `${p.x}%`, top: `${(p.y / H) * 100}%` }}
+              />
+            ))}
+          </div>
+          <div className="pr__chart-head" style={{ margin: '10px 0 0' }}>
+            <span>{results[0].date}</span>
+            <span>{results[n - 1].date}</span>
+          </div>
+        </div>
       </div>
 
       <div className="results-list">

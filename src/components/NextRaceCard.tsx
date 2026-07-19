@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Calendar, Clock, Route, Users, ArrowRight } from 'lucide-react';
-import { RACE, RACE_DATE } from '../data/race';
+import type { EventDto } from '../lib/api';
 
 type Props = {
+  event: EventDto;
   onRegister: () => void;
 };
 
@@ -42,11 +43,25 @@ function useCountdown(target: Date): TimeLeft {
 
 const pad = (n: number) => n.toString().padStart(2, '0');
 
-function NextRaceCard({ onRegister }: Props) {
-  const { days, hours, minutes, seconds, done } = useCountdown(RACE_DATE);
+// Форматирование в часовом поясе Астаны (UTC+5) независимо от локали устройства.
+const TZ = 'Asia/Almaty';
+const dateFmt = new Intl.DateTimeFormat('ru-RU', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  timeZone: TZ,
+});
+const timeFmt = new Intl.DateTimeFormat('ru-RU', {
+  hour: 'numeric',
+  minute: '2-digit',
+  timeZone: TZ,
+});
+
+function NextRaceCard({ event, onRegister }: Props) {
+  const target = useMemo(() => new Date(event.date), [event.date]);
+  const { days, hours, minutes, seconds, done } = useCountdown(target);
   const reduceMotion = useReducedMotion();
 
-  // Табличные моноширинные цифры, без покадровой анимации — приборный стиль.
   const blocks = [
     { key: 'd', value: String(days), label: 'дней' },
     { key: 'h', value: pad(hours), label: 'часов' },
@@ -55,10 +70,14 @@ function NextRaceCard({ onRegister }: Props) {
   ];
 
   const meta = [
-    { icon: Calendar, label: 'Дата', value: RACE.dateLabel },
-    { icon: Clock, label: 'Старт', value: RACE.timeLabel },
-    { icon: Route, label: 'Дистанция', value: RACE.distance },
-    { icon: Users, label: 'Лимит', value: `${RACE.slots} слотов` },
+    { icon: Calendar, label: 'Дата', value: dateFmt.format(target) },
+    { icon: Clock, label: 'Старт', value: timeFmt.format(target) },
+    { icon: Route, label: 'Дистанция', value: event.distance },
+    {
+      icon: Users,
+      label: 'Свободно',
+      value: `${event.slotsLeft} / ${event.slotsTotal}`,
+    },
   ];
 
   return (
@@ -73,7 +92,7 @@ function NextRaceCard({ onRegister }: Props) {
         Ближайший старт
       </span>
 
-      <h2 className="race__title">{RACE.title}</h2>
+      <h2 className="race__title">{event.title}</h2>
 
       <div className="race__meta">
         {meta.map(({ icon: Icon, label, value }) => (
@@ -105,11 +124,12 @@ function NextRaceCard({ onRegister }: Props) {
         type="button"
         className="btn-register"
         onClick={onRegister}
+        disabled={event.slotsLeft <= 0}
         whileTap={reduceMotion ? undefined : { scale: 0.985 }}
         transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
       >
-        Зарегистрироваться
-        <ArrowRight size={18} strokeWidth={2.4} />
+        {event.slotsLeft > 0 ? 'Зарегистрироваться' : 'Мест нет'}
+        {event.slotsLeft > 0 && <ArrowRight size={18} strokeWidth={2.4} />}
       </motion.button>
     </motion.section>
   );

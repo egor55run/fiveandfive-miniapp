@@ -80,6 +80,7 @@ export async function registrationsRoutes(app: FastifyInstance) {
     });
 
     return reply.code(201).send({
+      user,
       registration,
       // Payment stub — no real gateway wired up yet.
       payment: {

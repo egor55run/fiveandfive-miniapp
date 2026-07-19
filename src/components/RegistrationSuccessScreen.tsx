@@ -1,16 +1,25 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { CheckCircle2, Share2, Home } from 'lucide-react';
-import { RACE } from '../data/race';
-import type { Participant } from './RegistrationScreen';
+import type { EventDto, UserDto } from '../lib/api';
 
 type Props = {
-  participant: Participant;
+  user: UserDto;
+  event: EventDto;
   onBackHome: () => void;
 };
 
-function RegistrationSuccessScreen({ participant, onBackHome }: Props) {
+const dateFmt = new Intl.DateTimeFormat('ru-RU', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  timeZone: 'Asia/Almaty',
+});
+
+function RegistrationSuccessScreen({ user, event, onBackHome }: Props) {
   const reduceMotion = useReducedMotion();
-  const fullName = `${participant.firstName} ${participant.lastName}`.trim();
+  const fullName = `${user.firstName} ${user.lastName}`.trim();
 
   return (
     <motion.main
@@ -29,9 +38,7 @@ function RegistrationSuccessScreen({ participant, onBackHome }: Props) {
           <CheckCircle2 size={64} strokeWidth={2} />
         </motion.span>
         <h2 className="success__title">Вы зарегистрированы</h2>
-        <p className="success__subtitle">
-          Детали отправили на {participant.email}
-        </p>
+        <p className="success__subtitle">Детали отправили на {user.email}</p>
       </div>
 
       <div className="card ticket">
@@ -43,17 +50,15 @@ function RegistrationSuccessScreen({ participant, onBackHome }: Props) {
         <div className="ticket__rows">
           <div className="ticket__row">
             <span>Старт</span>
-            <strong>{RACE.title}</strong>
+            <strong>{event.title}</strong>
           </div>
           <div className="ticket__row">
             <span>Дистанция</span>
-            <strong>{RACE.distance}</strong>
+            <strong>{event.distance}</strong>
           </div>
           <div className="ticket__row">
             <span>Дата</span>
-            <strong>
-              {RACE.dateLabel}, {RACE.timeLabel}
-            </strong>
+            <strong>{dateFmt.format(new Date(event.date))}</strong>
           </div>
         </div>
       </div>

@@ -1,9 +1,20 @@
 import { useState, type FormEvent } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { ChevronLeft, ArrowRight } from 'lucide-react';
-import { RACE } from '../data/race';
+import { ChevronLeft, ArrowRight, AlertCircle } from 'lucide-react';
+import {
+  ApiError,
+  createRegistration,
+  type EventDto,
+  type RegistrationResult,
+} from '../lib/api';
 
-export type Participant = {
+type Props = {
+  event: EventDto;
+  onBack: () => void;
+  onRegistered: (result: RegistrationResult) => void;
+};
+
+type FormValues = {
   firstName: string;
   lastName: string;
   email: string;
@@ -11,12 +22,7 @@ export type Participant = {
   phone: string;
 };
 
-type Props = {
-  onSubmit: (participant: Participant) => void;
-  onBack: () => void;
-};
-
-const EMPTY: Participant = {
+const EMPTY: FormValues = {
   firstName: '',
   lastName: '',
   email: '',
@@ -34,52 +40,88 @@ const FIELDS = [
   { name: 'phone', label: 'Номер телефона', type: 'tel', placeholder: '+7 700 000 00 00' },
 ] as const;
 
-type FieldErrors = Partial<Record<keyof Participant, string>>;
+type FieldErrors = Partial<Record<keyof FormValues, string>>;
 
-function validate(values: Participant): FieldErrors {
+function validate(values: FormValues): FieldErrors {
   const errors: FieldErrors = {};
-
   if (!values.firstName.trim()) errors.firstName = 'Укажите имя';
   if (!values.lastName.trim()) errors.lastName = 'Укажите фамилию';
-
   if (!values.email.trim()) errors.email = 'Укажите email';
   else if (!EMAIL_RE.test(values.email.trim())) errors.email = 'Некорректный email';
-
   const age = Number(values.age);
   if (!values.age.trim()) errors.age = 'Укажите возраст';
   else if (!Number.isFinite(age) || age <= 0 || age > 120)
     errors.age = 'Возраст должен быть числом';
-
   if (!values.phone.trim()) errors.phone = 'Укажите номер телефона';
-
   return errors;
 }
 
-function RegistrationScreen({ onSubmit, onBack }: Props) {
-  const [values, setValues] = useState<Participant>(EMPTY);
+// Понятные сообщения об ошибках сервера.
+function mapServerError(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.status === 0) return err.message; // сетевая ошибка
+    if (err.status === 409 && /slot/i.test(err.message))
+      return 'Мест на этот старт больше нет';
+    if (err.status === 409 && /already/i.test(err.message))
+      return 'Вы уже зарегистрированы на этот старт';
+    if (err.status === 400) return 'Проверьте правильность заполнения полей';
+    if (err.status === 404) return 'Старт не найден';
+  }
+  return 'Не удалось зарегистрироваться. Попробуйте ещё раз';
+}
+
+const dateFmt = new Intl.DateTimeFormat('ru-RU', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  timeZone: 'Asia/Almaty',
+});
+
+function RegistrationScreen({ event, onBack, onRegistered }: Props) {
+  const [values, setValues] = useState<FormValues>(EMPTY);
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
   const reduceMotion = useReducedMotion();
 
-  const handleChange = (name: keyof Participant, value: string) => {
+  const handleChange = (name: keyof FormValues, value: string) => {
     setValues((prev) => ({ ...prev, [name]: value }));
-    // Сбрасываем ошибку поля, как только пользователь его правит
     setErrors((prev) => (prev[name] ? { ...prev, [name]: undefined } : prev));
+    if (serverError) setServerError(null);
   };
 
-  const handleSubmit = (event: FormEvent) => {
-    event.preventDefault();
+  const handleSubmit = async (event_: FormEvent) => {
+    event_.preventDefault();
     const nextErrors = validate(values);
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       return;
     }
-    onSubmit(values);
+
+    setSubmitting(true);
+    setServerError(null);
+    try {
+      const result = await createRegistration({
+        eventId: event.id,
+        firstName: values.firstName.trim(),
+        lastName: values.lastName.trim(),
+        email: values.email.trim(),
+        age: Number(values.age),
+        phone: values.phone.trim(),
+      });
+      onRegistered(result);
+    } catch (err) {
+      setServerError(mapServerError(err));
+      setSubmitting(false);
+    }
   };
 
   return (
     <motion.main
       className="screen"
-      initial={{ opacity: 0, x: 24 }}
+      initial={reduceMotion ? false : { opacity: 0, x: 24 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
     >
@@ -93,9 +135,9 @@ function RegistrationScreen({ onSubmit, onBack }: Props) {
           <span className="race__pulse" aria-hidden="true" />
           Регистрация на старт
         </span>
-        <h2 className="race__title reg__context-title">{RACE.title}</h2>
+        <h2 className="race__title reg__context-title">{event.title}</h2>
         <p className="reg__context-distance">
-          Дистанция {RACE.distance} · {RACE.dateLabel}, {RACE.timeLabel}
+          Дистанция {event.distance} · {dateFmt.format(new Date(event.date))}
         </p>
       </div>
 
@@ -110,6 +152,7 @@ function RegistrationScreen({ onSubmit, onBack }: Props) {
               name={field.name}
               type={field.type}
               placeholder={field.placeholder}
+              disabled={submitting}
               className={`field__input${errors[field.name] ? ' field__input--error' : ''}`}
               value={values[field.name]}
               onChange={(e) => handleChange(field.name, e.target.value)}
@@ -128,14 +171,22 @@ function RegistrationScreen({ onSubmit, onBack }: Props) {
           </div>
         ))}
 
+        {serverError && (
+          <div className="form-error" role="alert">
+            <AlertCircle size={16} strokeWidth={2.2} />
+            <span>{serverError}</span>
+          </div>
+        )}
+
         <motion.button
           type="submit"
           className="btn-register"
-          whileTap={reduceMotion ? undefined : { scale: 0.985 }}
+          disabled={submitting}
+          whileTap={reduceMotion || submitting ? undefined : { scale: 0.985 }}
           transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
         >
-          Зарегистрироваться
-          <ArrowRight size={18} strokeWidth={2.4} />
+          {submitting ? 'Отправляем…' : 'Зарегистрироваться'}
+          {!submitting && <ArrowRight size={18} strokeWidth={2.4} />}
         </motion.button>
       </form>
     </motion.main>
