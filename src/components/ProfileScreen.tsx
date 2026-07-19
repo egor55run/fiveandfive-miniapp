@@ -26,13 +26,13 @@ function ProfileTab({
   if (!participant) {
     return (
       <div className="card empty">
-        <CalendarX2 className="empty__icon" size={48} strokeWidth={1.6} />
+        <CalendarX2 className="empty__icon" size={44} strokeWidth={1.6} />
         <p className="empty__text">
           Вы ещё не зарегистрированы ни на один старт
         </p>
         <button type="button" className="btn-register" onClick={onViewRaces}>
           Посмотреть старты
-          <ArrowRight size={20} strokeWidth={2.6} />
+          <ArrowRight size={18} strokeWidth={2.4} />
         </button>
       </div>
     );
@@ -66,6 +66,67 @@ function ProfileTab({
   );
 }
 
+// Спарклайн истории финишного времени. Меньше время = выше точка.
+function Sparkline() {
+  const W = 100;
+  const H = 30;
+  const padX = 3;
+  const padY = 4;
+  const times = results.map((r) => r.timeSeconds);
+  const min = Math.min(...times);
+  const max = Math.max(...times);
+  const n = results.length;
+
+  const points = results.map((race, i) => {
+    const x = n === 1 ? W / 2 : padX + (i / (n - 1)) * (W - padX * 2);
+    const norm = max === min ? 0.5 : (race.timeSeconds - min) / (max - min);
+    const y = padY + norm * (H - padY * 2);
+    return { x, y, best: race.timeSeconds === min };
+  });
+
+  const lineD = points
+    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
+    .join(' ');
+  const areaD =
+    `M ${points[0].x.toFixed(1)} ${H} ` +
+    points.map((p) => `L ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ') +
+    ` L ${points[n - 1].x.toFixed(1)} ${H} Z`;
+
+  return (
+    <div className="pr__chart">
+      <div className="pr__chart-head">
+        <span>Финишное время · 5 км</span>
+        <span>{n} стартов</span>
+      </div>
+      <div
+        className="sparkline"
+        role="img"
+        aria-label="История финишного времени: улучшается от старта к старту"
+      >
+        <svg
+          className="sparkline__svg"
+          viewBox={`0 0 ${W} ${H}`}
+          preserveAspectRatio="none"
+        >
+          <path className="sparkline__area" d={areaD} />
+          <path className="sparkline__line" d={lineD} />
+        </svg>
+        {points.map((p, i) => (
+          <span
+            key={results[i].date}
+            className={`sparkline__dot${p.best ? ' sparkline__dot--best' : ''}`}
+            style={{ left: `${p.x}%`, top: `${(p.y / H) * 100}%` }}
+          />
+        ))}
+      </div>
+      <div className="pr__chart-head" style={{ margin: '10px 0 0' }}>
+        <span>{results[0].date}</span>
+        <span>{results[n - 1].date}</span>
+      </div>
+    </div>
+  );
+}
+
 function ResultsTab() {
   const history = [...results].reverse(); // новые сверху
   const percentLabel = progress.percent.toFixed(1).replace('.', ',');
@@ -76,7 +137,7 @@ function ResultsTab() {
       <div className="card pr">
         <div className="pr__record">
           <span className="pr__record-icon" aria-hidden="true">
-            <Trophy size={22} strokeWidth={2.2} />
+            <Trophy size={20} strokeWidth={2.2} />
           </span>
           <span className="pr__record-text">
             <span className="pr__label">Личный рекорд</span>
@@ -89,7 +150,7 @@ function ResultsTab() {
 
         <div className={`pr__progress ${progress.improved ? 'is-up' : 'is-down'}`}>
           <span className="pr__progress-icon" aria-hidden="true">
-            <TrendIcon size={22} strokeWidth={2.4} />
+            <TrendIcon size={20} strokeWidth={2.4} />
           </span>
           <span className="pr__progress-text">
             <span className="pr__progress-value">
@@ -99,6 +160,8 @@ function ResultsTab() {
             ({percentLabel}%) к предыдущему старту
           </span>
         </div>
+
+        <Sparkline />
       </div>
 
       <div className="results-list">
@@ -136,7 +199,7 @@ function ProfileScreen({ participant, onViewRaces }: Props) {
   return (
     <motion.main
       className="screen screen--tabbar"
-      initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+      initial={reduceMotion ? false : { opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
     >
@@ -161,7 +224,7 @@ function ProfileScreen({ participant, onViewRaces }: Props) {
                   transition={
                     reduceMotion
                       ? { duration: 0 }
-                      : { type: 'spring', stiffness: 420, damping: 34 }
+                      : { duration: 0.3, ease: [0.16, 1, 0.3, 1] }
                   }
                 />
               )}
@@ -174,10 +237,10 @@ function ProfileScreen({ participant, onViewRaces }: Props) {
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={tab}
-          initial={reduceMotion ? false : { opacity: 0, x: 12 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -12 }}
-          transition={{ duration: reduceMotion ? 0 : 0.25, ease: [0.16, 1, 0.3, 1] }}
+          initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -8 }}
+          transition={{ duration: reduceMotion ? 0 : 0.22, ease: [0.16, 1, 0.3, 1] }}
         >
           {tab === 'profile' ? (
             <ProfileTab participant={participant} onViewRaces={onViewRaces} />

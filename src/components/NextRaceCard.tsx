@@ -46,6 +46,7 @@ function NextRaceCard({ onRegister }: Props) {
   const { days, hours, minutes, seconds, done } = useCountdown(RACE_DATE);
   const reduceMotion = useReducedMotion();
 
+  // Табличные моноширинные цифры, без покадровой анимации — приборный стиль.
   const blocks = [
     { key: 'd', value: String(days), label: 'дней' },
     { key: 'h', value: pad(hours), label: 'часов' },
@@ -63,9 +64,9 @@ function NextRaceCard({ onRegister }: Props) {
   return (
     <motion.section
       className="card race"
-      initial={{ opacity: 0, y: 24 }}
+      initial={reduceMotion ? false : { opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1], delay: 0.05 }}
     >
       <span className="race__eyebrow">
         <span className="race__pulse" aria-hidden="true" />
@@ -77,7 +78,7 @@ function NextRaceCard({ onRegister }: Props) {
       <div className="race__meta">
         {meta.map(({ icon: Icon, label, value }) => (
           <div className="race__meta-item" key={label}>
-            <Icon className="race__meta-icon" size={20} strokeWidth={2.2} />
+            <Icon className="race__meta-icon" size={18} strokeWidth={2} />
             <div className="race__meta-text">
               <span className="race__meta-label">{label}</span>
               <span className="race__meta-value">{value}</span>
@@ -88,21 +89,12 @@ function NextRaceCard({ onRegister }: Props) {
 
       <div className="countdown">
         <span className="countdown__caption">
-          {done ? 'Старт уже идёт!' : 'До старта осталось'}
+          {done ? 'Старт уже идёт' : 'До старта'}
         </span>
         <div className="countdown__grid">
           {blocks.map((block) => (
             <div className="countdown__block" key={block.key}>
-              <motion.span
-                className="countdown__value"
-                // Лёгкий "тик" при смене значения (кроме reduced-motion)
-                key={reduceMotion ? undefined : `${block.key}-${block.value}`}
-                initial={reduceMotion ? false : { y: -10, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-              >
-                {block.value}
-              </motion.span>
+              <span className="countdown__value">{block.value}</span>
               <span className="countdown__label">{block.label}</span>
             </div>
           ))}
@@ -113,12 +105,11 @@ function NextRaceCard({ onRegister }: Props) {
         type="button"
         className="btn-register"
         onClick={onRegister}
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+        whileTap={reduceMotion ? undefined : { scale: 0.985 }}
+        transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
       >
         Зарегистрироваться
-        <ArrowRight size={20} strokeWidth={2.6} />
+        <ArrowRight size={18} strokeWidth={2.4} />
       </motion.button>
     </motion.section>
   );

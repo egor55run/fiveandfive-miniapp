@@ -40,7 +40,7 @@ function TabBar({ active, onNavigate }: Props) {
                 transition={
                   reduceMotion
                     ? { duration: 0 }
-                    : { type: 'spring', stiffness: 420, damping: 34 }
+                    : { duration: 0.3, ease: [0.16, 1, 0.3, 1] }
                 }
               />
             )}

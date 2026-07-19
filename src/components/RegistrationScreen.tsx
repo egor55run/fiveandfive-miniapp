@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { ChevronLeft, ArrowRight } from 'lucide-react';
 import { RACE } from '../data/race';
 
@@ -58,6 +58,7 @@ function validate(values: Participant): FieldErrors {
 function RegistrationScreen({ onSubmit, onBack }: Props) {
   const [values, setValues] = useState<Participant>(EMPTY);
   const [errors, setErrors] = useState<FieldErrors>({});
+  const reduceMotion = useReducedMotion();
 
   const handleChange = (name: keyof Participant, value: string) => {
     setValues((prev) => ({ ...prev, [name]: value }));
@@ -130,12 +131,11 @@ function RegistrationScreen({ onSubmit, onBack }: Props) {
         <motion.button
           type="submit"
           className="btn-register"
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          whileTap={reduceMotion ? undefined : { scale: 0.985 }}
+          transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
         >
           Зарегистрироваться
-          <ArrowRight size={20} strokeWidth={2.6} />
+          <ArrowRight size={18} strokeWidth={2.4} />
         </motion.button>
       </form>
     </motion.main>

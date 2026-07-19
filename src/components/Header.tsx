@@ -1,17 +1,19 @@
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Footprints } from 'lucide-react';
 
 function Header() {
+  const reduceMotion = useReducedMotion();
+
   return (
     <motion.header
       className="header"
-      initial={{ opacity: 0, y: -16 }}
+      initial={reduceMotion ? false : { opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
     >
       <div className="header__brand">
         <span className="header__badge" aria-hidden="true">
-          <Footprints size={22} strokeWidth={2.5} />
+          <Footprints size={20} strokeWidth={2.2} />
         </span>
         <h1 className="header__title">
           FIVE<span className="header__amp">&amp;</span>FIVE

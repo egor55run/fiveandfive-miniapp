@@ -1,23 +1,25 @@
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap');
 
-/* Design system: UI/UX Pro Max — "Vibrant & Block-based", energetic orange on dark */
+/* Design system: SPLITS — Precision Sport-Tech.
+   Instrument-like dark UI, single volt accent, monospaced numerals. */
 :root {
-  --color-primary: #ea580c;
-  --color-primary-hover: #f97316;
-  --color-on-primary: #ffffff;
-  --color-secondary: #f97316;
-  --color-accent: #059669; /* pace green — CTA success */
-  --color-background: #0f172a;
-  --color-surface: rgba(255, 255, 255, 0.04);
-  --color-foreground: #ffffff;
-  --color-muted: #94a3b8;
+  --color-bg: #101418;
+  --color-elevated: #171c22;
+  --color-surface: rgba(255, 255, 255, 0.03);
+  --color-text: #e8ecef;
+  --color-muted: #7c8794;
+  --color-accent: #c7f03d; /* volt — единственный акцент */
+  --color-accent-ink: #101418; /* текст на volt */
+  --color-accent-soft: rgba(199, 240, 61, 0.12);
   --color-border: rgba(255, 255, 255, 0.08);
-  --color-destructive: #dc2626;
+  --color-border-strong: rgba(255, 255, 255, 0.14);
+  --color-negative: #f2a1a1; /* мягкий красный для ошибок формы */
 
-  --font-heading: 'Barlow Condensed', system-ui, 'Segoe UI', sans-serif;
-  --font-body: 'Barlow', system-ui, 'Segoe UI', sans-serif;
+  --font-ui: 'Hanken Grotesk', system-ui, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'Cascadia Mono', monospace;
 
-  --radius: 20px;
+  --radius: 12px;
+  --radius-sm: 10px;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
 
   color-scheme: dark;
@@ -34,38 +36,29 @@ body {
 }
 
 body {
-  font-family: var(--font-body);
-  background: var(--color-background);
-  color: var(--color-foreground);
+  font-family: var(--font-ui);
+  background: var(--color-bg);
+  color: var(--color-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
 
-/* Ambient orange glow at the top — subtle, minimalist */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: radial-gradient(
-    circle at 50% -10%,
-    rgba(234, 88, 12, 0.22),
-    transparent 55%
-  );
-  pointer-events: none;
-  z-index: 0;
-}
-
 #root {
-  position: relative;
-  z-index: 1;
   max-width: 480px;
   margin: 0 auto;
   min-height: 100svh;
   padding: 24px 20px 40px;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 24px;
+}
+
+/* Числа везде — табличные моноширинные */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.3px;
 }
 
 @media (prefers-reduced-motion: reduce) {
