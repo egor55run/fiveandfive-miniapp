@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         Int      @id @default(autoincrement())
+  telegramId BigInt?  @unique @map("telegram_id")
+  firstName  String   @map("first_name")
+  lastName   String   @map("last_name")
+  email      String   @unique
+  age        Int
+  phone      String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  registrations Registration[]
+  results       Result[]
+
+  @@map("users")
+}
+
+model Event {
+  id         Int      @id @default(autoincrement())
+  title      String
+  date       DateTime
+  location   String
+  distance   String
+  slotsTotal Int      @map("slots_total")
+  slotsTaken Int      @default(0) @map("slots_taken")
+  price      Decimal  @default(0) @db.Decimal(10, 2)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  registrations Registration[]
+  results       Result[]
+
+  @@map("events")
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+model Registration {
+  id            Int           @id @default(autoincrement())
+  userId        Int           @map("user_id")
+  eventId       Int           @map("event_id")
+  paymentStatus PaymentStatus @default(PENDING) @map("payment_status")
+  qrCode        String?       @map("qr_code")
+  registeredAt  DateTime      @default(now()) @map("registered_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  // Один пользователь — одна регистрация на конкретный старт
+  @@unique([userId, eventId])
+  @@map("registrations")
+}
+
+model Result {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @map("user_id")
+  eventId    Int      @map("event_id")
+  finishTime Int      @map("finish_time") // финишное время в секундах
+  place      Int // место в общем зачёте
+  recordedAt DateTime @default(now()) @map("recorded_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@map("results")
+}
