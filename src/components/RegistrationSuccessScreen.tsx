@@ -4,11 +4,12 @@ import type { EventDto, UserDto } from '../lib/api';
 
 type Props = {
   user: UserDto;
-  event: EventDto;
+  events: EventDto[]; // один старт — одиночная регистрация; несколько — абонемент
+  seasonPass: boolean;
   onBackHome: () => void;
 };
 
-const dateFmt = new Intl.DateTimeFormat('ru-RU', {
+const dateTimeFmt = new Intl.DateTimeFormat('ru-RU', {
   day: 'numeric',
   month: 'long',
   year: 'numeric',
@@ -16,10 +17,16 @@ const dateFmt = new Intl.DateTimeFormat('ru-RU', {
   minute: '2-digit',
   timeZone: 'Asia/Almaty',
 });
+const dateShort = new Intl.DateTimeFormat('ru-RU', {
+  day: 'numeric',
+  month: 'long',
+  timeZone: 'Asia/Almaty',
+});
 
-function RegistrationSuccessScreen({ user, event, onBackHome }: Props) {
+function RegistrationSuccessScreen({ user, events, seasonPass, onBackHome }: Props) {
   const reduceMotion = useReducedMotion();
   const fullName = `${user.firstName} ${user.lastName}`.trim();
+  const single = events[0];
 
   return (
     <motion.main
@@ -37,30 +44,47 @@ function RegistrationSuccessScreen({ user, event, onBackHome }: Props) {
         >
           <CheckCircle2 size={64} strokeWidth={2} />
         </motion.span>
-        <h2 className="success__title">Вы зарегистрированы</h2>
-        <p className="success__subtitle">Детали отправили на {user.email}</p>
+        <h2 className="success__title">
+          {seasonPass ? 'Вы в сезоне 5&5' : 'Вы зарегистрированы'}
+        </h2>
+        <p className="success__subtitle">
+          {seasonPass
+            ? `Записали на все ${events.length} стартов сезона. Детали — на ${user.email}`
+            : `Детали отправили на ${user.email}`}
+        </p>
       </div>
 
       <div className="card ticket">
         <span className="race__eyebrow">
-          <span className="race__pulse" aria-hidden="true" />
-          Участник
+          {seasonPass ? 'Абонемент 5&5' : 'Участник'}
         </span>
         <h3 className="ticket__name">{fullName}</h3>
-        <div className="ticket__rows">
-          <div className="ticket__row">
-            <span>Старт</span>
-            <strong>{event.title}</strong>
+
+        {seasonPass ? (
+          <div className="ticket__rows">
+            {events.map((e) => (
+              <div className="ticket__row" key={e.id}>
+                <span>{dateShort.format(new Date(e.date))}</span>
+                <strong>{e.title}</strong>
+              </div>
+            ))}
           </div>
-          <div className="ticket__row">
-            <span>Дистанция</span>
-            <strong>{event.distance}</strong>
+        ) : (
+          <div className="ticket__rows">
+            <div className="ticket__row">
+              <span>Старт</span>
+              <strong>{single.title}</strong>
+            </div>
+            <div className="ticket__row">
+              <span>Дистанция</span>
+              <strong>{single.distance}</strong>
+            </div>
+            <div className="ticket__row">
+              <span>Дата</span>
+              <strong>{dateTimeFmt.format(new Date(single.date))}</strong>
+            </div>
           </div>
-          <div className="ticket__row">
-            <span>Дата</span>
-            <strong>{dateFmt.format(new Date(event.date))}</strong>
-          </div>
-        </div>
+        )}
       </div>
 
       <div className="success__actions">

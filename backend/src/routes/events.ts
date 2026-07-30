@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Event } from '@prisma/client';
 import { prisma } from '../prisma';
 
-function serializeEvent(e: Event) {
+export function serializeEvent(e: Event) {
   return {
     id: e.id,
     title: e.title,

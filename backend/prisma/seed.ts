@@ -9,39 +9,65 @@ async function main() {
     return;
   }
 
-  await prisma.event.createMany({
-    data: [
-      {
-        title: 'Триатлон Парк Астана',
-        date: new Date('2027-05-23T08:00:00+05:00'),
-        location: 'Парк Астана, Астана',
-        distance: '5 км',
-        slotsTotal: 2000,
-        slotsTaken: 0,
-        price: 5000,
+  // Сезон 5&5 2027 — пять парков мая–сентября. Абонемент 20 000₸
+  // против 5×5000 = 25 000₸ по отдельности → экономия 5 000₸.
+  const season = await prisma.season.create({
+    data: {
+      title: '5&5 2027',
+      year: 2027,
+      price: 20000,
+      isActive: true,
+      events: {
+        create: [
+          {
+            title: 'Триатлон Парк Астана',
+            date: new Date('2027-05-23T08:00:00+05:00'),
+            location: 'Парк Астана, Астана',
+            distance: '5 км',
+            slotsTotal: 2000,
+            price: 5000,
+          },
+          {
+            title: 'Президентский парк',
+            date: new Date('2027-06-13T08:00:00+05:00'),
+            location: 'Президентский парк, Астана',
+            distance: '5 км',
+            slotsTotal: 2000,
+            price: 5000,
+          },
+          {
+            title: 'Ботанический сад',
+            date: new Date('2027-07-18T08:00:00+05:00'),
+            location: 'Ботанический сад, Астана',
+            distance: '5 км',
+            slotsTotal: 2000,
+            price: 5000,
+          },
+          {
+            title: 'Центральный парк',
+            date: new Date('2027-08-19T08:00:00+05:00'),
+            location: 'Центральный парк, Астана',
+            distance: '5 км',
+            slotsTotal: 2000,
+            price: 5000,
+          },
+          {
+            title: 'Триатлон парк — финал сезона',
+            date: new Date('2027-09-05T08:00:00+05:00'),
+            location: 'Парк Астана, Астана',
+            distance: '5 км',
+            slotsTotal: 2000,
+            price: 5000,
+          },
+        ],
       },
-      {
-        title: 'Осенний забег «Медеу 5K»',
-        date: new Date('2025-08-17T09:00:00+05:00'),
-        location: 'Медеу, Алматы',
-        distance: '5 км',
-        slotsTotal: 1500,
-        slotsTaken: 1500,
-        price: 4000,
-      },
-      {
-        title: 'Ночной старт Астана',
-        date: new Date('2025-10-05T20:00:00+05:00'),
-        location: 'Набережная, Астана',
-        distance: '5 км',
-        slotsTotal: 1000,
-        slotsTaken: 1000,
-        price: 4500,
-      },
-    ],
+    },
+    include: { events: true },
   });
 
-  console.log('Seeded 3 events.');
+  console.log(
+    `Seeded season "${season.title}" (id=${season.id}) with ${season.events.length} events.`,
+  );
 }
 
 main()

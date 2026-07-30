@@ -1,26 +1,39 @@
 import { motion, useReducedMotion } from 'framer-motion';
-import { Footprints } from 'lucide-react';
+import { ChevronLeft, MoreHorizontal } from 'lucide-react';
 
-function Header() {
+type Props = {
+  // Показывать кнопку «Назад». В Telegram-мини-аппе верхнюю панель позже
+  // заменят нативные контролы; на web это визуальный аналог макета.
+  onBack?: () => void;
+};
+
+function Header({ onBack }: Props) {
   const reduceMotion = useReducedMotion();
 
   return (
     <motion.header
-      className="header"
-      initial={reduceMotion ? false : { opacity: 0, y: -10 }}
+      className="topbar"
+      initial={reduceMotion ? false : { opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
     >
-      <div className="header__brand">
-        <span className="header__badge" aria-hidden="true">
-          <Footprints size={20} strokeWidth={2.2} />
-        </span>
-        <h1 className="header__title">
-          FIVE<span className="header__amp">&amp;</span>FIVE
-        </h1>
-      </div>
+      {onBack ? (
+        <button type="button" className="topbar__back" onClick={onBack}>
+          <ChevronLeft size={22} strokeWidth={2.4} />
+          Back
+        </button>
+      ) : (
+        <span />
+      )}
 
-      <p className="header__subtitle">Твои старты в одном приложении</p>
+      <span className="topbar__title">
+        <b>5&5</b>
+        <span>application</span>
+      </span>
+
+      <button type="button" className="topbar__menu" aria-label="Меню">
+        <MoreHorizontal size={18} strokeWidth={2.2} />
+      </button>
     </motion.header>
   );
 }

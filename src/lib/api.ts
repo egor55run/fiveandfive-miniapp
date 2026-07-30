@@ -94,3 +94,77 @@ export async function createRegistration(
   }
   return data as RegistrationResult;
 }
+
+// ---------- Сезон и абонемент 5&5 ----------
+
+export type SeasonDto = {
+  id: number;
+  title: string;
+  year: number;
+  price: number;
+  savings: number;
+  events: EventDto[];
+};
+
+export type SeasonPassDto = {
+  id: number;
+  userId: number;
+  seasonId: number;
+  price: number;
+  paymentStatus: string;
+  createdAt: string;
+};
+
+export type SeasonPassPayload = {
+  seasonId: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  age: number;
+  phone: string;
+};
+
+export type SeasonPassResult = {
+  user: UserDto;
+  seasonPass: SeasonPassDto;
+  registrations: RegistrationDto[];
+  payment: { status: string; message: string };
+};
+
+// Активный сезон. Возвращает null, если сезона нет (404) — тогда UI
+// откатывается к одиночной регистрации без опции абонемента.
+export async function getCurrentSeason(): Promise<SeasonDto | null> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/seasons/current`);
+  } catch {
+    throw new ApiError(0, 'Не удалось связаться с сервером');
+  }
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new ApiError(res.status, `Не удалось загрузить сезон (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function createSeasonPass(
+  payload: SeasonPassPayload,
+): Promise<SeasonPassResult> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/season-passes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    throw new ApiError(0, 'Не удалось связаться с сервером');
+  }
+
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    const message = (data && (data.error as string)) || `Ошибка (${res.status})`;
+    throw new ApiError(res.status, message);
+  }
+  return data as SeasonPassResult;
+}

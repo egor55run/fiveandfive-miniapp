@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import { prisma } from './prisma';
 import { eventsRoutes } from './routes/events';
 import { registrationsRoutes } from './routes/registrations';
+import { seasonsRoutes } from './routes/seasons';
 
 // BigInt (telegram_id) is not JSON-serializable by default — render as string.
 (BigInt.prototype as unknown as { toJSON: () => string }).toJSON = function () {
@@ -26,6 +27,7 @@ async function main() {
 
   await app.register(eventsRoutes);
   await app.register(registrationsRoutes);
+  await app.register(seasonsRoutes);
 
   app.addHook('onClose', async () => {
     await prisma.$disconnect();

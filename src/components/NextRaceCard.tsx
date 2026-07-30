@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Calendar, Clock, Route, Users, ArrowRight } from 'lucide-react';
+import { Map } from 'lucide-react';
 import type { EventDto } from '../lib/api';
 
 type Props = {
@@ -8,129 +8,113 @@ type Props = {
   onRegister: () => void;
 };
 
-type TimeLeft = {
-  days: number;
-  hours: number;
-  minutes: number;
-  seconds: number;
-  done: boolean;
-};
+type Countdown = { days: number; started: boolean };
 
-function getTimeLeft(target: Date): TimeLeft {
+function getCountdown(target: Date): Countdown {
   const diff = target.getTime() - Date.now();
-  if (diff <= 0) {
-    return { days: 0, hours: 0, minutes: 0, seconds: 0, done: true };
-  }
-  return {
-    days: Math.floor(diff / 86_400_000),
-    hours: Math.floor((diff % 86_400_000) / 3_600_000),
-    minutes: Math.floor((diff % 3_600_000) / 60_000),
-    seconds: Math.floor((diff % 60_000) / 1000),
-    done: false,
-  };
+  return { days: diff <= 0 ? 0 : Math.floor(diff / 86_400_000), started: diff <= 0 };
 }
 
-function useCountdown(target: Date): TimeLeft {
-  const [timeLeft, setTimeLeft] = useState<TimeLeft>(() => getTimeLeft(target));
+// «День до старта» с русским склонением.
+function pluralDays(n: number): string {
+  const mod100 = n % 100;
+  const mod10 = n % 10;
+  if (mod100 >= 11 && mod100 <= 14) return 'дней';
+  if (mod10 === 1) return 'день';
+  if (mod10 >= 2 && mod10 <= 4) return 'дня';
+  return 'дней';
+}
 
+function useCountdown(target: Date): Countdown {
+  const [state, setState] = useState<Countdown>(() => getCountdown(target));
   useEffect(() => {
-    const id = setInterval(() => setTimeLeft(getTimeLeft(target)), 1000);
+    const id = setInterval(() => setState(getCountdown(target)), 60_000);
     return () => clearInterval(id);
   }, [target]);
-
-  return timeLeft;
+  return state;
 }
-
-const pad = (n: number) => n.toString().padStart(2, '0');
 
 // Форматирование в часовом поясе Астаны (UTC+5) независимо от локали устройства.
 const TZ = 'Asia/Almaty';
-const dateFmt = new Intl.DateTimeFormat('ru-RU', {
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
-  timeZone: TZ,
-});
-const timeFmt = new Intl.DateTimeFormat('ru-RU', {
-  hour: 'numeric',
-  minute: '2-digit',
-  timeZone: TZ,
-});
+const dateShort = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', timeZone: TZ });
+const timeFmt = new Intl.DateTimeFormat('ru-RU', { hour: 'numeric', minute: '2-digit', timeZone: TZ });
+const priceFmt = new Intl.NumberFormat('ru-RU');
 
 function NextRaceCard({ event, onRegister }: Props) {
   const target = useMemo(() => new Date(event.date), [event.date]);
-  const { days, hours, minutes, seconds, done } = useCountdown(target);
+  const { days, started } = useCountdown(target);
   const reduceMotion = useReducedMotion();
+  const [showRoute, setShowRoute] = useState(false);
 
-  const blocks = [
-    { key: 'd', value: String(days), label: 'дней' },
-    { key: 'h', value: pad(hours), label: 'часов' },
-    { key: 'm', value: pad(minutes), label: 'минут' },
-    { key: 's', value: pad(seconds), label: 'секунд' },
-  ];
-
-  const meta = [
-    { icon: Calendar, label: 'Дата', value: dateFmt.format(target) },
-    { icon: Clock, label: 'Старт', value: timeFmt.format(target) },
-    { icon: Route, label: 'Дистанция', value: event.distance },
-    {
-      icon: Users,
-      label: 'Свободно',
-      value: `${event.slotsLeft} / ${event.slotsTotal}`,
-    },
-  ];
+  const soldOut = event.slotsLeft <= 0;
 
   return (
     <motion.section
-      className="card race"
+      className="hero-card hero"
       initial={reduceMotion ? false : { opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1], delay: 0.05 }}
     >
-      <span className="race__eyebrow">
-        <span className="race__pulse" aria-hidden="true" />
-        Ближайший старт
-      </span>
+      <span className="hero__eyebrow">Ближайший старт</span>
+      <h2 className="hero__title u-display">{event.title}</h2>
 
-      <h2 className="race__title">{event.title}</h2>
-
-      <div className="race__meta">
-        {meta.map(({ icon: Icon, label, value }) => (
-          <div className="race__meta-item" key={label}>
-            <Icon className="race__meta-icon" size={18} strokeWidth={2} />
-            <div className="race__meta-text">
-              <span className="race__meta-label">{label}</span>
-              <span className="race__meta-value">{value}</span>
-            </div>
-          </div>
-        ))}
+      <div className="hero__meta">
+        <span>{dateShort.format(target)}</span>
+        <span className="dot">•</span>
+        <span>{event.distance}</span>
+        <span className="dot">•</span>
+        <span>{timeFmt.format(target)}</span>
+        <span className="dot">•</span>
+        <span>{priceFmt.format(event.price)}₸</span>
       </div>
 
-      <div className="countdown">
-        <span className="countdown__caption">
-          {done ? 'Старт уже идёт' : 'До старта'}
-        </span>
-        <div className="countdown__grid">
-          {blocks.map((block) => (
-            <div className="countdown__block" key={block.key}>
-              <span className="countdown__value">{block.value}</span>
-              <span className="countdown__label">{block.label}</span>
-            </div>
-          ))}
+      {!started ? (
+        <div className="hero__countdown">
+          <span className="hero__count-num">{days}</span>
+          <span className="hero__count-cap">
+            {pluralDays(days)}
+            <br />
+            до старта
+          </span>
         </div>
-      </div>
+      ) : (
+        <div className="hero__countdown">
+          <span className="hero__count-cap">Старт уже идёт</span>
+        </div>
+      )}
 
-      <motion.button
-        type="button"
-        className="btn-register"
-        onClick={onRegister}
-        disabled={event.slotsLeft <= 0}
-        whileTap={reduceMotion ? undefined : { scale: 0.985 }}
-        transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-      >
-        {event.slotsLeft > 0 ? 'Зарегистрироваться' : 'Мест нет'}
-        {event.slotsLeft > 0 && <ArrowRight size={18} strokeWidth={2.4} />}
-      </motion.button>
+      {showRoute && (
+        <motion.div
+          className="hero__map"
+          initial={reduceMotion ? false : { opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 190 }}
+          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <Map size={26} strokeWidth={1.8} />
+          Карта трассы появится здесь
+        </motion.div>
+      )}
+
+      {!showRoute ? (
+        <motion.button
+          type="button"
+          className="btn-register"
+          onClick={() => setShowRoute(true)}
+          whileTap={reduceMotion ? undefined : { scale: 0.985 }}
+        >
+          Посмотреть трассу
+        </motion.button>
+      ) : (
+        <motion.button
+          type="button"
+          className="btn-register"
+          onClick={onRegister}
+          disabled={soldOut}
+          whileTap={reduceMotion ? undefined : { scale: 0.985 }}
+        >
+          {soldOut ? 'Мест нет' : 'Зарегистрироваться'}
+        </motion.button>
+      )}
     </motion.section>
   );
 }

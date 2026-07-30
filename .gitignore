@@ -25,3 +25,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Figma working data (JSON dumps, PNG exports) — not committed
+backend/_figma/

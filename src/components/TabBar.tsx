@@ -1,7 +1,7 @@
 import { motion, useReducedMotion } from 'framer-motion';
-import { Home, User } from 'lucide-react';
+import { BarChart3, Home, User } from 'lucide-react';
 
-export type TabId = 'home' | 'profile';
+export type TabId = 'analytics' | 'home' | 'profile';
 
 type Props = {
   active: TabId;
@@ -9,47 +9,36 @@ type Props = {
 };
 
 const TABS = [
-  { id: 'home', label: 'Главная', icon: Home },
-  { id: 'profile', label: 'Профиль', icon: User },
+  { id: 'analytics', label: 'analytics', icon: BarChart3 },
+  { id: 'home', label: 'home', icon: Home },
+  { id: 'profile', label: 'profile', icon: User },
 ] as const;
 
 function TabBar({ active, onNavigate }: Props) {
   const reduceMotion = useReducedMotion();
 
   return (
-    <motion.nav
-      className="tabbar"
-      initial={reduceMotion ? false : { y: 48, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-    >
+    <nav className="tabbar">
       {TABS.map(({ id, label, icon: Icon }) => {
         const isActive = active === id;
         return (
-          <button
+          <motion.button
             key={id}
             type="button"
+            layout={!reduceMotion}
             className={`tabbar__tab${isActive ? ' tabbar__tab--active' : ''}`}
             onClick={() => onNavigate(id)}
             aria-current={isActive ? 'page' : undefined}
+            aria-label={label}
+            transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+            whileTap={reduceMotion ? undefined : { scale: 0.96 }}
           >
-            {isActive && (
-              <motion.span
-                className="tabbar__indicator"
-                layoutId="tab-indicator"
-                transition={
-                  reduceMotion
-                    ? { duration: 0 }
-                    : { duration: 0.3, ease: [0.16, 1, 0.3, 1] }
-                }
-              />
-            )}
-            <Icon size={22} strokeWidth={2.2} />
-            <span className="tabbar__label">{label}</span>
-          </button>
+            <Icon size={24} strokeWidth={2.2} />
+            {isActive && <span className="tabbar__label">{label}</span>}
+          </motion.button>
         );
       })}
-    </motion.nav>
+    </nav>
   );
 }
 

@@ -1,19 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import './App.css';
+import AnalyticsScreen from './components/AnalyticsScreen';
 import HomeScreen from './components/HomeScreen';
 import ProfileScreen from './components/ProfileScreen';
-import RegistrationScreen from './components/RegistrationScreen';
+import RegistrationScreen, {
+  type RegistrationOutcome,
+} from './components/RegistrationScreen';
 import RegistrationSuccessScreen from './components/RegistrationSuccessScreen';
-import TabBar from './components/TabBar';
-import {
-  ApiError,
-  getEvents,
-  type EventDto,
-  type RegistrationResult,
-  type UserDto,
-} from './lib/api';
+import TabBar, { type TabId } from './components/TabBar';
+import { ApiError, getEvents, type EventDto, type UserDto } from './lib/api';
 
-type Screen = 'home' | 'profile' | 'registration' | 'success';
+type Screen = 'analytics' | 'home' | 'profile' | 'registration' | 'success';
 
 // Ближайший старт: самый ранний из будущих; иначе самый недавний из прошедших.
 function pickNearest(events: EventDto[]): EventDto | null {
@@ -33,7 +30,10 @@ function App() {
   const [error, setError] = useState<string | null>(null);
 
   const [participant, setParticipant] = useState<UserDto | null>(null);
-  const [registeredEvent, setRegisteredEvent] = useState<EventDto | null>(null);
+  // Итог регистрации: участник + старт(ы) + был ли это абонемент.
+  const [outcome, setOutcome] = useState<RegistrationOutcome | null>(null);
+  // Старт, выбранный для регистрации (hero, карточка ленты или промо серии).
+  const [regEvent, setRegEvent] = useState<EventDto | null>(null);
 
   const loadEvents = useCallback(async () => {
     setLoading(true);
@@ -51,59 +51,73 @@ function App() {
     loadEvents();
   }, [loadEvents]);
 
-  const selectedEvent = useMemo(() => pickNearest(events), [events]);
+  const nearest = useMemo(() => pickNearest(events), [events]);
 
-  const handleRegistered = (result: RegistrationResult) => {
+  const openRegistration = (event: EventDto) => {
+    setRegEvent(event);
+    setCurrentScreen('registration');
+  };
+
+  const handleRegistered = (result: RegistrationOutcome) => {
     setParticipant(result.user);
-    setRegisteredEvent(selectedEvent);
+    setOutcome(result);
     setCurrentScreen('success');
     // Обновить слоты на главной после успешной регистрации.
     loadEvents();
   };
 
   // Флоу регистрации — свои экраны без таб-бара.
-  if (currentScreen === 'registration' && selectedEvent) {
+  if (currentScreen === 'registration' && regEvent) {
     return (
       <RegistrationScreen
-        event={selectedEvent}
+        event={regEvent}
         onBack={() => setCurrentScreen('home')}
         onRegistered={handleRegistered}
       />
     );
   }
 
-  if (currentScreen === 'success' && participant && registeredEvent) {
+  if (currentScreen === 'success' && outcome) {
     return (
       <RegistrationSuccessScreen
-        user={participant}
-        event={registeredEvent}
+        user={outcome.user}
+        events={outcome.events}
+        seasonPass={outcome.seasonPass}
         onBackHome={() => setCurrentScreen('home')}
       />
     );
   }
 
+  const activeTab: TabId =
+    currentScreen === 'analytics'
+      ? 'analytics'
+      : currentScreen === 'profile'
+        ? 'profile'
+        : 'home';
+
   // Основные экраны — с нижним таб-баром.
   return (
     <>
-      {currentScreen === 'profile' ? (
+      {currentScreen === 'analytics' ? (
+        <AnalyticsScreen />
+      ) : currentScreen === 'profile' ? (
         <ProfileScreen
           participant={participant}
           onViewRaces={() => setCurrentScreen('home')}
         />
       ) : (
         <HomeScreen
-          event={selectedEvent}
+          events={events}
+          nearest={nearest}
           loading={loading}
           error={error}
-          onRegister={() => setCurrentScreen('registration')}
+          onRegister={openRegistration}
+          onJoinSeries={() => nearest && openRegistration(nearest)}
           onRetry={loadEvents}
         />
       )}
 
-      <TabBar
-        active={currentScreen === 'profile' ? 'profile' : 'home'}
-        onNavigate={(tab) => setCurrentScreen(tab)}
-      />
+      <TabBar active={activeTab} onNavigate={(tab) => setCurrentScreen(tab)} />
     </>
   );
 }
