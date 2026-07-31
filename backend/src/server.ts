@@ -34,7 +34,10 @@ async function main() {
   });
 
   const port = Number(process.env.PORT ?? 3000);
-  await app.listen({ port, host: '0.0.0.0' });
+  // Локально слушаем все интерфейсы (удобно открывать с телефона в той же сети),
+  // в проде HOST=127.0.0.1 — наружу API отдаёт nginx по /api/.
+  const host = process.env.HOST ?? '0.0.0.0';
+  await app.listen({ port, host });
 }
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
