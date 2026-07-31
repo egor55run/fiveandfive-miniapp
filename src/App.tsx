@@ -99,10 +99,13 @@ function App() {
   return (
     <>
       {currentScreen === 'analytics' ? (
-        <AnalyticsScreen />
+        <AnalyticsScreen onBack={() => setCurrentScreen('home')} />
       ) : currentScreen === 'profile' ? (
         <ProfileScreen
           participant={participant}
+          birthDate={outcome?.birthDate ?? null}
+          registeredEvents={outcome?.events ?? []}
+          nearest={nearest}
           onViewRaces={() => setCurrentScreen('home')}
         />
       ) : (

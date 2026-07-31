@@ -395,35 +395,6 @@
 }
 
 /* ===================================================================
-   Экран-заглушка (Аналитика — до отдельного этапа)
-   =================================================================== */
-.stub {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  min-height: 55vh;
-  text-align: center;
-}
-
-.stub__icon {
-  color: var(--brand-primary);
-}
-
-.stub__title {
-  margin: 0;
-  font-size: 30px;
-  color: var(--text-primary);
-}
-
-.stub__text {
-  margin: 0;
-  font-size: 14px;
-  color: var(--text-muted);
-}
-
-/* ===================================================================
    Ниже — секции ещё не мигрированных экранов (Регистрация / Успех /
    Профиль / Результаты). Работают через мост-алиасы в index.css,
    версту их отдельными этапами.
@@ -627,64 +598,6 @@
   gap: 12px;
 }
 
-/* ---------- Screen title & segmented sub-tabs ---------- */
-.screen__title {
-  margin: 0;
-  font-family: var(--font-ui);
-  font-size: 30px;
-  font-weight: 800;
-  letter-spacing: -0.8px;
-  color: var(--color-text);
-}
-
-.segmented {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  padding: 4px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-}
-
-.segmented__btn {
-  position: relative;
-  padding: 10px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--color-muted);
-  background: none;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: color 200ms var(--ease);
-}
-
-.segmented__btn--active {
-  color: var(--color-accent-ink);
-}
-
-.segmented__btn:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-}
-
-.segmented__pill {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  background: var(--color-accent);
-  border-radius: 8px;
-}
-
-.segmented__label {
-  position: relative;
-  z-index: 1;
-}
-
 /* ---------- Empty state ---------- */
 .empty {
   display: flex;
@@ -708,226 +621,6 @@
 .empty .btn-register {
   width: auto;
   padding-inline: 24px;
-}
-
-/* ---------- Results: PR + progress + sparkline ---------- */
-.results {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.pr {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.pr__record {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-}
-
-.pr__record-icon {
-  flex: none;
-  width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  color: var(--color-accent);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
-}
-
-.pr__record-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.pr__label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--color-muted);
-}
-
-.pr__value {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 28px;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: -1px;
-  color: var(--color-text);
-}
-
-.pr__value small {
-  margin-left: 8px;
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--color-muted);
-}
-
-.pr__progress {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-top: 15px;
-  border-top: 1px solid var(--color-border);
-}
-
-.pr__progress-icon {
-  display: grid;
-  place-items: center;
-  flex: none;
-  color: var(--color-muted);
-}
-
-.pr__progress.is-up .pr__progress-icon,
-.pr__progress.is-up .pr__progress-value {
-  color: var(--color-accent);
-}
-
-.pr__progress-text {
-  font-size: 13px;
-  color: var(--color-muted);
-}
-
-.pr__progress-value {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-/* Sparkline */
-.pr__chart {
-  padding-top: 15px;
-  border-top: 1px solid var(--color-border);
-}
-
-.pr__chart-head {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 12px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--color-muted);
-}
-
-.sparkline {
-  position: relative;
-  width: 100%;
-  height: 64px;
-}
-
-.sparkline__svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.sparkline__area {
-  fill: var(--color-accent-soft);
-  stroke: none;
-}
-
-.sparkline__line {
-  fill: none;
-  stroke: var(--color-accent);
-  stroke-width: 2;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-  vector-effect: non-scaling-stroke;
-}
-
-.sparkline__dot {
-  position: absolute;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  background: var(--color-bg);
-  border: 1.5px solid var(--color-accent);
-}
-
-.sparkline__dot--best {
-  width: 9px;
-  height: 9px;
-  background: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-soft);
-}
-
-/* ---------- Results list ---------- */
-.results-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.result-card {
-  padding: 15px 16px;
-  background: var(--color-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-}
-
-.result-card__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 13px;
-}
-
-.result-card__title {
-  margin: 0;
-  font-family: var(--font-ui);
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: -0.2px;
-  color: var(--color-text);
-}
-
-.result-card__date {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--color-muted);
-  white-space: nowrap;
-}
-
-.result-card__stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-}
-
-.result-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.result-stat__label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  color: var(--color-muted);
-}
-
-.result-stat__value {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--color-text);
 }
 
 /* ---------- Loading / error state ---------- */
@@ -1227,4 +920,648 @@ select.rfield__input {
   font-size: 20px;
   line-height: 1.15;
   white-space: normal;
+}
+
+/* ===================================================================
+   Экран профиля (5&5) — мигрирован под новый дизайн
+   =================================================================== */
+
+/* ---------- Аватар-иконка + имя ---------- */
+.pf-id {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-lg);
+}
+
+.pf-id__avatar {
+  flex: none;
+  width: 96px;
+  height: 96px;
+  display: grid;
+  place-items: center;
+  color: var(--text-on-brand);
+  background: radial-gradient(120% 120% at 30% 20%, #f49705 0%, #e84f03 48%, #ba160d 100%);
+  border: 1px solid rgba(255, 176, 3, 0.45);
+  border-radius: var(--r-full);
+  box-shadow: var(--glow-brand);
+}
+
+.pf-id__name {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.3px;
+  color: var(--text-primary);
+}
+
+/* ---------- Редактируемые поля (карандаш) ---------- */
+.pf-fields {
+  display: flex;
+  flex-direction: column;
+  padding: 15px var(--sp-lg);
+}
+
+.pf-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 0;
+  border-top: 1px solid var(--glass-border);
+}
+
+.pf-field:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.pf-field:last-child {
+  padding-bottom: 0;
+}
+
+.pf-field__label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.pf-field__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-md);
+  width: 100%;
+  padding: 0;
+  text-align: left;
+  color: var(--text-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.pf-field__row svg {
+  flex: none;
+  color: var(--text-muted);
+  transition: color 200ms var(--ease);
+}
+
+.pf-field__row:hover svg {
+  color: var(--brand-primary);
+}
+
+.pf-field__row:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 3px;
+  border-radius: var(--r-sm);
+}
+
+.pf-field__value {
+  font-size: 18px;
+  font-weight: 400;
+}
+
+.pf-field__input {
+  width: 100%;
+  padding: 0 0 2px;
+  font-family: var(--font-ui);
+  font-size: 18px;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--brand-primary);
+}
+
+.pf-field__input:focus {
+  outline: none;
+}
+
+/* ---------- «Тебе предстоит» ---------- */
+.pf-next {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+}
+
+.pf-next__label {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.pf-next__title {
+  margin: 0;
+  font-size: 30px;
+  color: var(--text-on-brand);
+}
+
+.pf-next__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.pf-next__meta .dot {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.pf-next__stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-md);
+  margin-top: var(--sp-xs);
+}
+
+.pf-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--r-md);
+}
+
+.pf-stat__label {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.pf-stat__value {
+  font-size: 21px;
+  color: var(--text-on-brand);
+}
+
+.pf-next__links {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-md);
+  margin-top: 2px;
+}
+
+/* Текстовая ссылка с иконкой. nowrap — обе ссылки должны лечь в одну строку. */
+.pf-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  padding: 0;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.92);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 200ms var(--ease);
+}
+
+.pf-link svg {
+  flex: none;
+}
+
+.pf-link:hover {
+  color: var(--brand-highlight);
+}
+
+.pf-link:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 3px;
+  border-radius: var(--r-sm);
+}
+
+.pf-link--ink {
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+/* ---------- Трекер серии 5&5 ---------- */
+.pf-series {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+}
+
+.pf-series__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-md);
+}
+
+.pf-series__title {
+  margin: 0;
+  font-size: 26px;
+  color: var(--text-primary);
+}
+
+.pf-series__count {
+  font-size: 15px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.pf-progress {
+  display: flex;
+  gap: 6px;
+}
+
+.pf-progress__seg {
+  flex: 1;
+  height: 14px;
+  background: rgba(232, 79, 3, 0.18);
+  border-radius: var(--r-full);
+}
+
+.pf-progress__seg--on {
+  background: var(--grad-brand-cta);
+}
+
+.pf-series__text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.3;
+  color: var(--text-muted);
+}
+
+/* ---------- Пройденные старты ---------- */
+.pf-section-label {
+  margin: 4px 0 -6px;
+  font-size: 15px;
+  color: var(--text-muted);
+}
+
+.pf-past {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+}
+
+.pf-past__item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 15px var(--sp-lg);
+}
+
+.pf-past__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+  min-width: 0;
+}
+
+.pf-past__title {
+  margin: 0;
+  font-size: 20px;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.pf-past__date {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.pf-past__result {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.pf-past__time {
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+
+.pf-past__place {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ---------- Нижние ссылки ---------- */
+.pf-links {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-md);
+  margin-top: var(--sp-xs);
+}
+
+/* ===================================================================
+   Экран аналитики (5&5) — мигрирован под новый дизайн
+   =================================================================== */
+
+/* ---------- Сводные чипы ---------- */
+.an-chips {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.an-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 13px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+}
+
+.an-chip--record {
+  background: linear-gradient(150deg, #5a2409 0%, #2c1408 100%);
+  border-color: var(--brand-highlight);
+  box-shadow: 0 0 24px rgba(232, 79, 3, 0.35);
+}
+
+.an-chip__label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.an-chip--record .an-chip__label {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.an-chip__value {
+  font-size: 20px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+/* Единицы измерения — обычным шрифтом, без апперкейса от .u-display */
+.an-chip__value small,
+.an-stat__value small {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-muted);
+}
+
+.an-chip--record .an-chip__value {
+  color: var(--text-on-brand);
+}
+
+/* ---------- Динамика времени ---------- */
+.an-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: radial-gradient(125% 95% at 40% 55%, #f2660f 0%, #d8480a 45%, #6f2207 100%);
+}
+
+.an-chart__title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-on-brand);
+}
+
+.an-chart__cols {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  height: 250px;
+}
+
+.an-chart__col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.an-chart__spacer {
+  flex: none;
+  width: 0;
+}
+
+.an-chart__pill {
+  flex: none;
+  padding: 4px 7px;
+  font-size: 13px;
+  color: var(--text-on-brand);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+/* Отметка выбранного забега — разбор ниже показывает именно его */
+.an-chart__pill--on {
+  color: #2c1408;
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+}
+
+.an-chart__line {
+  flex: 1 1 auto;
+  min-height: 12px;
+  width: 0;
+  margin: 6px 0;
+  border-left: 2px dashed rgba(255, 255, 255, 0.8);
+}
+
+.an-chart__date {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-on-brand);
+  white-space: nowrap;
+}
+
+.an-gain {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  padding: 10px 16px;
+  font-size: 15px;
+  color: var(--state-success);
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: var(--r-md);
+}
+
+.an-gain--down {
+  color: var(--brand-highlight);
+}
+
+/* ---------- Разбор забега ---------- */
+.an-section-label {
+  margin: 4px 0 -6px;
+  font-size: 15px;
+  color: var(--text-muted);
+}
+
+.an-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px var(--sp-lg);
+}
+
+.an-detail__title {
+  margin: 0;
+  font-size: 26px;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.an-detail__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: -8px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.an-detail__meta .dot {
+  color: var(--border-subtle);
+}
+
+.an-detail__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.an-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+}
+
+.an-stat__label {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.an-stat__value {
+  font-size: 21px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.an-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.an-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-md);
+  padding: 11px 0;
+  font-size: 15px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--glass-border);
+}
+
+.an-row:last-child {
+  padding-bottom: 0;
+}
+
+.an-row__value b {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.an-row__value.is-up {
+  color: var(--state-success);
+}
+
+.an-row__value.is-down {
+  color: var(--brand-highlight);
+}
+
+/* ---------- Список забегов ---------- */
+.an-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+}
+
+.an-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+  width: 100%;
+  padding: 14px var(--sp-lg);
+  text-align: left;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color 200ms var(--ease);
+}
+
+.an-item--on {
+  border-color: var(--brand-primary);
+}
+
+.an-item:hover {
+  border-color: rgba(255, 176, 3, 0.4);
+}
+
+.an-item:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 3px;
+}
+
+.an-item__main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.an-item__title {
+  font-size: 18px;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.an-item__date {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.an-item__result {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.an-item__time {
+  font-size: 20px;
+  color: var(--text-muted);
+}
+
+.an-item--on .an-item__time {
+  color: var(--text-primary);
+}
+
+.an-item__place {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.an-item svg {
+  flex: none;
+  color: var(--text-muted);
 }

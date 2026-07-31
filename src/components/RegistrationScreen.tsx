@@ -16,6 +16,9 @@ export type RegistrationOutcome = {
   user: UserDto;
   events: EventDto[]; // один — одиночная регистрация; несколько — абонемент
   seasonPass: boolean;
+  // Бэкенд хранит только age, поэтому дату рождения несём в состоянии сессии —
+  // профиль показывает её как введённую. См. registration-backend-gaps.
+  birthDate: string;
 };
 
 type Props = {
@@ -165,10 +168,20 @@ function RegistrationScreen({ event, onBack, onRegistered }: Props) {
     try {
       if (useSeason && season) {
         const result = await createSeasonPass({ seasonId: season.id, ...participant });
-        onRegistered({ user: result.user, events: season.events, seasonPass: true });
+        onRegistered({
+          user: result.user,
+          events: season.events,
+          seasonPass: true,
+          birthDate: values.birthDate,
+        });
       } else {
         const result = await createRegistration({ eventId: event.id, ...participant });
-        onRegistered({ user: result.user, events: [event], seasonPass: false });
+        onRegistered({
+          user: result.user,
+          events: [event],
+          seasonPass: false,
+          birthDate: values.birthDate,
+        });
       }
     } catch (err) {
       setServerError(mapServerError(err));
