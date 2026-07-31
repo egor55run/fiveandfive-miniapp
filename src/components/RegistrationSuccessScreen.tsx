@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion';
-import { CheckCircle2, Share2, Home } from 'lucide-react';
+import { Check, Home, Share2 } from 'lucide-react';
+import Header from './Header';
 import type { EventDto, UserDto } from '../lib/api';
 
 type Props = {
@@ -9,88 +10,109 @@ type Props = {
   onBackHome: () => void;
 };
 
-const dateTimeFmt = new Intl.DateTimeFormat('ru-RU', {
+const TZ = 'Asia/Almaty';
+const dateFull = new Intl.DateTimeFormat('ru-RU', {
   day: 'numeric',
   month: 'long',
   year: 'numeric',
-  hour: 'numeric',
-  minute: '2-digit',
-  timeZone: 'Asia/Almaty',
+  timeZone: TZ,
 });
 const dateShort = new Intl.DateTimeFormat('ru-RU', {
   day: 'numeric',
   month: 'long',
-  timeZone: 'Asia/Almaty',
+  timeZone: TZ,
+});
+const timeFmt = new Intl.DateTimeFormat('ru-RU', {
+  hour: 'numeric',
+  minute: '2-digit',
+  timeZone: TZ,
 });
 
 function RegistrationSuccessScreen({ user, events, seasonPass, onBackHome }: Props) {
   const reduceMotion = useReducedMotion();
   const fullName = `${user.firstName} ${user.lastName}`.trim();
   const single = events[0];
+  const singleDate = new Date(single.date);
 
   return (
     <motion.main
-      className="screen"
+      className="screen su"
       initial={reduceMotion ? false : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
     >
-      <div className="success">
+      <Header />
+
+      <section className="hero-card su-hero">
         <motion.span
-          className="success__icon"
-          initial={reduceMotion ? false : { opacity: 0, scale: 0.85 }}
+          className="su-hero__badge"
+          aria-hidden="true"
+          initial={reduceMotion ? false : { opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
         >
-          <CheckCircle2 size={64} strokeWidth={2} />
+          <Check size={38} strokeWidth={2.6} />
         </motion.span>
-        <h2 className="success__title">
-          {seasonPass ? 'Вы в сезоне 5&5' : 'Вы зарегистрированы'}
-        </h2>
-        <p className="success__subtitle">
-          {seasonPass
-            ? `Записали на все ${events.length} стартов сезона. Детали — на ${user.email}`
-            : `Детали отправили на ${user.email}`}
-        </p>
-      </div>
 
-      <div className="card ticket">
-        <span className="race__eyebrow">
+        {/* Короткие заголовки — «ЗАРЕГИСТРИРОВАНЫ» одним словом не влезает
+            в ширину карточки дисплейным шрифтом. */}
+        <h2 className="su-hero__title u-display">
+          {seasonPass ? 'Вы в сезоне 5&5' : 'Вы на старте'}
+        </h2>
+
+        <p className="su-hero__text">
+          {seasonPass
+            ? `Записали на все ${events.length} стартов сезона`
+            : 'Место забронировано'}
+          <br />
+          Детали отправили на <b>{user.email}</b>
+        </p>
+      </section>
+
+      <section className="glass-card su-card">
+        <span className="su-card__eyebrow">
           {seasonPass ? 'Абонемент 5&5' : 'Участник'}
         </span>
-        <h3 className="ticket__name">{fullName}</h3>
+        <h3 className="su-card__name">{fullName}</h3>
 
         {seasonPass ? (
-          <div className="ticket__rows">
+          <div className="su-races">
             {events.map((e) => (
-              <div className="ticket__row" key={e.id}>
-                <span>{dateShort.format(new Date(e.date))}</span>
-                <strong>{e.title}</strong>
+              <div className="su-race" key={e.id}>
+                <span className="su-race__title u-display">{e.title}</span>
+                <span className="su-race__date">{dateShort.format(new Date(e.date))}</span>
               </div>
             ))}
           </div>
         ) : (
-          <div className="ticket__rows">
-            <div className="ticket__row">
+          <div className="su-rows">
+            <div className="su-row">
               <span>Старт</span>
-              <strong>{single.title}</strong>
+              <b>{single.title}</b>
             </div>
-            <div className="ticket__row">
-              <span>Дистанция</span>
-              <strong>{single.distance}</strong>
-            </div>
-            <div className="ticket__row">
+            <div className="su-row">
               <span>Дата</span>
-              <strong>{dateTimeFmt.format(new Date(single.date))}</strong>
+              <b>
+                {dateFull.format(singleDate)}, {timeFmt.format(singleDate)}
+              </b>
+            </div>
+            <div className="su-row">
+              <span>Дистанция</span>
+              <b>{single.distance}</b>
+            </div>
+            <div className="su-row">
+              <span>Место старта</span>
+              <b>{single.location}</b>
             </div>
           </div>
         )}
-      </div>
+      </section>
 
-      <div className="success__actions">
+      <div className="su-actions">
+        {/* TODO: шеринг пока без обработчика — нужен текст/ссылка приглашения. */}
         <motion.button
           type="button"
-          className="btn-register"
+          className="btn-register btn-register--gradient"
           whileTap={reduceMotion ? undefined : { scale: 0.985 }}
           transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
         >
@@ -99,7 +121,7 @@ function RegistrationSuccessScreen({ user, events, seasonPass, onBackHome }: Pro
         </motion.button>
 
         <button type="button" className="btn-secondary" onClick={onBackHome}>
-          <Home size={17} strokeWidth={2.2} />
+          <Home size={18} strokeWidth={2.2} />
           Вернуться на главный экран
         </button>
       </div>

@@ -310,15 +310,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 14px;
+  gap: 10px;
+  padding: 16px;
   font-family: var(--font-ui);
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--color-text);
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--text-primary);
   background: transparent;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
   cursor: pointer;
   transition:
     background 200ms var(--ease),
@@ -326,12 +326,12 @@
 }
 
 .btn-secondary:hover {
-  background: var(--color-surface);
-  border-color: var(--color-muted);
+  background: var(--glass-fill);
+  border-color: var(--text-muted);
 }
 
 .btn-secondary:focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 3px;
 }
 
@@ -428,14 +428,6 @@
   border-radius: 6px;
 }
 
-/* ---------- Card (legacy) ---------- */
-.card {
-  background: var(--color-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: 20px;
-}
-
 /* ---------- Registration context + form ---------- */
 .reg__context {
   display: flex;
@@ -507,95 +499,6 @@
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--color-negative);
-}
-
-/* ---------- Success screen ---------- */
-.success {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 20px 0 4px;
-  text-align: center;
-}
-
-.success__icon {
-  display: grid;
-  place-items: center;
-  color: var(--color-accent);
-}
-
-.success__title {
-  margin: 0;
-  font-family: var(--font-ui);
-  font-size: 30px;
-  font-weight: 800;
-  letter-spacing: -0.6px;
-  color: var(--color-text);
-}
-
-.success__subtitle {
-  margin: 0;
-  font-size: 14px;
-  color: var(--color-muted);
-}
-
-/* ---------- Ticket / participant data ---------- */
-.ticket {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.ticket__name {
-  margin: 0;
-  font-family: var(--font-ui);
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-  color: var(--color-text);
-}
-
-.ticket__rows {
-  display: flex;
-  flex-direction: column;
-}
-
-.ticket__row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 11px 0;
-  font-size: 14px;
-  border-top: 1px solid var(--color-border);
-}
-
-.ticket__row:first-child {
-  border-top: none;
-}
-
-.ticket__row span {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--color-muted);
-}
-
-.ticket__row strong {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-text);
-  text-align: right;
-}
-
-.success__actions {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
 }
 
 /* ---------- Empty state ---------- */
@@ -1564,4 +1467,139 @@ select.rfield__input {
 .an-item svg {
   flex: none;
   color: var(--text-muted);
+}
+
+/* ===================================================================
+   Экран успешной регистрации (5&5) — мигрирован под новый дизайн.
+   Два состояния: один старт и абонемент на весь сезон.
+   =================================================================== */
+.su-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-md);
+  padding: 28px var(--sp-xl);
+  text-align: center;
+}
+
+.su-hero__badge {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  color: var(--text-on-brand);
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: var(--r-full);
+}
+
+.su-hero__title {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.05;
+  color: var(--text-on-brand);
+  /* страховка: длинное слово должно переноситься, а не уезжать под обрез */
+  overflow-wrap: anywhere;
+}
+
+.su-hero__text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.su-hero__text b {
+  font-weight: 500;
+  color: var(--text-on-brand);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Карточка участника ---------- */
+.su-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+  padding: 18px var(--sp-lg);
+}
+
+.su-card__eyebrow {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.su-card__name {
+  margin: -6px 0 2px;
+  font-family: var(--font-ui);
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.3px;
+  color: var(--text-primary);
+}
+
+/* Одиночная регистрация — строки «поле → значение» */
+.su-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.su-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-md);
+  padding: 11px 0;
+  font-size: 15px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--glass-border);
+}
+
+.su-row:last-child {
+  padding-bottom: 0;
+}
+
+.su-row b {
+  font-weight: 500;
+  color: var(--text-primary);
+  text-align: right;
+}
+
+/* Абонемент — список стартов сезона */
+.su-races {
+  display: flex;
+  flex-direction: column;
+}
+
+.su-race {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-md);
+  padding: 12px 0;
+  border-top: 1px solid var(--glass-border);
+}
+
+.su-race:last-child {
+  padding-bottom: 0;
+}
+
+.su-race__title {
+  font-size: 18px;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.su-race__date {
+  flex: none;
+  font-size: 14px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.su-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+  margin-top: var(--sp-xs);
 }
