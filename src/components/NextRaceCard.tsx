@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Map } from 'lucide-react';
 import type { EventDto } from '../lib/api';
+import { getRouteMap } from '../data/routeMaps';
 
 type Props = {
   event: EventDto;
@@ -47,6 +48,7 @@ function NextRaceCard({ event, onRegister }: Props) {
   const [showRoute, setShowRoute] = useState(false);
 
   const soldOut = event.slotsLeft <= 0;
+  const routeMap = useMemo(() => getRouteMap(event), [event]);
 
   return (
     <motion.section
@@ -87,11 +89,27 @@ function NextRaceCard({ event, onRegister }: Props) {
         <motion.div
           className="hero__map"
           initial={reduceMotion ? false : { opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 190 }}
+          animate={{ opacity: 1, height: 'auto' }}
           transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
         >
-          <Map size={26} strokeWidth={1.8} />
-          Карта трассы появится здесь
+          {routeMap ? (
+            <img
+              className="hero__map-img"
+              src={routeMap.src}
+              srcSet={routeMap.srcSet}
+              alt={routeMap.alt}
+              style={{ aspectRatio: routeMap.aspectRatio }}
+              // Карта раскрывается по тапу, так что к моменту показа её ещё нет в кэше —
+              // грузим сразу, а не лениво, иначе видно пустой блок.
+              decoding="async"
+              draggable={false}
+            />
+          ) : (
+            <div className="hero__map-stub">
+              <Map size={26} strokeWidth={1.8} />
+              Карта трассы появится здесь
+            </div>
+          )}
         </motion.div>
       )}
 
