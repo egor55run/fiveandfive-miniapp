@@ -62,24 +62,6 @@
 
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   color-scheme: dark;
-
-  /* --- Мост совместимости: старые имена SPLITS → новые токены.
-     Держит непеределанные экраны (Профиль/Регистрация/Успех) рабочими,
-     пока они не мигрируют. Удалить по мере переверстки. --- */
-  --color-bg: var(--bg-canvas);
-  --color-elevated: var(--bg-surface);
-  --color-surface: var(--glass-fill);
-  --color-text: var(--text-primary);
-  --color-muted: var(--text-muted);
-  --color-accent: var(--brand-primary);
-  --color-accent-ink: var(--text-on-brand);
-  --color-accent-soft: rgba(232, 79, 3, 0.14);
-  --color-border: var(--glass-border);
-  --color-border-strong: var(--border-subtle);
-  --color-negative: var(--state-error);
-  --radius: var(--r-md);
-  --radius-sm: var(--r-sm);
-  --font-mono: var(--font-ui); /* Geist Mono убран — старые экраны используют Montserrat */
 }
 
 * {
