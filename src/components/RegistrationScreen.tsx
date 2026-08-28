@@ -25,6 +25,8 @@ type Props = {
   event: EventDto;
   onBack: () => void;
   onRegistered: (outcome: RegistrationOutcome) => void;
+  /** Что уже известно об участнике: ФИО из Telegram, контакты из профиля в БД. */
+  prefill?: RegistrationPrefill;
 };
 
 type FormValues = {
@@ -48,6 +50,23 @@ const EMPTY: FormValues = {
 };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Поля, которые можно подставить заранее. Дату рождения предзаполнить нечем:
+ * бэкенд хранит только age, самой даты в БД нет (см. RegistrationOutcome).
+ */
+export type RegistrationPrefill = Partial<
+  Pick<FormValues, 'fio' | 'phone' | 'email'>
+>;
+
+/** Пустые и отсутствующие значения не должны затирать EMPTY. */
+function withPrefill(prefill?: RegistrationPrefill): FormValues {
+  if (!prefill) return EMPTY;
+  const filled = Object.fromEntries(
+    Object.entries(prefill).filter(([, v]) => typeof v === 'string' && v !== ''),
+  ) as Partial<FormValues>;
+  return { ...EMPTY, ...filled };
+}
 
 const GENDERS = ['Мужской', 'Женский'];
 const FINISH_TIMES = ['~20 минут', '~25 минут', '~30 минут', '~40 минут', '~50 минут', '60+ минут'];
@@ -92,8 +111,10 @@ function mapServerError(err: unknown): string {
   return 'Не удалось зарегистрироваться. Попробуйте ещё раз';
 }
 
-function RegistrationScreen({ event, onBack, onRegistered }: Props) {
-  const [values, setValues] = useState<FormValues>(EMPTY);
+function RegistrationScreen({ event, onBack, onRegistered, prefill }: Props) {
+  // Формы входа пользователь не видит: имя приходит из Telegram, а контакты —
+  // из профиля, если он уже регистрировался раньше.
+  const [values, setValues] = useState<FormValues>(() => withPrefill(prefill));
   const [season, setSeason] = useState<SeasonDto | null>(null);
   const [seasonChecked, setSeasonChecked] = useState(false);
   const [consentRules, setConsentRules] = useState(false);

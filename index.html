@@ -8,6 +8,10 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <title>fiveandfive</title>
+    <!-- Telegram Mini App SDK. Обязательно внешним тегом с telegram.org и до
+         бандла приложения: npm-копия не создаёт рабочий window.Telegram.WebApp,
+         а initData нужен уже на первом рендере. -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
   </head>
   <body>
     <div id="root"></div>

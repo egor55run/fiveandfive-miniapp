@@ -3,6 +3,8 @@ import type { Event, SeasonPass, User } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../prisma';
 import { serializeEvent } from './events';
+import { requireTelegramAuth, tgUserOf } from '../plugins/telegramAuth';
+import { serializeUser } from './auth';
 
 function serializeSeasonPass(p: SeasonPass) {
   return {
@@ -22,7 +24,6 @@ const bodySchema = z.object({
   email: z.string().trim().email(),
   age: z.number().int().min(1).max(120),
   phone: z.string().trim().min(3),
-  telegramId: z.number().int().optional(),
 });
 
 // Причина, по которой абонемент нельзя оформить (all-or-nothing).
@@ -64,7 +65,7 @@ export async function seasonsRoutes(app: FastifyInstance) {
   // POST /season-passes — оформить абонемент на весь сезон.
   // Стратегия «всё или ничего»: если хоть один старт недоступен — 409, ничего не создаётся.
   // Оплата — заглушка (paymentStatus PENDING).
-  app.post('/season-passes', async (req, reply) => {
+  app.post('/season-passes', { preHandler: requireTelegramAuth }, async (req, reply) => {
     const parsed = bodySchema.safeParse(req.body);
     if (!parsed.success) {
       return reply
@@ -72,6 +73,8 @@ export async function seasonsRoutes(app: FastifyInstance) {
         .send({ error: 'Validation failed', details: parsed.error.flatten() });
     }
     const data = parsed.data;
+    const tg = tgUserOf(req);
+    const telegramId = BigInt(tg.id);
 
     const season = await prisma.season.findUnique({ where: { id: data.seasonId } });
     if (!season) {
@@ -80,20 +83,19 @@ export async function seasonsRoutes(app: FastifyInstance) {
 
     try {
       const result = await prisma.$transaction(async (tx) => {
-        // Участник — upsert по email.
-        const userData = {
+        // Участник опознаётся по подтверждённому telegram_id, а не по email
+        // из формы: email теперь обычное поле профиля, подставить чужой нельзя.
+        const profile = {
           firstName: data.firstName,
           lastName: data.lastName,
+          email: data.email,
           age: data.age,
           phone: data.phone,
-          ...(data.telegramId !== undefined
-            ? { telegramId: BigInt(data.telegramId) }
-            : {}),
         };
         const user: User = await tx.user.upsert({
-          where: { email: data.email },
-          update: userData,
-          create: { email: data.email, ...userData },
+          where: { telegramId },
+          create: { telegramId, username: tg.username ?? null, ...profile },
+          update: profile,
         });
 
         // Уже есть абонемент на этот сезон?
@@ -154,7 +156,7 @@ export async function seasonsRoutes(app: FastifyInstance) {
       });
 
       return reply.code(201).send({
-        user: result.user,
+        user: serializeUser(result.user),
         seasonPass: serializeSeasonPass(result.pass),
         registrations: result.registrations,
         payment: {

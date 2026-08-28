@@ -3,12 +3,19 @@ import './App.css';
 import AnalyticsScreen from './components/AnalyticsScreen';
 import HomeScreen from './components/HomeScreen';
 import ProfileScreen from './components/ProfileScreen';
+import OpenInTelegramScreen, {
+  AuthErrorScreen,
+  AuthLoadingScreen,
+} from './components/OpenInTelegramScreen';
 import RegistrationScreen, {
   type RegistrationOutcome,
+  type RegistrationPrefill,
 } from './components/RegistrationScreen';
 import RegistrationSuccessScreen from './components/RegistrationSuccessScreen';
 import TabBar, { type TabId } from './components/TabBar';
 import { ApiError, getEvents, type EventDto, type UserDto } from './lib/api';
+import { useTelegramAuth } from './hooks/useTelegramAuth';
+import { getUnsafeTelegramUser, telegramFullName } from './lib/telegram';
 
 type Screen = 'analytics' | 'home' | 'profile' | 'registration' | 'success';
 
@@ -29,7 +36,21 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [participant, setParticipant] = useState<UserDto | null>(null);
+  const {
+    state: authState,
+    user: authUser,
+    me,
+    error: authError,
+    retry: retryAuth,
+    refreshMe,
+  } = useTelegramAuth();
+
+  // Кто пользователь — известно сразу после входа, без всякой формы.
+  // Override появляется после регистрации: оттуда приходит дополненный профиль.
+  const [participantOverride, setParticipantOverride] = useState<UserDto | null>(
+    null,
+  );
+  const participant = participantOverride ?? authUser;
   // Итог регистрации: участник + старт(ы) + был ли это абонемент.
   const [outcome, setOutcome] = useState<RegistrationOutcome | null>(null);
   // Старт, выбранный для регистрации (hero, карточка ленты или промо серии).
@@ -59,12 +80,37 @@ function App() {
   };
 
   const handleRegistered = (result: RegistrationOutcome) => {
-    setParticipant(result.user);
+    setParticipantOverride(result.user);
     setOutcome(result);
     setCurrentScreen('success');
     // Обновить слоты на главной после успешной регистрации.
     loadEvents();
+    // И перечитать профиль — в нём появилась новая регистрация.
+    refreshMe();
   };
+
+  // Вход в Mini App — до всего остального: пока личность неизвестна, показывать
+  // старты и профиль нечему. Все хуки объявлены выше, поэтому ранний return
+  // не нарушает их порядок.
+  if (authState === 'loading') return <AuthLoadingScreen />;
+  if (authState === 'outside') return <OpenInTelegramScreen />;
+  if (authState === 'error') {
+    return <AuthErrorScreen message={authError} onRetry={retryAuth} />;
+  }
+
+  // ФИО берём из профиля в БД (пользователь мог поправить его при регистрации),
+  // а если там пусто — из Telegram. Контакты — из профиля, Telegram их не даёт.
+  const prefill: RegistrationPrefill = {
+    fio:
+      [participant?.lastName, participant?.firstName].filter(Boolean).join(' ') ||
+      telegramFullName(getUnsafeTelegramUser()),
+    email: me?.user.email ?? undefined,
+    phone: me?.user.phone ?? undefined,
+  };
+
+  // Старты, на которые пользователь записан, — из БД, а не только из состояния
+  // текущей сессии: профиль должен быть верным и после переоткрытия приложения.
+  const myEvents = me?.registrations.map((r) => r.event) ?? outcome?.events ?? [];
 
   // Флоу регистрации — свои экраны без таб-бара.
   if (currentScreen === 'registration' && regEvent) {
@@ -73,6 +119,7 @@ function App() {
         event={regEvent}
         onBack={() => setCurrentScreen('home')}
         onRegistered={handleRegistered}
+        prefill={prefill}
       />
     );
   }
@@ -104,7 +151,7 @@ function App() {
         <ProfileScreen
           participant={participant}
           birthDate={outcome?.birthDate ?? null}
-          registeredEvents={outcome?.events ?? []}
+          registeredEvents={myEvents}
           nearest={nearest}
           onViewRaces={() => setCurrentScreen('home')}
         />

@@ -125,7 +125,10 @@ function ProfileScreen({
     );
   }
 
-  const fullName = `${participant.firstName} ${participant.lastName}`.trim();
+  const fullName = [participant.lastName, participant.firstName]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
 
   const fields: { key: EditKey; label: string; value: string; type: string }[] = [
     {
@@ -134,8 +137,18 @@ function ProfileScreen({
       value: formatDob(overrides.birthDate ?? birthDate) || 'не указана',
       type: 'date',
     },
-    { key: 'phone', label: 'Телефон', value: overrides.phone ?? participant.phone, type: 'tel' },
-    { key: 'email', label: 'Email', value: overrides.email ?? participant.email, type: 'email' },
+    {
+      key: 'phone',
+      label: 'Телефон',
+      value: overrides.phone ?? participant.phone ?? 'не указан',
+      type: 'tel',
+    },
+    {
+      key: 'email',
+      label: 'Email',
+      value: overrides.email ?? participant.email ?? 'не указан',
+      type: 'email',
+    },
   ];
 
   const startEdit = (key: EditKey) => {
@@ -143,8 +156,8 @@ function ProfileScreen({
       key === 'birthDate'
         ? (overrides.birthDate ?? birthDate ?? '')
         : key === 'phone'
-          ? (overrides.phone ?? participant.phone)
-          : (overrides.email ?? participant.email);
+          ? (overrides.phone ?? participant.phone ?? '')
+          : (overrides.email ?? participant.email ?? '');
     setDraft(raw);
     setEditing(key);
   };

@@ -1,6 +1,8 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { prisma } from './prisma';
+import { setupTelegramAuth } from './plugins/telegramAuth';
+import { authRoutes } from './routes/auth';
 import { eventsRoutes } from './routes/events';
 import { registrationsRoutes } from './routes/registrations';
 import { seasonsRoutes } from './routes/seasons';
@@ -11,6 +13,11 @@ import { seasonsRoutes } from './routes/seasons';
 };
 
 const app = Fastify({ logger: true });
+
+// Декоратор request.tgUser объявляем на корневом инстансе, а не через
+// app.register(): декораторы из зарегистрированного плагина не видны роутам,
+// зарегистрированным рядом. Здесь же падаем, если BOT_TOKEN не задан.
+setupTelegramAuth(app);
 
 async function main() {
   await app.register(cors, { origin: true });
@@ -25,6 +32,7 @@ async function main() {
     }
   });
 
+  await app.register(authRoutes);
   await app.register(eventsRoutes);
   await app.register(registrationsRoutes);
   await app.register(seasonsRoutes);

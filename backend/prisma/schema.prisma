@@ -9,12 +9,19 @@ datasource db {
 
 model User {
   id         Int      @id @default(autoincrement())
+  // Личность из подписанного Telegram initData — основной идентификатор.
+  // Nullable только ради legacy-строк, созданных до Mini App: весь новый код
+  // (plugins/telegramAuth.ts) заводит пользователя исключительно по нему.
   telegramId BigInt?  @unique @map("telegram_id")
+  username   String?
   firstName  String   @map("first_name")
-  lastName   String   @map("last_name")
-  email      String   @unique
-  age        Int
-  phone      String
+  lastName   String?  @map("last_name")
+  // email/age/phone заполняются не при входе, а при регистрации на старт,
+  // поэтому опциональны. @unique с email снят: идентификатор теперь telegram_id,
+  // и два Telegram-аккаунта вправе указать один и тот же email.
+  email      String?
+  age        Int?
+  phone      String?
   createdAt  DateTime @default(now()) @map("created_at")
 
   registrations Registration[]
