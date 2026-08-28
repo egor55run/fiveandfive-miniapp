@@ -119,3 +119,20 @@ model Result {
   @@unique([userId, eventId])
   @@map("results")
 }
+
+/// Сессия администратора в /admin. Пароля в системе нет: личность подтверждает
+/// Telegram (Login Widget в браузере или initData внутри Telegram), а дальше
+/// живёт эта сессия — её, в отличие от JWT, можно отозвать.
+model AdminSession {
+  id Int @id @default(autoincrement())
+  // Только sha256 от токена: дамп БД не даёт войти, сам токен есть лишь в cookie.
+  tokenHash  String   @unique @map("token_hash")
+  telegramId BigInt   @map("telegram_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+  expiresAt  DateTime @map("expires_at")
+  ip         String?
+  userAgent  String?  @map("user_agent")
+
+  @@map("admin_sessions")
+}

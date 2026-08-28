@@ -1,0 +1,375 @@
+/* Админка. Токены берутся из src/index.css, здесь только раскладка под таблицы:
+   приложение участников свёрстано под 430px, а тут нужна вся ширина экрана. */
+
+.ad-shell {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--sp-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xl);
+}
+
+.ad-shell--center {
+  min-height: 100svh;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ─── Верхняя панель ─────────────────────────────────────────────────────── */
+
+.ad-top {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-lg);
+  flex-wrap: wrap;
+  padding-bottom: var(--sp-md);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.ad-top__brand {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-sm);
+  font-family: var(--font-display);
+}
+
+.ad-top__brand strong {
+  font-size: 20px;
+  letter-spacing: -0.5px;
+}
+
+.ad-top__brand span {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.ad-top__user {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.ad-tabs {
+  display: flex;
+  gap: var(--sp-xs);
+}
+
+.ad-tab {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 14px;
+  border-radius: var(--r-full);
+  cursor: pointer;
+  transition: color 0.15s var(--ease), background 0.15s var(--ease);
+}
+
+.ad-tab:hover {
+  color: var(--text-primary);
+  background: var(--glass-fill);
+}
+
+.ad-tab--active {
+  color: var(--text-on-brand);
+  background: var(--brand-primary);
+}
+
+/* ─── Секции и карточки ──────────────────────────────────────────────────── */
+
+.ad-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+}
+
+.ad-section__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-lg);
+  flex-wrap: wrap;
+}
+
+.ad-section__head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  letter-spacing: -0.5px;
+}
+
+.ad-actions {
+  margin-left: auto;
+  display: flex;
+  gap: var(--sp-sm);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ad-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  padding: var(--sp-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+}
+
+.ad-card h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+/* ─── Кнопки ─────────────────────────────────────────────────────────────── */
+
+.ad-btn {
+  appearance: none;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 14px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: filter 0.15s var(--ease);
+}
+
+.ad-btn:hover:not(:disabled) {
+  filter: brightness(1.25);
+}
+
+.ad-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ad-btn--primary {
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+  color: var(--text-on-brand);
+}
+
+.ad-btn--danger {
+  background: transparent;
+  border-color: var(--state-error);
+  color: #ff8080;
+}
+
+.ad-btn--sm {
+  font-size: 12px;
+  padding: 5px 10px;
+}
+
+.ad-btn--sm + .ad-btn--sm {
+  margin-left: var(--sp-xs);
+}
+
+/* ─── Поля ───────────────────────────────────────────────────────────────── */
+
+.ad-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--sp-md);
+}
+
+.ad-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+input,
+select {
+  font: inherit;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+}
+
+input:focus,
+select:focus {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: -1px;
+}
+
+.ad-input--time {
+  width: 90px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Таблицы ────────────────────────────────────────────────────────────── */
+
+.ad-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  background: var(--bg-surface);
+}
+
+.ad-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.ad-table th,
+.ad-table td {
+  padding: 9px 12px;
+  text-align: left;
+  border-bottom: 1px solid rgba(80, 80, 80, 0.4);
+  vertical-align: middle;
+}
+
+.ad-table th {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+}
+
+.ad-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ad-table tbody tr:hover {
+  background: var(--glass-fill);
+}
+
+.ad-table .num,
+.ad-table th.num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.ad-nowrap {
+  white-space: nowrap;
+}
+
+.ad-row--muted td {
+  opacity: 0.45;
+}
+
+.ad-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: var(--r-full);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ─── Сообщения ──────────────────────────────────────────────────────────── */
+
+.ad-msg {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.ad-msg--error {
+  color: #ff8f8f;
+  background: rgba(193, 9, 9, 0.12);
+  border: 1px solid rgba(193, 9, 9, 0.5);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+}
+
+.ad-msg--ok {
+  color: #86e58f;
+  background: rgba(18, 192, 38, 0.1);
+  border: 1px solid rgba(18, 192, 38, 0.4);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+}
+
+.ad-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.ad-hint--dim {
+  opacity: 0.65;
+}
+
+/* ─── Экран входа ────────────────────────────────────────────────────────── */
+
+.ad-login {
+  width: min(420px, 92vw);
+  text-align: center;
+  align-items: center;
+}
+
+.ad-login h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 26px;
+  letter-spacing: -1px;
+}
+
+.ad-login__sub {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+.tg-login {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ─── Протокол ───────────────────────────────────────────────────────────── */
+
+.ad-protocol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ad-protocol li {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: var(--sp-md);
+  align-items: center;
+  padding: 7px 10px;
+  border-radius: var(--r-sm);
+  font-size: 14px;
+}
+
+.ad-protocol li:nth-child(odd) {
+  background: var(--glass-fill);
+}
+
+.ad-protocol li .num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--brand-highlight);
+  font-family: var(--font-display);
+}
