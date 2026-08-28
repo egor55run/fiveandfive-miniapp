@@ -69,8 +69,17 @@ export function telegramReady(): void {
   app.expand();
 }
 
-/** «Фамилия Имя» — в таком порядке ФИО ожидает форма регистрации. */
-export function telegramFullName(user: TelegramWebAppUser | null): string {
-  if (!user) return '';
-  return [user.last_name, user.first_name].filter(Boolean).join(' ');
+/**
+ * Собирает «Фамилия Имя» для поля ФИО — но только когда известны ОБЕ части.
+ *
+ * Форма читает первое слово как фамилию (splitFio в RegistrationScreen), а у
+ * аккаунтов без last_name в Telegram одно имя встало бы в позицию фамилии:
+ * пользователь дописал бы фамилию в конец и она сохранилась бы как имя.
+ * Лучше оставить поле пустым — там есть подсказка «Иванов Иван Иванович».
+ */
+export function fioFromParts(
+  last: string | null | undefined,
+  first: string | null | undefined,
+): string {
+  return last && first ? last + ' ' + first : '';
 }

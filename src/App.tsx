@@ -15,7 +15,7 @@ import RegistrationSuccessScreen from './components/RegistrationSuccessScreen';
 import TabBar, { type TabId } from './components/TabBar';
 import { ApiError, getEvents, type EventDto, type UserDto } from './lib/api';
 import { useTelegramAuth } from './hooks/useTelegramAuth';
-import { getUnsafeTelegramUser, telegramFullName } from './lib/telegram';
+import { fioFromParts, getUnsafeTelegramUser } from './lib/telegram';
 
 type Screen = 'analytics' | 'home' | 'profile' | 'registration' | 'success';
 
@@ -100,10 +100,11 @@ function App() {
 
   // ФИО берём из профиля в БД (пользователь мог поправить его при регистрации),
   // а если там пусто — из Telegram. Контакты — из профиля, Telegram их не даёт.
+  const tgUser = getUnsafeTelegramUser();
   const prefill: RegistrationPrefill = {
     fio:
-      [participant?.lastName, participant?.firstName].filter(Boolean).join(' ') ||
-      telegramFullName(getUnsafeTelegramUser()),
+      fioFromParts(participant?.lastName, participant?.firstName) ||
+      fioFromParts(tgUser?.last_name, tgUser?.first_name),
     email: me?.user.email ?? undefined,
     phone: me?.user.phone ?? undefined,
   };
