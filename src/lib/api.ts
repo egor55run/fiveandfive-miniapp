@@ -142,9 +142,25 @@ export type MeRegistrationDto = {
   event: EventDto;
 };
 
+/**
+ * Финишный результат участника. Всё, что есть в модели Result, плюс
+ * finishersTotal — его сервер считает на лету по протоколу старта.
+ * Отсортированы от старых стартов к новым.
+ */
+export type MeRaceResultDto = {
+  id: number;
+  eventId: number;
+  finishTime: number; // секунды
+  place: number; // место в общем зачёте
+  finishersTotal: number; // сколько всего финишировало на этом старте
+  recordedAt: string;
+  event: EventDto;
+};
+
 export type MeResult = {
   user: UserDto;
   registrations: MeRegistrationDto[];
+  results: MeRaceResultDto[];
   seasonPasses: SeasonPassDto[];
 };
 

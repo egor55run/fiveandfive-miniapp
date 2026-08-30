@@ -70,7 +70,7 @@ export async function authRoutes(app: FastifyInstance) {
     },
   );
 
-  /** GET /me — профиль и всё, на что пользователь записан. */
+  /** GET /me — профиль, всё, на что пользователь записан, и его результаты. */
   app.get('/me', { preHandler: requireTelegramAuth }, async (req, reply) => {
     const tg = tgUserOf(req);
     const user = await prisma.user.findUnique({
@@ -79,6 +79,12 @@ export async function authRoutes(app: FastifyInstance) {
         registrations: {
           include: { event: true },
           orderBy: { registeredAt: 'desc' },
+        },
+        // От старых к новым: на этом порядке держатся динамика времени и
+        // «минус X с первого старта» в аналитике.
+        results: {
+          include: { event: true },
+          orderBy: { event: { date: 'asc' } },
         },
         seasonPasses: { orderBy: { createdAt: 'desc' } },
       },
@@ -90,6 +96,21 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Пользователь не найден', reason: 'no_user_row' });
     }
 
+    // Сколько всего человек финишировало на каждом из «своих» стартов — знаменатель
+    // для «N-е место из M». Одним запросом, а не по одному на забег; у кого
+    // результатов ещё нет (а это каждый новый пользователь) — вообще без запроса.
+    const finishersByEvent = new Map<number, number>();
+    if (user.results.length > 0) {
+      const finishers = await prisma.result.groupBy({
+        by: ['eventId'],
+        where: { eventId: { in: user.results.map((r) => r.eventId) } },
+        _count: { _all: true },
+      });
+      for (const row of finishers) {
+        finishersByEvent.set(row.eventId, row._count._all);
+      }
+    }
+
     return {
       user: serializeUser(user),
       registrations: user.registrations.map((r) => ({
@@ -99,6 +120,16 @@ export async function authRoutes(app: FastifyInstance) {
         paymentStatus: r.paymentStatus,
         qrCode: r.qrCode,
         registeredAt: r.registeredAt,
+        event: serializeEvent(r.event),
+      })),
+      results: user.results.map((r) => ({
+        id: r.id,
+        eventId: r.eventId,
+        finishTime: r.finishTime,
+        place: r.place,
+        // Считается на лету, в модели Result этого поля нет.
+        finishersTotal: finishersByEvent.get(r.eventId) ?? 1,
+        recordedAt: r.recordedAt,
         event: serializeEvent(r.event),
       })),
       seasonPasses: user.seasonPasses.map((p) => ({

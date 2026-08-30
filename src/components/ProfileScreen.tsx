@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import {
   ArrowRight,
@@ -11,11 +11,10 @@ import {
   Ticket,
 } from 'lucide-react';
 import Header from './Header';
-import { getCurrentSeason, type EventDto, type UserDto } from '../lib/api';
-// TODO: пройденные старты пока из моков. Заменить на GET /results/:userId,
-// когда бэкенд начнёт отдавать финишные протоколы.
-import { results } from '../data/results';
-// TODO: номер участника и прогресс серии бэкенд пока не отдаёт — см. комментарий в файле.
+import type { EventDto, UserDto } from '../lib/api';
+import type { RaceResult } from '../data/results';
+import { useSeasonProgress } from '../hooks/useSeasonProgress';
+// TODO: номер участника бэкенд пока не отдаёт — см. комментарий в файле.
 import { profileMock } from '../data/profile';
 
 type Props = {
@@ -25,6 +24,8 @@ type Props = {
   birthDate?: string | null;
   // Старты, на которые участник зарегистрировался в этой сессии.
   registeredEvents: EventDto[];
+  // Пройденные старты с внесённым результатом, от старых к новым.
+  results: RaceResult[];
   // Ближайший старт вообще — запасной вариант, если регистраций нет.
   nearest: EventDto | null;
   onViewRaces: () => void;
@@ -70,6 +71,7 @@ function ProfileScreen({
   participant,
   birthDate,
   registeredEvents,
+  results,
   nearest,
   onViewRaces,
 }: Props) {
@@ -79,22 +81,9 @@ function ProfileScreen({
   const [overrides, setOverrides] = useState<Partial<Record<EditKey, string>>>({});
   const [editing, setEditing] = useState<EditKey | null>(null);
   const [draft, setDraft] = useState('');
-  const [seasonTotal, setSeasonTotal] = useState(profileMock.seriesTotalFallback);
   // Текущее время фиксируем на монтировании — рендер должен оставаться чистым.
   const [now] = useState(() => Date.now());
-
-  // Число стартов в сезоне — реальное, из API. Ошибку игнорируем: остаётся 5.
-  useEffect(() => {
-    let alive = true;
-    getCurrentSeason()
-      .then((season) => {
-        if (alive && season) setSeasonTotal(season.events.length);
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, []);
+  const { done, total: seasonTotal } = useSeasonProgress(results);
 
   // Предстоящий старт: ближайший будущий из своих регистраций, иначе общий ближайший.
   const upcoming = useMemo(() => {
@@ -169,7 +158,6 @@ function ProfileScreen({
 
   const upcomingDate = upcoming ? new Date(upcoming.date) : null;
   const left = upcomingDate ? daysUntil(upcomingDate, now) : 0;
-  const done = Math.min(profileMock.seriesDone, seasonTotal);
   const past = [...results].reverse(); // новые сверху
 
   return (
@@ -287,22 +275,27 @@ function ProfileScreen({
         </p>
       </section>
 
-      {/* Пройденные старты */}
-      <p className="pf-section-label">Пройдено:</p>
-      <section className="pf-past">
-        {past.map((race) => (
-          <article className="glass-card pf-past__item" key={`${race.title}-${race.date}`}>
-            <div className="pf-past__main">
-              <h4 className="pf-past__title u-display">{race.title}</h4>
-              <span className="pf-past__date">{race.date}</span>
-            </div>
-            <div className="pf-past__result">
-              <span className="pf-past__time num">{race.time}</span>
-              <span className="pf-past__place">{race.place} место</span>
-            </div>
-          </article>
-        ))}
-      </section>
+      {/* Пройденные старты — только те, кому организатор внёс результат.
+          Пока таких нет, секции нет вовсе: пустой заголовок ни о чём. */}
+      {past.length > 0 && (
+        <>
+          <p className="pf-section-label">Пройдено:</p>
+          <section className="pf-past">
+            {past.map((race) => (
+              <article className="glass-card pf-past__item" key={race.eventId}>
+                <div className="pf-past__main">
+                  <h4 className="pf-past__title u-display">{race.title}</h4>
+                  <span className="pf-past__date">{race.date}</span>
+                </div>
+                <div className="pf-past__result">
+                  <span className="pf-past__time num">{race.time}</span>
+                  <span className="pf-past__place">{race.place} место</span>
+                </div>
+              </article>
+            ))}
+          </section>
+        </>
+      )}
 
       {/* TODO: ссылки-заглушки — истории платежей и документов на бэкенде нет. */}
       <div className="pf-links">

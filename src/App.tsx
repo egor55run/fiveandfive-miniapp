@@ -14,6 +14,7 @@ import RegistrationScreen, {
 import RegistrationSuccessScreen from './components/RegistrationSuccessScreen';
 import TabBar, { type TabId } from './components/TabBar';
 import { ApiError, getEvents, type EventDto, type UserDto } from './lib/api';
+import { toRaceResults } from './data/results';
 import { useTelegramAuth } from './hooks/useTelegramAuth';
 import { fioFromParts, getUnsafeTelegramUser } from './lib/telegram';
 
@@ -73,6 +74,10 @@ function App() {
   }, [loadEvents]);
 
   const nearest = useMemo(() => pickNearest(events), [events]);
+
+  // Пройденные старты — из /me, один раз для профиля и аналитики: два экрана
+  // должны показывать одно и то же.
+  const raceResults = useMemo(() => toRaceResults(me?.results ?? []), [me]);
 
   const openRegistration = (event: EventDto) => {
     setRegEvent(event);
@@ -147,12 +152,17 @@ function App() {
   return (
     <>
       {currentScreen === 'analytics' ? (
-        <AnalyticsScreen onBack={() => setCurrentScreen('home')} />
+        <AnalyticsScreen
+          results={raceResults}
+          onBack={() => setCurrentScreen('home')}
+          onViewRaces={() => setCurrentScreen('home')}
+        />
       ) : currentScreen === 'profile' ? (
         <ProfileScreen
           participant={participant}
           birthDate={outcome?.birthDate ?? null}
           registeredEvents={myEvents}
+          results={raceResults}
           nearest={nearest}
           onViewRaces={() => setCurrentScreen('home')}
         />
