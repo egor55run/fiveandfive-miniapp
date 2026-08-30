@@ -855,6 +855,25 @@ select.rfield__input {
   outline: none;
 }
 
+.pf-field__input:disabled {
+  opacity: 0.6;
+}
+
+.pf-field__input--error {
+  border-bottom-color: var(--state-error);
+}
+
+/* Отказ сервера под полем — как .rfield__err в форме регистрации. */
+.pf-field__err {
+  font-size: 12px;
+  color: var(--state-error);
+}
+
+.pf-field__hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 /* ---------- «Тебе предстоит» ---------- */
 .pf-next {
   display: flex;

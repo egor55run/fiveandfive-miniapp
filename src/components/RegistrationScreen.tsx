@@ -16,9 +16,6 @@ export type RegistrationOutcome = {
   user: UserDto;
   events: EventDto[]; // один — одиночная регистрация; несколько — абонемент
   seasonPass: boolean;
-  // Бэкенд хранит только age, поэтому дату рождения несём в состоянии сессии —
-  // профиль показывает её как введённую. См. registration-backend-gaps.
-  birthDate: string;
 };
 
 type Props = {
@@ -51,12 +48,9 @@ const EMPTY: FormValues = {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/**
- * Поля, которые можно подставить заранее. Дату рождения предзаполнить нечем:
- * бэкенд хранит только age, самой даты в БД нет (см. RegistrationOutcome).
- */
+/** Поля, которые можно подставить заранее — из Telegram и из профиля в БД. */
 export type RegistrationPrefill = Partial<
-  Pick<FormValues, 'fio' | 'phone' | 'email'>
+  Pick<FormValues, 'fio' | 'birthDate' | 'phone' | 'email'>
 >;
 
 /** Пустые и отсутствующие значения не должны затирать EMPTY. */
@@ -180,7 +174,10 @@ function RegistrationScreen({ event, onBack, onRegistered, prefill }: Props) {
       firstName,
       lastName,
       email: values.email.trim(),
+      // Возраст шлём для совместимости, но решает дата: из неё сервер считает
+      // age сам и сохраняет саму дату в профиль.
       age: ageFromDob(values.birthDate),
+      birthDate: values.birthDate,
       phone: values.phone.trim(),
     };
 
@@ -189,20 +186,10 @@ function RegistrationScreen({ event, onBack, onRegistered, prefill }: Props) {
     try {
       if (useSeason && season) {
         const result = await createSeasonPass({ seasonId: season.id, ...participant });
-        onRegistered({
-          user: result.user,
-          events: season.events,
-          seasonPass: true,
-          birthDate: values.birthDate,
-        });
+        onRegistered({ user: result.user, events: season.events, seasonPass: true });
       } else {
         const result = await createRegistration({ eventId: event.id, ...participant });
-        onRegistered({
-          user: result.user,
-          events: [event],
-          seasonPass: false,
-          birthDate: values.birthDate,
-        });
+        onRegistered({ user: result.user, events: [event], seasonPass: false });
       }
     } catch (err) {
       setServerError(mapServerError(err));

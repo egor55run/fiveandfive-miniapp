@@ -1,6 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../prisma';
+import { ageProfileFields, parseBirthDate } from '../lib/birthDate';
+import {
+  birthDateField,
+  emailField,
+  phoneField,
+  sendValidationError,
+} from '../lib/validation';
 import { requireTelegramAuth, tgUserOf } from '../plugins/telegramAuth';
 import { serializeUser } from './auth';
 
@@ -9,11 +16,14 @@ import { serializeUser } from './auth';
 // Остальные поля Telegram не выдаёт, поэтому их по-прежнему спрашиваем формой.
 const bodySchema = z.object({
   eventId: z.number().int().positive(),
-  firstName: z.string().trim().min(1),
-  lastName: z.string().trim().min(1),
-  email: z.string().trim().email(),
+  firstName: z.string().trim().min(1, 'Укажите имя'),
+  lastName: z.string().trim().min(1, 'Укажите фамилию'),
+  email: emailField,
+  // Форма спрашивает дату рождения, а не возраст. age оставлен для совместимости
+  // и как запасной вариант: когда дата пришла, возраст считает сервер.
   age: z.number().int().min(1).max(120),
-  phone: z.string().trim().min(3),
+  birthDate: birthDateField.optional(),
+  phone: phoneField,
 });
 
 export async function registrationsRoutes(app: FastifyInstance) {
@@ -24,11 +34,7 @@ export async function registrationsRoutes(app: FastifyInstance) {
     { preHandler: requireTelegramAuth },
     async (req, reply) => {
       const parsed = bodySchema.safeParse(req.body);
-      if (!parsed.success) {
-        return reply
-          .code(400)
-          .send({ error: 'Validation failed', details: parsed.error.flatten() });
-      }
+      if (!parsed.success) return sendValidationError(reply, parsed.error);
       const data = parsed.data;
       const tg = tgUserOf(req);
       const telegramId = BigInt(tg.id);
@@ -43,12 +49,18 @@ export async function registrationsRoutes(app: FastifyInstance) {
 
       // Участник опознаётся по telegram_id. Раньше здесь был upsert по email —
       // то есть кто угодно мог, указав чужой email, дописаться в чужой профиль.
+      // Дата рождения проверена схемой, поэтому разбор здесь не может дать null.
+      const birthDate = data.birthDate ? parseBirthDate(data.birthDate) : null;
+      const known = await prisma.user.findUnique({
+        where: { telegramId },
+        select: { birthDate: true },
+      });
       const profile = {
         firstName: data.firstName,
         lastName: data.lastName,
         email: data.email,
-        age: data.age,
         phone: data.phone,
+        ...ageProfileFields(birthDate, known?.birthDate ?? null, data.age),
       };
       const user = await prisma.user.upsert({
         where: { telegramId },

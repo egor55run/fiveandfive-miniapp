@@ -110,13 +110,17 @@ function App() {
 
   // ФИО берём из профиля в БД (пользователь мог поправить его при регистрации),
   // а если там пусто — из Telegram. Контакты — из профиля, Telegram их не даёт.
+  // Контакты и дату рождения берём из participant, а не из me: после правки
+  // карандашом в профиле он свежее (в нём ответ PATCH /me), а me перечитывается
+  // не на каждое изменение.
   const tgUser = getUnsafeTelegramUser();
   const prefill: RegistrationPrefill = {
     fio:
       fioFromParts(participant?.lastName, participant?.firstName) ||
       fioFromParts(tgUser?.last_name, tgUser?.first_name),
-    email: me?.user.email ?? undefined,
-    phone: me?.user.phone ?? undefined,
+    email: participant?.email ?? me?.user.email ?? undefined,
+    phone: participant?.phone ?? me?.user.phone ?? undefined,
+    birthDate: participant?.birthDate ?? me?.user.birthDate ?? undefined,
   };
 
   // Старты, на которые пользователь записан, — из БД, а не только из состояния
@@ -165,10 +169,10 @@ function App() {
       ) : currentScreen === 'profile' ? (
         <ProfileScreen
           participant={participant}
-          birthDate={outcome?.birthDate ?? null}
           registeredEvents={myEvents}
           results={raceResults}
           nearest={nearest}
+          onUserUpdated={setParticipantOverride}
           onViewRaces={() => setCurrentScreen('home')}
         />
       ) : (

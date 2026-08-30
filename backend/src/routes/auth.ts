@@ -1,7 +1,14 @@
 import type { FastifyInstance } from 'fastify';
-import type { User } from '@prisma/client';
+import type { Prisma, User } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../prisma';
+import { ageFromBirthDate, formatBirthDate, parseBirthDate } from '../lib/birthDate';
+import {
+  birthDateField,
+  emailField,
+  phoneField,
+  sendValidationError,
+} from '../lib/validation';
 import { requireTelegramAuth, tgUserOf } from '../plugins/telegramAuth';
 import { serializeEvent } from './events';
 
@@ -19,6 +26,9 @@ export function serializeUser(u: User) {
     lastName: u.lastName,
     email: u.email,
     age: u.age,
+    // Отдаём днём («1999-12-14»), а не ISO-меткой времени: у колонки тип DATE,
+    // и в этом же формате её ждёт input[type=date] на фронте.
+    birthDate: formatBirthDate(u.birthDate),
     phone: u.phone,
     createdAt: u.createdAt,
   };
@@ -26,11 +36,11 @@ export function serializeUser(u: User) {
 
 const patchSchema = z
   .object({
-    firstName: z.string().trim().min(1).optional(),
-    lastName: z.string().trim().min(1).optional(),
-    email: z.string().trim().email().optional(),
-    age: z.number().int().min(1).max(120).optional(),
-    phone: z.string().trim().min(3).optional(),
+    firstName: z.string().trim().min(1, 'Укажите имя').optional(),
+    lastName: z.string().trim().min(1, 'Укажите фамилию').optional(),
+    email: emailField.optional(),
+    birthDate: birthDateField.optional(),
+    phone: phoneField.optional(),
   })
   .refine((v) => Object.keys(v).length > 0, {
     message: 'Нужно передать хотя бы одно поле',
@@ -142,14 +152,17 @@ export async function authRoutes(app: FastifyInstance) {
     };
   });
 
-  /** PATCH /me — правка профиля вне флоу регистрации на старт. */
+  /**
+   * PATCH /me — правка профиля вне флоу регистрации на старт (карандаши в
+   * профиле). Принимает любое подмножество полей, но минимум одно.
+   *
+   * `age` отдельным полем не принимается намеренно: он производный от даты
+   * рождения, и разрешить править его отдельно значит позволить двум полям
+   * разойтись. Пришла дата — возраст пересчитывает сервер.
+   */
   app.patch('/me', { preHandler: requireTelegramAuth }, async (req, reply) => {
     const parsed = patchSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return reply
-        .code(400)
-        .send({ error: 'Validation failed', details: parsed.error.flatten() });
-    }
+    if (!parsed.success) return sendValidationError(reply, parsed.error);
 
     const tg = tgUserOf(req);
     const user = await prisma.user.findUnique({
@@ -159,10 +172,20 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Пользователь не найден', reason: 'no_user_row' });
     }
 
-    const updated = await prisma.user.update({
-      where: { id: user.id },
-      data: parsed.data,
-    });
+    const { birthDate, ...rest } = parsed.data;
+    const data: Prisma.UserUpdateInput = { ...rest };
+
+    if (birthDate !== undefined) {
+      // Схема уже проверила разбор, поэтому null тут недостижим.
+      const parsedDate = parseBirthDate(birthDate);
+      if (parsedDate !== null) {
+        data.birthDate = parsedDate;
+        data.age = ageFromBirthDate(parsedDate);
+      }
+    }
+
+    const updated = await prisma.user.update({ where: { id: user.id }, data });
+    req.log.info({ userId: user.id, fields: Object.keys(data) }, 'Профиль обновлён');
     return { user: serializeUser(updated) };
   });
 }

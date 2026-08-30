@@ -26,7 +26,10 @@ export type UserDto = {
   firstName: string;
   lastName: string | null;
   email: string | null;
+  /** Полных лет. Считает сервер из birthDate — отдельно не редактируется. */
   age: number | null;
+  /** «1999-12-14» — тот же формат, что у input[type=date]. */
+  birthDate: string | null;
   phone: string | null;
   createdAt: string;
 };
@@ -52,16 +55,23 @@ export type RegistrationPayload = {
   lastName: string;
   email: string;
   age: number;
+  birthDate: string; // yyyy-mm-dd
   phone: string;
 };
 
 // Ошибка с HTTP-статусом от сервера — чтобы UI мог различать 409/400 и т.д.
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  /**
+   * Ошибки по полям формы, если сервер их прислал (400 от валидации):
+   * `{ email: 'Некорректный email' }`. Пусто для всего остального.
+   */
+  fields: Record<string, string>;
+  constructor(status: number, message: string, fields: Record<string, string> = {}) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.fields = fields;
   }
 }
 
@@ -118,7 +128,18 @@ async function request<T>(path: string, opts: RequestOptions): Promise<T> {
       typeof (data as { error?: unknown }).error === 'string'
         ? (data as { error: string }).error
         : null;
-    throw new ApiError(res.status, serverMessage ?? fallback(res.status));
+
+    // Пер-полевые тексты валидации (см. lib/validation.ts на бэке) — их UI
+    // ставит под конкретное поле, а не общей плашкой.
+    const raw = (data as { fields?: unknown } | null)?.fields;
+    const fields: Record<string, string> = {};
+    if (raw && typeof raw === 'object') {
+      for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+        if (typeof value === 'string') fields[key] = value;
+      }
+    }
+
+    throw new ApiError(res.status, serverMessage ?? fallback(res.status), fields);
   }
 
   return data as T;
@@ -182,11 +203,12 @@ export function getMe(): Promise<MeResult> {
   });
 }
 
+// age отдельным полем не правится: сервер считает его из даты рождения.
 export type ProfilePatch = Partial<{
   firstName: string;
   lastName: string;
   email: string;
-  age: number;
+  birthDate: string; // yyyy-mm-dd
   phone: string;
 }>;
 
@@ -244,6 +266,7 @@ export type SeasonPassPayload = {
   lastName: string;
   email: string;
   age: number;
+  birthDate: string; // yyyy-mm-dd
   phone: string;
 };
 

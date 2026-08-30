@@ -2,6 +2,13 @@ import type { FastifyInstance } from 'fastify';
 import type { Event, SeasonPass, User } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../prisma';
+import { ageProfileFields, parseBirthDate } from '../lib/birthDate';
+import {
+  birthDateField,
+  emailField,
+  phoneField,
+  sendValidationError,
+} from '../lib/validation';
 import { serializeEvent } from './events';
 import { requireTelegramAuth, tgUserOf } from '../plugins/telegramAuth';
 import { serializeUser } from './auth';
@@ -19,11 +26,14 @@ function serializeSeasonPass(p: SeasonPass) {
 
 const bodySchema = z.object({
   seasonId: z.number().int().positive(),
-  firstName: z.string().trim().min(1),
-  lastName: z.string().trim().min(1),
-  email: z.string().trim().email(),
+  firstName: z.string().trim().min(1, 'Укажите имя'),
+  lastName: z.string().trim().min(1, 'Укажите фамилию'),
+  email: emailField,
+  // См. комментарий в routes/registrations.ts: форма спрашивает дату,
+  // возраст остаётся запасным вариантом.
   age: z.number().int().min(1).max(120),
-  phone: z.string().trim().min(3),
+  birthDate: birthDateField.optional(),
+  phone: phoneField,
 });
 
 // Причина, по которой абонемент нельзя оформить (all-or-nothing).
@@ -67,12 +77,9 @@ export async function seasonsRoutes(app: FastifyInstance) {
   // Оплата — заглушка (paymentStatus PENDING).
   app.post('/season-passes', { preHandler: requireTelegramAuth }, async (req, reply) => {
     const parsed = bodySchema.safeParse(req.body);
-    if (!parsed.success) {
-      return reply
-        .code(400)
-        .send({ error: 'Validation failed', details: parsed.error.flatten() });
-    }
+    if (!parsed.success) return sendValidationError(reply, parsed.error);
     const data = parsed.data;
+    const birthDate = data.birthDate ? parseBirthDate(data.birthDate) : null;
     const tg = tgUserOf(req);
     const telegramId = BigInt(tg.id);
 
@@ -85,12 +92,16 @@ export async function seasonsRoutes(app: FastifyInstance) {
       const result = await prisma.$transaction(async (tx) => {
         // Участник опознаётся по подтверждённому telegram_id, а не по email
         // из формы: email теперь обычное поле профиля, подставить чужой нельзя.
+        const known = await tx.user.findUnique({
+          where: { telegramId },
+          select: { birthDate: true },
+        });
         const profile = {
           firstName: data.firstName,
           lastName: data.lastName,
           email: data.email,
-          age: data.age,
           phone: data.phone,
+          ...ageProfileFields(birthDate, known?.birthDate ?? null, data.age),
         };
         const user: User = await tx.user.upsert({
           where: { telegramId },

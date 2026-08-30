@@ -11,7 +11,7 @@ import {
   Ticket,
 } from 'lucide-react';
 import Header from './Header';
-import type { EventDto, UserDto } from '../lib/api';
+import { ApiError, patchMe, type EventDto, type UserDto } from '../lib/api';
 import type { RaceResult } from '../data/results';
 import { useSeasonProgress } from '../hooks/useSeasonProgress';
 // TODO: номер участника бэкенд пока не отдаёт — см. комментарий в файле.
@@ -19,15 +19,14 @@ import { profileMock } from '../data/profile';
 
 type Props = {
   participant: UserDto | null;
-  // Дата рождения из формы регистрации: бэкенд хранит только age, поэтому
-  // дату несём через состояние сессии. Пропадает при перезагрузке.
-  birthDate?: string | null;
   // Старты, на которые участник зарегистрировался в этой сессии.
   registeredEvents: EventDto[];
   // Пройденные старты с внесённым результатом, от старых к новым.
   results: RaceResult[];
   // Ближайший старт вообще — запасной вариант, если регистраций нет.
   nearest: EventDto | null;
+  // Профиль сохранён на сервере — поднять свежего пользователя в состояние приложения.
+  onUserUpdated: (user: UserDto) => void;
   onViewRaces: () => void;
 };
 
@@ -69,18 +68,22 @@ function formatDob(value: string | null | undefined): string {
 
 function ProfileScreen({
   participant,
-  birthDate,
   registeredEvents,
   results,
   nearest,
+  onUserUpdated,
   onViewRaces,
 }: Props) {
   const reduceMotion = useReducedMotion();
-  // Локальные правки полей. Бэкенд их не принимает (нет PATCH /users/:id),
-  // поэтому живут до перезагрузки — см. память проекта, registration-backend-gaps.
-  const [overrides, setOverrides] = useState<Partial<Record<EditKey, string>>>({});
+  // Правки уходят в PATCH /me сразу по «применить», поэтому локальной копии
+  // полей больше нет: единственный источник правды — participant с сервера.
   const [editing, setEditing] = useState<EditKey | null>(null);
   const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  // Ошибка последнего сохранения, привязана к полю: {email: 'Некорректный email'}.
+  const [saveError, setSaveError] = useState<{ key: EditKey; message: string } | null>(
+    null,
+  );
   // Текущее время фиксируем на монтировании — рендер должен оставаться чистым.
   const [now] = useState(() => Date.now());
   const { done, total: seasonTotal } = useSeasonProgress(results);
@@ -119,41 +122,91 @@ function ProfileScreen({
     .join(" ")
     .trim();
 
+  // Сохранённое значение поля — то, что лежит в профиле на сервере.
+  const stored = (key: EditKey): string =>
+    (key === 'birthDate'
+      ? participant.birthDate
+      : key === 'phone'
+        ? participant.phone
+        : participant.email) ?? '';
+
   const fields: { key: EditKey; label: string; value: string; type: string }[] = [
     {
       key: 'birthDate',
       label: 'Дата рождения',
-      value: formatDob(overrides.birthDate ?? birthDate) || 'не указана',
+      value: formatDob(participant.birthDate) || 'не указана',
       type: 'date',
     },
-    {
-      key: 'phone',
-      label: 'Телефон',
-      value: overrides.phone ?? participant.phone ?? 'не указан',
-      type: 'tel',
-    },
-    {
-      key: 'email',
-      label: 'Email',
-      value: overrides.email ?? participant.email ?? 'не указан',
-      type: 'email',
-    },
+    { key: 'phone', label: 'Телефон', value: participant.phone ?? 'не указан', type: 'tel' },
+    { key: 'email', label: 'Email', value: participant.email ?? 'не указан', type: 'email' },
   ];
 
   const startEdit = (key: EditKey) => {
-    const raw =
-      key === 'birthDate'
-        ? (overrides.birthDate ?? birthDate ?? '')
-        : key === 'phone'
-          ? (overrides.phone ?? participant.phone ?? '')
-          : (overrides.email ?? participant.email ?? '');
-    setDraft(raw);
+    setDraft(stored(key));
+    setSaveError(null);
     setEditing(key);
   };
 
-  const commitEdit = () => {
-    if (editing) setOverrides((prev) => ({ ...prev, [editing]: draft }));
+  const cancelEdit = () => {
     setEditing(null);
+    setSaveError(null);
+  };
+
+  /**
+   * Проверки, которые видно без сервера: пустое поле и дата из будущего.
+   * Остальное (формат email, длина телефона, возраст больше 120) решает
+   * бэкенд — дублировать его правила здесь значит держать их в двух местах.
+   */
+  const localError = (key: EditKey, value: string): string | null => {
+    if (value === '') {
+      return key === 'birthDate'
+        ? 'Укажите дату рождения'
+        : key === 'phone'
+          ? 'Укажите телефон'
+          : 'Укажите email';
+    }
+    // now зафиксирован на монтировании (см. выше) — для проверки даты рождения
+    // этой точности с запасом, а рендер остаётся чистым.
+    if (key === 'birthDate' && new Date(value).getTime() > now) {
+      return 'Дата рождения не может быть в будущем';
+    }
+    return null;
+  };
+
+  const commitEdit = async () => {
+    if (!editing || saving) return;
+    const key = editing;
+    const value = draft.trim();
+
+    // Ничего не поменялось — незачем ходить на сервер.
+    if (value === stored(key)) {
+      cancelEdit();
+      return;
+    }
+
+    const local = localError(key, value);
+    if (local) {
+      setSaveError({ key, message: local });
+      return;
+    }
+
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const { user } = await patchMe({ [key]: value });
+      onUserUpdated(user);
+      setEditing(null);
+    } catch (err) {
+      // У 400 от валидации есть текст под конкретное поле, у прочих ошибок
+      // (сеть, 401, 500) — только общий; показываем то, что есть.
+      const message =
+        err instanceof ApiError
+          ? (err.fields[key] ?? err.message)
+          : 'Не удалось сохранить';
+      setSaveError({ key, message });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const upcomingDate = upcoming ? new Date(upcoming.date) : null;
@@ -179,35 +232,52 @@ function ProfileScreen({
 
       {/* Редактируемые поля */}
       <section className="glass-card pf-fields">
-        {fields.map((field) => (
-          <div className="pf-field" key={field.key}>
-            <span className="pf-field__label">{field.label}</span>
-            {editing === field.key ? (
-              <input
-                className="pf-field__input"
-                type={field.type}
-                value={draft}
-                autoFocus
-                onChange={(e) => setDraft(e.target.value)}
-                onBlur={commitEdit}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitEdit();
-                  if (e.key === 'Escape') setEditing(null);
-                }}
-              />
-            ) : (
-              <button
-                type="button"
-                className="pf-field__row"
-                onClick={() => startEdit(field.key)}
-                aria-label={`Изменить: ${field.label}`}
-              >
-                <span className="pf-field__value">{field.value}</span>
-                <Pencil size={16} strokeWidth={2} />
-              </button>
-            )}
-          </div>
-        ))}
+        {fields.map((field) => {
+          const error = saveError?.key === field.key ? saveError.message : null;
+          const errorId = `pf-err-${field.key}`;
+          return (
+            <div className="pf-field" key={field.key}>
+              <span className="pf-field__label">{field.label}</span>
+              {editing === field.key ? (
+                <input
+                  className={`pf-field__input${error ? ' pf-field__input--error' : ''}`}
+                  type={field.type}
+                  value={draft}
+                  autoFocus
+                  disabled={saving}
+                  aria-invalid={error !== null}
+                  aria-describedby={error ? errorId : undefined}
+                  onChange={(e) => setDraft(e.target.value)}
+                  // Уход фокуса — то же «применить». Запрос уйдёт только если
+                  // значение изменилось, поэтому лишних PATCH нет.
+                  onBlur={commitEdit}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitEdit();
+                    if (e.key === 'Escape') cancelEdit();
+                  }}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="pf-field__row"
+                  onClick={() => startEdit(field.key)}
+                  aria-label={`Изменить: ${field.label}`}
+                >
+                  <span className="pf-field__value">{field.value}</span>
+                  <Pencil size={16} strokeWidth={2} />
+                </button>
+              )}
+              {error && (
+                <span className="pf-field__err" id={errorId} role="alert">
+                  {error}
+                </span>
+              )}
+              {saving && editing === field.key && (
+                <span className="pf-field__hint">Сохраняем…</span>
+              )}
+            </div>
+          );
+        })}
       </section>
 
       {/* Ближайший старт участника */}
