@@ -70,6 +70,11 @@ function App() {
   }, []);
 
   useEffect(() => {
+    // Загрузка стартов с бэкенда — та самая синхронизация с внешней системой,
+    // ради которой effect и существует. Правило видит только синхронный
+    // setLoading(true) в начале loadEvents и не отличает этот случай от
+    // каскадных setState; та же оговорка стоит в useTelegramAuth.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadEvents();
   }, [loadEvents]);
 
