@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
+import { deliver, formatFinishTime, resultText } from '../../lib/notify';
 import { requireAdmin } from '../../plugins/adminAuth';
 
 const upsertSchema = z.object({
@@ -123,6 +124,13 @@ export async function adminResultsRoutes(app: FastifyInstance) {
         });
       }
 
+      // До правки: по нему решаем, уведомлять ли участника. Если админ сохранил
+      // ту же цифру (поправил что-то другое или нажал дважды) — второе
+      // сообщение с тем же результатом было бы спамом.
+      const before = await prisma.result.findUnique({
+        where: { userId_eventId: { userId, eventId } },
+      });
+
       await prisma.$transaction(async (tx) => {
         await tx.result.upsert({
           where: { userId_eventId: { userId, eventId } },
@@ -134,7 +142,31 @@ export async function adminResultsRoutes(app: FastifyInstance) {
       });
 
       req.log.info({ eventId, userId, finishTime }, 'Результат внесён из админки');
-      return { results: await protocolOf(eventId) };
+
+      const results = await protocolOf(eventId);
+
+      if (before === null || before.finishTime !== finishTime) {
+        // Место и число финишёров берём уже после пересчёта — участнику важно
+        // финальное значение, а не то, что было до перестановки.
+        const mine = results.find((r) => r.userId === userId);
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (mine && user) {
+          await deliver({
+            userId,
+            telegramId: user.telegramId,
+            eventId,
+            kind: 'RESULT',
+            text: resultText(event, {
+              finishTime: formatFinishTime(mine.finishTime),
+              place: mine.place,
+              finishersTotal: results.length,
+            }),
+            log: req.log,
+          });
+        }
+      }
+
+      return { results };
     },
   );
 

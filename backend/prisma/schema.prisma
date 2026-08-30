@@ -33,6 +33,7 @@ model User {
   registrations Registration[]
   results       Result[]
   seasonPasses  SeasonPass[]
+  notifications Notification[]
 
   @@map("users")
 }
@@ -66,6 +67,7 @@ model Event {
   season        Season?        @relation(fields: [seasonId], references: [id], onDelete: SetNull)
   registrations Registration[]
   results       Result[]
+  notifications Notification[]
 
   @@map("events")
 }
@@ -124,6 +126,54 @@ model Result {
 
   @@unique([userId, eventId])
   @@map("results")
+}
+
+enum NotificationKind {
+  /// Регистрация на один старт принята.
+  REGISTERED
+  /// Оформлен абонемент на сезон — одно сообщение на все старты.
+  SEASON_PASS
+  /// Организатор внёс результат.
+  RESULT
+  /// Напоминание за 3 дня до старта.
+  RACE_REMINDER
+}
+
+enum NotificationStatus {
+  SENT
+  /// 403 от Telegram: пользователь не начинал диалог с ботом или заблокировал его.
+  /// Не ошибка сервера — писать первым бот не имеет права, и повторы не помогут.
+  BLOCKED
+  /// Сеть, 5xx, таймаут. Напоминания такие попытки повторят на следующий день.
+  FAILED
+  /// Отправка выключена (NOTIFY_ENABLED) или у пользователя нет telegram_id.
+  SKIPPED
+}
+
+/// Журнал уведомлений: и защита от повторной отправки, и единственное место, где
+/// видно, до кого сообщение не дошло.
+///
+/// Ключ (user, event, kind) уникален, а строки пишутся через upsert — то есть
+/// здесь лежит последняя попытка каждого вида, а не вся история. Так напоминание
+/// нельзя отправить дважды, но повторное сообщение о ИСПРАВЛЕННОМ результате
+/// отправить можно: оно просто перезапишет свою строку.
+model Notification {
+  id        Int                @id @default(autoincrement())
+  userId    Int                @map("user_id")
+  /// null у SEASON_PASS: сообщение относится к сезону, а не к одному старту.
+  eventId   Int?               @map("event_id")
+  kind      NotificationKind
+  status    NotificationStatus
+  /// Текст отказа от Telegram — чтобы разбираться, не читая логи pm2.
+  error     String?
+  createdAt DateTime           @default(now()) @map("created_at")
+  updatedAt DateTime           @updatedAt @map("updated_at")
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId, kind])
+  @@map("notifications")
 }
 
 /// Сессия администратора в /admin. Пароля в системе нет: личность подтверждает

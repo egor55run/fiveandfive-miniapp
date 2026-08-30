@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../prisma';
 import { ageProfileFields, parseBirthDate } from '../lib/birthDate';
+import { deliver, registrationText } from '../lib/notify';
 import {
   birthDateField,
   emailField,
@@ -97,6 +98,20 @@ export async function registrationsRoutes(app: FastifyInstance) {
           data: { slotsTaken: { increment: 1 } },
         });
         return withQr;
+      });
+
+      // После коммита: место занято, регистрация существует. Сообщение —
+      // best effort, его судьба на ответ участнику не влияет.
+      // TODO: когда появится реальная оплата, отправку надо перевесить с
+      // создания регистрации на успешный платёж — сейчас статус PENDING, и
+      // текст говорит «регистрация принята», а не «оплачено».
+      await deliver({
+        userId: user.id,
+        telegramId: user.telegramId,
+        eventId: event.id,
+        kind: 'REGISTERED',
+        text: registrationText(event),
+        log: req.log,
       });
 
       return reply.code(201).send({

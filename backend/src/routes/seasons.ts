@@ -3,6 +3,7 @@ import type { Event, SeasonPass, User } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../prisma';
 import { ageProfileFields, parseBirthDate } from '../lib/birthDate';
+import { deliver, seasonPassText } from '../lib/notify';
 import {
   birthDateField,
   emailField,
@@ -163,7 +164,19 @@ export async function seasonsRoutes(app: FastifyInstance) {
           registrations.push(withQr);
         }
 
-        return { user, pass, registrations };
+        return { user, pass, registrations, events };
+      });
+
+      // Одно сообщение на весь абонемент, а не пять подряд: eventId = null,
+      // потому что оно относится к сезону целиком. Конкретные даты выдачи
+      // придут в напоминаниях по каждому старту.
+      await deliver({
+        userId: result.user.id,
+        telegramId: result.user.telegramId,
+        eventId: null,
+        kind: 'SEASON_PASS',
+        text: seasonPassText(result.events),
+        log: req.log,
       });
 
       return reply.code(201).send({
