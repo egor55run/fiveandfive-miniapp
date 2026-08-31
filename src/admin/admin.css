@@ -211,6 +211,64 @@ select:focus {
   font-variant-numeric: tabular-nums;
 }
 
+/* ─── Карта трассы ───────────────────────────────────────────────────────────
+   Отдельным блоком, а не ячейкой .ad-form: превью нужна ширина больше колонки
+   в 220px, и вписывать картинку в сетку полей ввода нечестно — это не поле,
+   а файл, который уходит на сервер своим запросом. */
+
+.ad-route {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ad-route__label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.ad-route__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+  align-items: flex-start;
+}
+
+/* Тот же бокс, в котором карта показывается в приложении (328×227), — чтобы
+   администратор видел ровно то, что увидит участник, включая поля по краям у
+   картинки с другим соотношением сторон. */
+.ad-route__preview {
+  display: block;
+  width: min(328px, 100%);
+  aspect-ratio: 328 / 227;
+  object-fit: contain;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+}
+
+.ad-route__preview--empty {
+  display: grid;
+  place-items: center;
+  padding: var(--sp-md);
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  border-style: dashed;
+}
+
+.ad-route__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-sm);
+}
+
+.ad-route__controls input[type='file'] {
+  padding: 6px;
+  font-size: 13px;
+}
+
 /* ─── Таблицы ────────────────────────────────────────────────────────────── */
 
 .ad-table-wrap {

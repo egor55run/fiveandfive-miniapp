@@ -2,6 +2,12 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
 import { requireAdmin } from '../../plugins/adminAuth';
+import {
+  MAX_ROUTE_IMAGE_BYTES,
+  RouteImageError,
+  deleteRouteImage,
+  saveRouteImage,
+} from '../../lib/routeImages';
 import { serializeEvent } from '../events';
 
 const eventFields = {
@@ -14,6 +20,10 @@ const eventFields = {
   seasonId: z.number().int().positive().nullable(),
 };
 
+// routeImageUrl в eventFields сознательно нет: карту ставит только загрузка
+// файла (POST /admin/events/:id/route-image), которая сама придумывает имя и
+// проверяет содержимое. Иначе в колонку можно было бы вписать любую строку —
+// и ссылку на чужой сайт, и путь мимо каталога загрузок.
 const createSchema = z.object(eventFields);
 // Правка частичная: форма присылает только изменённые поля.
 const updateSchema = z.object(eventFields).partial().refine(
@@ -145,6 +155,104 @@ export async function adminEventsRoutes(app: FastifyInstance) {
   });
 
   /**
+   * POST /admin/events/:id/route-image — загрузить карту трассы.
+   *
+   * Тело — multipart/form-data с единственным файлом в поле `file`. Файл
+   * целиком поднимаем в память (не более MAX_ROUTE_IMAGE_BYTES, лимит стоит на
+   * самом плагине multipart): так формат проверяется по содержимому ДО того,
+   * как что-то попадёт на диск, и не остаётся недописанных файлов.
+   */
+  app.post<{ Params: { id: string } }>('/admin/events/:id/route-image', async (req, reply) => {
+    const id = parseId(req.params.id);
+    if (id === null) return reply.code(400).send({ error: 'Некорректный id' });
+
+    const event = await prisma.event.findUnique({ where: { id } });
+    if (!event) return reply.code(404).send({ error: 'Старт не найден' });
+
+    let data: Awaited<ReturnType<typeof req.file>>;
+    try {
+      data = await req.file();
+    } catch (err) {
+      req.log.warn({ err, eventId: id }, 'Не удалось разобрать multipart с картой трассы');
+      return reply.code(400).send({
+        error: 'Ожидается файл в multipart/form-data',
+        reason: 'bad_multipart',
+      });
+    }
+    if (!data) {
+      return reply.code(400).send({ error: 'Файл не приложен', reason: 'no_file' });
+    }
+
+    const tooLarge = {
+      error: `Файл больше ${Math.round(MAX_ROUTE_IMAGE_BYTES / 1024 / 1024)} МБ`,
+      reason: 'file_too_large',
+    };
+
+    let buffer: Buffer;
+    try {
+      buffer = await data.toBuffer();
+    } catch (err) {
+      // Превышение лимита — единственная ожидаемая ошибка чтения, и для неё
+      // правильный код 413, а не 500.
+      if ((err as { code?: string }).code === 'FST_REQ_FILE_TOO_LARGE') {
+        return reply.code(413).send(tooLarge);
+      }
+      throw err;
+    }
+
+    // Лимит плагина не всегда становится исключением: файл может просто
+    // приехать обрезанным по лимиту. Молча сохранять такое нельзя — у
+    // усечённого PNG заголовок остаётся правильным, проверка формата его
+    // пропустит, и в приложение уйдёт битая картинка.
+    if (data.file.truncated) {
+      return reply.code(413).send(tooLarge);
+    }
+
+    let saved;
+    try {
+      saved = await saveRouteImage(id, buffer);
+    } catch (err) {
+      if (err instanceof RouteImageError) {
+        return reply.code(400).send({ error: err.message, reason: err.reason });
+      }
+      throw err;
+    }
+
+    // Порядок: сначала новый файл на диске, потом ссылка в БД, и только затем
+    // удаление прежнего файла. Обрыв на любом шаге оставляет рабочую картинку —
+    // либо старую, либо новую, но не ссылку в пустоту.
+    const updated = await prisma.event.update({
+      where: { id },
+      data: { routeImageUrl: saved.url },
+    });
+    await deleteRouteImage(event.routeImageUrl);
+
+    req.log.info(
+      { eventId: id, url: saved.url, bytes: saved.bytes, kind: saved.kind },
+      'Карта трассы загружена',
+    );
+    return serializeEvent(updated);
+  });
+
+  /** DELETE /admin/events/:id/route-image — убрать карту (в приложении вернётся плейсхолдер). */
+  app.delete<{ Params: { id: string } }>('/admin/events/:id/route-image', async (req, reply) => {
+    const id = parseId(req.params.id);
+    if (id === null) return reply.code(400).send({ error: 'Некорректный id' });
+
+    const event = await prisma.event.findUnique({ where: { id } });
+    if (!event) return reply.code(404).send({ error: 'Старт не найден' });
+
+    const updated = await prisma.event.update({
+      where: { id },
+      data: { routeImageUrl: null },
+    });
+    await deleteRouteImage(event.routeImageUrl);
+
+    req.log.info({ eventId: id }, 'Карта трассы убрана');
+    return serializeEvent(updated);
+  });
+
+  /**
    * DELETE /admin/events/:id — удалить старт.
    *
    * В схеме у registrations и results onDelete: Cascade, поэтому обычное
@@ -179,6 +287,8 @@ export async function adminEventsRoutes(app: FastifyInstance) {
       }
 
       await prisma.event.delete({ where: { id } });
+      // Строки в БД больше нет — файл карты иначе остался бы на диске навсегда.
+      await deleteRouteImage(event.routeImageUrl);
       req.log.warn(
         { eventId: id, title: event.title, registrations: regs, results },
         'Старт удалён из админки',

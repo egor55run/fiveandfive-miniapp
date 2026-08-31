@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Map } from 'lucide-react';
-import type { EventDto } from '../lib/api';
-import { getRouteMap } from '../data/routeMaps';
+import { apiAsset, type EventDto } from '../lib/api';
 
 type Props = {
   event: EventDto;
@@ -48,7 +47,9 @@ function NextRaceCard({ event, onRegister }: Props) {
   const [showRoute, setShowRoute] = useState(false);
 
   const soldOut = event.slotsLeft <= 0;
-  const routeMap = useMemo(() => getRouteMap(event), [event]);
+  // Карту загружает организатор в админке; у стартов без неё показываем
+  // плейсхолдер, а не чужой маршрут.
+  const routeSrc = event.routeImageUrl ? apiAsset(event.routeImageUrl) : null;
 
   return (
     <motion.section
@@ -92,13 +93,11 @@ function NextRaceCard({ event, onRegister }: Props) {
           animate={{ opacity: 1, height: 'auto' }}
           transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
         >
-          {routeMap ? (
+          {routeSrc ? (
             <img
               className="hero__map-img"
-              src={routeMap.src}
-              srcSet={routeMap.srcSet}
-              alt={routeMap.alt}
-              style={{ aspectRatio: routeMap.aspectRatio }}
+              src={routeSrc}
+              alt={`Схема трассы: ${event.distance} — ${event.title}`}
               // Карта раскрывается по тапу, так что к моменту показа её ещё нет в кэше —
               // грузим сразу, а не лениво, иначе видно пустой блок.
               decoding="async"

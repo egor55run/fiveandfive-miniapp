@@ -13,6 +13,9 @@ export function serializeEvent(e: Event) {
     slotsTaken: e.slotsTaken,
     slotsLeft: e.slotsTotal - e.slotsTaken,
     price: Number(e.price),
+    // Путь относительно корня API («/uploads/routes/…») или null, если карты у
+    // старта нет. Базовый адрес приклеивает клиент — см. apiAsset в src/lib/api.ts.
+    routeImageUrl: e.routeImageUrl,
     createdAt: e.createdAt,
   };
 }

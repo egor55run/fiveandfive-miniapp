@@ -14,8 +14,22 @@ export type EventDto = {
   slotsTaken: number;
   slotsLeft: number;
   price: number;
+  /**
+   * Карта трассы: путь относительно корня API («/uploads/routes/…»), который
+   * админка получила при загрузке файла, или null, если карты у старта нет.
+   * Для <img src> прогонять через apiAsset — базового адреса в значении нет.
+   */
+  routeImageUrl: string | null;
   createdAt: string;
 };
+
+/**
+ * Абсолютная ссылка на файл, загруженный через админку. В БД лежит путь без
+ * домена, потому что базовый адрес API у прода и локальной разработки разный.
+ */
+export function apiAsset(path: string): string {
+  return `${API_URL}${path}`;
+}
 
 // email/age/phone заполняются не при входе, а при регистрации на старт,
 // поэтому у только что вошедшего пользователя они пустые.

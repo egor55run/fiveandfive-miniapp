@@ -1,7 +1,15 @@
 import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
+import multipart from '@fastify/multipart';
+import fastifyStatic from '@fastify/static';
 import { prisma } from './prisma';
+import {
+  MAX_ROUTE_IMAGE_BYTES,
+  UPLOADS_PREFIX,
+  ensureUploadDirs,
+  uploadsRoot,
+} from './lib/routeImages';
 import { setupAdminAuth } from './plugins/adminAuth';
 import { setupTelegramAuth } from './plugins/telegramAuth';
 import { adminEventsRoutes } from './routes/admin/events';
@@ -45,6 +53,32 @@ function corsOrigins(): string[] | boolean {
 async function main() {
   await app.register(cors, { origin: corsOrigins() });
   await app.register(cookie);
+
+  // Загрузка файлов. Единственный потребитель — карта трассы в админке, поэтому
+  // лимиты сразу узкие: один файл, без текстовых полей. Плагин регистрируем на
+  // корневом инстансе — дочерние плагины с роутами наследуют его декораторы.
+  await app.register(multipart, {
+    limits: { fileSize: MAX_ROUTE_IMAGE_BYTES, files: 1, fields: 0 },
+  });
+
+  /**
+   * Раздача загруженных файлов. Наружу это /api/uploads/... — nginx уже
+   * проксирует /api/ сюда, отдельный location для картинок не нужен.
+   *
+   * Кэш навсегда безопасен: имя файла содержит случайный хвост, и замена карты
+   * меняет URL (см. lib/routeImages.ts). index/dirlist выключены — по префиксу
+   * должно отдаваться только то, что запрошено по точному имени.
+   */
+  await ensureUploadDirs();
+  await app.register(fastifyStatic, {
+    root: uploadsRoot(),
+    prefix: `${UPLOADS_PREFIX}/`,
+    index: false,
+    list: false,
+    cacheControl: true,
+    maxAge: '365d',
+    immutable: true,
+  });
 
   // Health check — also verifies DB connectivity.
   app.get('/health', async (_req, reply) => {

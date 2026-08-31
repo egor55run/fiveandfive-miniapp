@@ -105,6 +105,8 @@ export type AdminEvent = {
   slotsTaken: number;
   slotsLeft: number;
   price: number;
+  /** Путь к загруженной карте трассы относительно корня API, или null. */
+  routeImageUrl: string | null;
   createdAt: string;
   season: { id: number; title: string; year: number } | null;
   registrations: { total: number; pending: number; paid: number; cancelled: number };
@@ -132,6 +134,66 @@ export const deleteEvent = (id: number, force = false) =>
     `/admin/events/${id}${force ? '?force=1' : ''}`,
     { method: 'DELETE' },
   );
+
+// ---------- Карта трассы ----------
+
+/** Что принимает сервер (проверяет по содержимому файла, а не по этим строкам). */
+export const ROUTE_IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp';
+export const ROUTE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
+/** Абсолютная ссылка на загруженный файл: в БД лежит путь без домена. */
+export const assetUrl = (path: string) => `${API_URL}${path}`;
+
+/**
+ * Ответ роутов карты — сериализованный старт, но без счётчиков и сезона,
+ * которыми список обрастает в GET /admin/events. Берём из него только то, что
+ * там точно есть: свежий список UI всё равно перезагружает.
+ */
+export type RouteImageResult = { id: number; routeImageUrl: string | null };
+
+/**
+ * Загрузка карты трассы. Идёт не через request(): тело здесь multipart, а не
+ * JSON, и Content-Type должен поставить сам браузер — вместе с boundary.
+ */
+export async function uploadRouteImage(
+  eventId: number,
+  file: File,
+): Promise<RouteImageResult> {
+  const body = new FormData();
+  body.append('file', file);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/admin/events/${eventId}/route-image`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      body,
+    });
+  } catch {
+    throw new AdminApiError(0, 'Не удалось связаться с сервером');
+  }
+
+  const data: unknown = await res.json().catch(() => null);
+  if (!res.ok) {
+    const obj = (data ?? {}) as { error?: string; reason?: string };
+    // 413 без JSON — это nginx, а не наш обработчик: у него свой лимит на тело
+    // запроса (client_max_body_size, по умолчанию 1 МБ), и до бэкенда файл не
+    // дошёл. Иначе администратор увидел бы бессмысленную «Ошибка 413».
+    if (res.status === 413 && !obj.error) {
+      throw new AdminApiError(
+        413,
+        'Файл отклонён веб-сервером как слишком большой. Уменьшите картинку или поднимите client_max_body_size в nginx.',
+        'nginx_limit',
+      );
+    }
+    throw new AdminApiError(res.status, obj.error ?? `Ошибка ${res.status}`, obj.reason);
+  }
+  return data as AdminEvent;
+}
+
+/** Убрать карту: в приложении у старта снова будет плейсхолдер. */
+export const deleteRouteImage = (eventId: number) =>
+  request<RouteImageResult>(`/admin/events/${eventId}/route-image`, { method: 'DELETE' });
 
 // ---------- Участники ----------
 

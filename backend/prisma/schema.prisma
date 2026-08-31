@@ -62,6 +62,12 @@ model Event {
   slotsTaken Int      @default(0) @map("slots_taken")
   price      Decimal  @default(0) @db.Decimal(10, 2)
   seasonId   Int?     @map("season_id")
+  /// Карта трассы: путь относительно корня API — «/uploads/routes/<файл>».
+  /// Не абсолютный URL осознанно: одно и то же значение работает и локально
+  /// (localhost:3000), и в проде, где nginx проксирует /api/ на бэкенд.
+  /// Сам файл лежит на диске (UPLOAD_DIR, см. lib/routeImages.ts), в БД только
+  /// ссылка. null — карты у старта нет, приложение покажет плейсхолдер.
+  routeImageUrl String? @map("route_image_url")
   createdAt  DateTime @default(now()) @map("created_at")
 
   season        Season?        @relation(fields: [seasonId], references: [id], onDelete: SetNull)

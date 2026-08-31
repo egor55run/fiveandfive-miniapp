@@ -28,3 +28,7 @@ dist-ssr
 
 # Figma working data (JSON dumps, PNG exports) — not committed
 backend/_figma/
+
+# Файлы, загруженные через админку (карты трасс). Это данные, не код: на каждой
+# машине свои. Каталог переопределяется через UPLOAD_DIR в backend/.env.
+backend/uploads/

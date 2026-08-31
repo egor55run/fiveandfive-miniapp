@@ -1,11 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AdminApiError,
+  ROUTE_IMAGE_ACCEPT,
+  ROUTE_IMAGE_MAX_BYTES,
+  assetUrl,
   createEvent,
   deleteEvent,
+  deleteRouteImage,
   getEvents,
   getSeasons,
   updateEvent,
+  uploadRouteImage,
   type AdminEvent,
   type EventInput,
   type SeasonOption,
@@ -69,6 +74,19 @@ export default function EventsSection() {
   const [formOpen, setFormOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  /**
+   * Карта трассы живёт отдельно от остальных полей: она передаётся не в JSON, а
+   * отдельным multipart-запросом (у нового старта — уже после того, как сервер
+   * выдал id). Поэтому здесь три состояния: выбранный файл, уже сохранённая
+   * карта и признак «убрать». Применяются они все в submit(), чтобы форма
+   * оставалась одной операцией, а не набором мгновенных действий.
+   */
+  const [routeFile, setRouteFile] = useState<File | null>(null);
+  const [routePreview, setRoutePreview] = useState<string | null>(null);
+  const [routeSaved, setRouteSaved] = useState<string | null>(null);
+  const [routeCleared, setRouteCleared] = useState(false);
+  const routeInputRef = useRef<HTMLInputElement>(null);
+
   const load = async () => {
     setLoading(true);
     setError(null);
@@ -91,15 +109,59 @@ export default function EventsSection() {
     void load();
   }, []);
 
+  /**
+   * Сбросить всё, что относится к карте. Object URL превью обязательно
+   * отзываем: без этого каждый выбранный файл остаётся висеть в памяти
+   * страницы до перезагрузки.
+   */
+  const resetRoute = (saved: string | null) => {
+    if (routePreview) URL.revokeObjectURL(routePreview);
+    setRoutePreview(null);
+    setRouteFile(null);
+    setRouteCleared(false);
+    setRouteSaved(saved);
+    // Без сброса значения input повторный выбор того же файла не даст события
+    // change, и «Убрать карту» → выбрать ту же картинку не сработало бы.
+    if (routeInputRef.current) routeInputRef.current.value = '';
+  };
+
+  /** Проверки до отправки: те же правила, что на сервере, но без ожидания сети. */
+  const pickRouteFile = (file: File | null) => {
+    if (!file) {
+      resetRoute(routeSaved);
+      return;
+    }
+    // Пустой type встречается, когда система не знает расширения; окончательное
+    // слово всё равно за сервером, он смотрит в содержимое. Здесь отсекаем
+    // только заведомо чужие форматы, чтобы не гонять файл по сети зря.
+    if (file.type && !ROUTE_IMAGE_ACCEPT.split(',').includes(file.type)) {
+      setError('Карта должна быть JPG, PNG или WebP');
+      if (routeInputRef.current) routeInputRef.current.value = '';
+      return;
+    }
+    if (file.size > ROUTE_IMAGE_MAX_BYTES) {
+      setError(`Файл больше ${Math.round(ROUTE_IMAGE_MAX_BYTES / 1024 / 1024)} МБ`);
+      if (routeInputRef.current) routeInputRef.current.value = '';
+      return;
+    }
+    setError(null);
+    if (routePreview) URL.revokeObjectURL(routePreview);
+    setRoutePreview(URL.createObjectURL(file));
+    setRouteFile(file);
+    setRouteCleared(false);
+  };
+
   const openCreate = () => {
     setEditingId(null);
     setForm(EMPTY_FORM);
+    resetRoute(null);
     setFormOpen(true);
     setError(null);
   };
 
   const openEdit = (event: AdminEvent) => {
     setEditingId(event.id);
+    resetRoute(event.routeImageUrl);
     setForm({
       title: event.title,
       date: toDateTimeLocal(event.date),
@@ -122,21 +184,51 @@ export default function EventsSection() {
     setSaving(true);
     setError(null);
     setNotice(null);
+
+    // id известен либо сразу (правка), либо только после создания — карта
+    // грузится отдельным запросом и потому всегда вторым шагом.
+    let eventId = editingId;
     try {
       if (editingId === null) {
-        await createEvent(input);
+        const created = await createEvent(input);
+        eventId = created.id;
         setNotice('Старт создан');
       } else {
         await updateEvent(editingId, input);
         setNotice('Изменения сохранены');
       }
-      setFormOpen(false);
-      await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось сохранить');
-    } finally {
       setSaving(false);
+      return;
     }
+
+    // Старт уже сохранён. Если карта не доедет, об этом надо сказать прямо, а не
+    // общим «не удалось сохранить»: поля-то записались, повторять их незачем.
+    try {
+      if (routeFile && eventId !== null) {
+        await uploadRouteImage(eventId, routeFile);
+        setNotice((prev) => `${prev ?? 'Сохранено'}, карта трассы загружена`);
+      } else if (routeCleared && routeSaved && eventId !== null) {
+        await deleteRouteImage(eventId);
+        setNotice((prev) => `${prev ?? 'Сохранено'}, карта трассы убрана`);
+      }
+    } catch (err) {
+      const what = routeFile ? 'загрузить' : 'убрать';
+      setNotice(null);
+      setError(
+        `Старт сохранён, но карту не удалось ${what}: ` +
+          (err instanceof Error ? err.message : 'ошибка запроса'),
+      );
+      setSaving(false);
+      await load();
+      return;
+    }
+
+    resetRoute(null);
+    setFormOpen(false);
+    setSaving(false);
+    await load();
   };
 
   const remove = async (event: AdminEvent) => {
@@ -171,6 +263,11 @@ export default function EventsSection() {
 
   const field = (key: keyof FormState, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  // Что показать в превью: выбранный файл важнее сохранённой карты, а помеченная
+  // на удаление карта не показывается вовсе — форма показывает будущее состояние.
+  const routePreviewSrc =
+    routePreview ?? (!routeCleared && routeSaved ? assetUrl(routeSaved) : null);
 
   return (
     <section className="ad-section">
@@ -258,6 +355,51 @@ export default function EventsSection() {
               </select>
             </label>
           </div>
+
+          <div className="ad-route">
+            <span className="ad-route__label">Карта трассы</span>
+            <div className="ad-route__body">
+              {routePreviewSrc ? (
+                <img className="ad-route__preview" src={routePreviewSrc} alt="Карта трассы" />
+              ) : (
+                <div className="ad-route__preview ad-route__preview--empty">
+                  Карты нет — в приложении будет плейсхолдер
+                </div>
+              )}
+
+              <div className="ad-route__controls">
+                <input
+                  ref={routeInputRef}
+                  type="file"
+                  accept={ROUTE_IMAGE_ACCEPT}
+                  onChange={(e) => pickRouteFile(e.target.files?.[0] ?? null)}
+                />
+                {(routeFile || (routeSaved && !routeCleared)) && (
+                  <button
+                    type="button"
+                    className="ad-btn ad-btn--sm"
+                    onClick={() => {
+                      // Выбранный файл просто отменяем, сохранённую карту
+                      // помечаем на удаление — оно уйдёт на сервер в «Сохранить».
+                      const hadSaved = routeSaved;
+                      resetRoute(hadSaved);
+                      if (!routeFile && hadSaved) setRouteCleared(true);
+                    }}
+                  >
+                    {routeFile ? 'Отменить выбор' : 'Убрать карту'}
+                  </button>
+                )}
+              </div>
+
+              <p className="ad-hint">
+                JPG, PNG или WebP, до {Math.round(ROUTE_IMAGE_MAX_BYTES / 1024 / 1024)} МБ.
+                Пропорции макета — 328×227; картинка вписывается в этот бокс целиком,
+                поэтому сильно другое соотношение сторон оставит поля по краям.
+                {editingId === null && ' У нового старта карта загрузится сразу после создания.'}
+              </p>
+            </div>
+          </div>
+
           <div className="ad-actions">
             <button
               type="button"
@@ -267,7 +409,14 @@ export default function EventsSection() {
             >
               {saving ? 'Сохраняем…' : 'Сохранить'}
             </button>
-            <button type="button" className="ad-btn" onClick={() => setFormOpen(false)}>
+            <button
+              type="button"
+              className="ad-btn"
+              onClick={() => {
+                resetRoute(null);
+                setFormOpen(false);
+              }}
+            >
               Отмена
             </button>
           </div>
@@ -292,6 +441,7 @@ export default function EventsSection() {
                 <th className="num">Занято</th>
                 <th>Оплаты</th>
                 <th>Сезон</th>
+                <th>Карта</th>
                 <th className="num">Рез-ты</th>
                 <th />
               </tr>
@@ -316,6 +466,15 @@ export default function EventsSection() {
                     <span title="Отменено">{e.registrations.cancelled}</span>
                   </td>
                   <td>{e.season ? `${e.season.title}` : '—'}</td>
+                  <td>
+                    {e.routeImageUrl ? (
+                      <a href={assetUrl(e.routeImageUrl)} target="_blank" rel="noreferrer">
+                        есть
+                      </a>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
                   <td className="num">{e.resultsCount}</td>
                   <td className="ad-nowrap">
                     <button type="button" className="ad-btn ad-btn--sm" onClick={() => openEdit(e)}>
