@@ -34,6 +34,7 @@ model User {
   results       Result[]
   seasonPasses  SeasonPass[]
   notifications Notification[]
+  payments      Payment[]
 
   @@map("users")
 }
@@ -96,6 +97,7 @@ model Registration {
   user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   event      Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
   seasonPass SeasonPass? @relation(fields: [seasonPassId], references: [id], onDelete: SetNull)
+  payments   Payment[]
 
   // Один пользователь — одна регистрация на конкретный старт
   @@unique([userId, eventId])
@@ -113,6 +115,7 @@ model SeasonPass {
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   season        Season         @relation(fields: [seasonId], references: [id], onDelete: Cascade)
   registrations Registration[]
+  payments      Payment[]
 
   // Один абонемент на сезон на пользователя
   @@unique([userId, seasonId])
@@ -197,4 +200,64 @@ model AdminSession {
   userAgent  String?  @map("user_agent")
 
   @@map("admin_sessions")
+}
+
+enum PaymentPurpose {
+  /// Одиночная регистрация на старт.
+  REGISTRATION
+  /// Абонемент на сезон: один счёт на все старты.
+  SEASON_PASS
+}
+
+enum PaymentState {
+  /// Строка создана, счёт в Kaspi ещё не выставлен (или запрос не дошёл).
+  CREATED
+  /// Счёт выставлен, ждём оплату в приложении Kaspi.
+  PENDING
+  PAID
+  /// Счёт отменён (участником в Kaspi или нами).
+  CANCELLED
+  /// Время на оплату вышло — место освобождено.
+  EXPIRED
+  /// Счёт не удалось выставить: номер без Kaspi, ошибка ApiPay и т.п.
+  FAILED
+}
+
+/// Попытка оплаты через ApiPay (счёт в Kaspi по номеру телефона).
+///
+/// Одна регистрация или абонемент может иметь несколько попыток: участник
+/// не оплатил вовремя и пробует снова. Решает только последняя активная, но
+/// старые строки остаются — по ним видно, что происходило со счётом.
+model Payment {
+  id             Int            @id @default(autoincrement())
+  userId         Int            @map("user_id")
+  purpose        PaymentPurpose
+  registrationId Int?           @map("registration_id")
+  seasonPassId   Int?           @map("season_pass_id")
+  /// Сумма в тенге, только целые: Kaspi не принимает тиыны в счёте по номеру.
+  amount         Decimal        @db.Decimal(10, 2)
+  /// Номер в формате ApiPay: 8XXXXXXXXXX.
+  phone          String
+  state          PaymentState   @default(CREATED)
+  /// id счёта в ApiPay. Уникален: вебхук находит платёж по нему.
+  providerInvoiceId Int?        @unique @map("provider_invoice_id")
+  /// Последний сырой статус из ApiPay — для разбора без логов.
+  providerStatus String?        @map("provider_status")
+  error          String?
+  /// До какого момента держим место за участником.
+  expiresAt      DateTime       @map("expires_at")
+  paidAt         DateTime?      @map("paid_at")
+  /// Когда последний раз спрашивали статус у ApiPay (ограничиваем частоту опроса).
+  checkedAt      DateTime?      @map("checked_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  registration Registration? @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  seasonPass   SeasonPass?   @relation(fields: [seasonPassId], references: [id], onDelete: Cascade)
+
+  @@index([state, expiresAt])
+  @@index([registrationId])
+  @@index([seasonPassId])
+  @@map("payments")
 }

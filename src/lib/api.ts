@@ -57,10 +57,34 @@ export type RegistrationDto = {
   registeredAt: string;
 };
 
+/**
+ * Оплата через Kaspi (ApiPay). null — счёт не нужен: старт бесплатный или
+ * оплата на сервере не настроена.
+ */
+export type PaymentState = 'CREATED' | 'PENDING' | 'PAID' | 'CANCELLED' | 'EXPIRED' | 'FAILED';
+
+export type PaymentDto = {
+  id: number;
+  state: PaymentState;
+  amount: number;
+  /** Номер, на который выставлен счёт: 8XXXXXXXXXX. */
+  phone: string;
+  /** До какого момента держим место. */
+  expiresAt: string;
+  paidAt: string | null;
+  /** Готовая фраза, когда счёт не выставился, отменён или истёк. */
+  message: string | null;
+};
+
+/** Ждём ли ещё оплату по счёту. */
+export function isPaymentOpen(p: PaymentDto): boolean {
+  return p.state === 'CREATED' || p.state === 'PENDING';
+}
+
 export type RegistrationResult = {
   user: UserDto;
   registration: RegistrationDto;
-  payment: { status: string; message: string };
+  payment: PaymentDto | null;
 };
 
 export type RegistrationPayload = {
@@ -288,7 +312,7 @@ export type SeasonPassResult = {
   user: UserDto;
   seasonPass: SeasonPassDto;
   registrations: RegistrationDto[];
-  payment: { status: string; message: string };
+  payment: PaymentDto | null;
 };
 
 // Активный сезон. Возвращает null, если сезона нет (404) — тогда UI
@@ -313,4 +337,17 @@ export function createSeasonPass(
     preferServerMessage: true,
     fallback: (s) => `Ошибка (${s})`,
   });
+}
+
+// ---------- Оплата ----------
+
+/**
+ * Статус оплаты. Экран «Оплатите в Kaspi» опрашивает его, пока счёт открыт;
+ * сервер при этом сам сверяется с ApiPay, если вебхук ещё не пришёл.
+ */
+export async function getPayment(id: number): Promise<PaymentDto> {
+  const res = await request<{ payment: PaymentDto }>(`/payments/${id}`, {
+    fallback: (s) => `Не удалось проверить оплату (${s})`,
+  });
+  return res.payment;
 }

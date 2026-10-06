@@ -12,13 +12,20 @@ import RegistrationScreen, {
   type RegistrationPrefill,
 } from './components/RegistrationScreen';
 import RegistrationSuccessScreen from './components/RegistrationSuccessScreen';
+import PaymentScreen from './components/PaymentScreen';
 import TabBar, { type TabId } from './components/TabBar';
-import { ApiError, getEvents, type EventDto, type UserDto } from './lib/api';
+import {
+  ApiError,
+  getEvents,
+  type EventDto,
+  type PaymentDto,
+  type UserDto,
+} from './lib/api';
 import { toRaceResults } from './data/results';
 import { useTelegramAuth } from './hooks/useTelegramAuth';
 import { fioFromParts, getUnsafeTelegramUser } from './lib/telegram';
 
-type Screen = 'analytics' | 'home' | 'profile' | 'registration' | 'success';
+type Screen = 'analytics' | 'home' | 'profile' | 'registration' | 'payment' | 'success';
 
 // Ближайший старт: самый ранний из будущих; иначе самый недавний из прошедших.
 function pickNearest(events: EventDto[]): EventDto | null {
@@ -56,6 +63,11 @@ function App() {
   const [outcome, setOutcome] = useState<RegistrationOutcome | null>(null);
   // Старт, выбранный для регистрации (hero, карточка ленты или промо серии).
   const [regEvent, setRegEvent] = useState<EventDto | null>(null);
+  // Выставленный, но ещё не оплаченный счёт в Kaspi + что им оплачивается.
+  const [pending, setPending] = useState<{
+    outcome: RegistrationOutcome;
+    payment: PaymentDto;
+  } | null>(null);
 
   const loadEvents = useCallback(async () => {
     setLoading(true);
@@ -89,7 +101,16 @@ function App() {
     setCurrentScreen('registration');
   };
 
+  const handlePaymentStarted = (result: RegistrationOutcome, payment: PaymentDto) => {
+    setParticipantOverride(result.user);
+    setPending({ outcome: result, payment });
+    setCurrentScreen('payment');
+    // Место уже занято — пусть главная покажет актуальные слоты.
+    loadEvents();
+  };
+
   const handleRegistered = (result: RegistrationOutcome) => {
+    setPending(null);
     setParticipantOverride(result.user);
     setOutcome(result);
     setCurrentScreen('success');
@@ -125,7 +146,11 @@ function App() {
 
   // Старты, на которые пользователь записан, — из БД, а не только из состояния
   // текущей сессии: профиль должен быть верным и после переоткрытия приложения.
-  const myEvents = me?.registrations.map((r) => r.event) ?? outcome?.events ?? [];
+  // Отменённые (не успел оплатить, место освобождено) — не в счёт.
+  const myEvents =
+    me?.registrations.filter((r) => r.paymentStatus !== 'CANCELLED').map((r) => r.event) ??
+    outcome?.events ??
+    [];
 
   // Флоу регистрации — свои экраны без таб-бара.
   if (currentScreen === 'registration' && regEvent) {
@@ -134,7 +159,28 @@ function App() {
         event={regEvent}
         onBack={() => setCurrentScreen('home')}
         onRegistered={handleRegistered}
+        onPaymentStarted={handlePaymentStarted}
         prefill={prefill}
+      />
+    );
+  }
+
+  if (currentScreen === 'payment' && pending) {
+    return (
+      <PaymentScreen
+        payment={pending.payment}
+        title={
+          pending.outcome.seasonPass
+            ? `${pending.outcome.events.length} стартов сезона`
+            : pending.outcome.events[0]?.title ?? ''
+        }
+        seasonPass={pending.outcome.seasonPass}
+        onPaid={() => handleRegistered(pending.outcome)}
+        onBack={() => {
+          // Форма та же: можно поправить номер и выставить счёт заново.
+          setCurrentScreen(regEvent ? 'registration' : 'home');
+          loadEvents();
+        }}
       />
     );
   }

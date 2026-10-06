@@ -18,6 +18,8 @@ import { adminResultsRoutes } from './routes/admin/results';
 import { adminSessionRoutes } from './routes/admin/session';
 import { authRoutes } from './routes/auth';
 import { eventsRoutes } from './routes/events';
+import { paymentsRoutes } from './routes/payments';
+import { apiPayConfigured, sweepPayments } from './lib/payments';
 import { registrationsRoutes } from './routes/registrations';
 import { seasonsRoutes } from './routes/seasons';
 
@@ -95,6 +97,7 @@ async function main() {
   await app.register(eventsRoutes);
   await app.register(registrationsRoutes);
   await app.register(seasonsRoutes);
+  await app.register(paymentsRoutes);
 
   // Админка: своя cookie-сессия, к initData участников отношения не имеет.
   // Каждая группа — отдельный плагин, поэтому preHandler requireAdmin внутри
@@ -104,7 +107,36 @@ async function main() {
   await app.register(adminParticipantsRoutes);
   await app.register(adminResultsRoutes);
 
+  // Фоновая сверка оплат: раз в минуту освобождаем места по просроченным
+  // счетам и перепроверяем те, по которым не пришёл вебхук. Процесс бэкенда
+  // один (pm2), поэтому отдельный планировщик не нужен; PAYMENTS_SWEEP=false
+  // выключает сверку, если когда-нибудь появится второй экземпляр.
+  let sweepTimer: NodeJS.Timeout | null = null;
+  if (process.env.PAYMENTS_SWEEP !== 'false') {
+    let running = false;
+    const sweep = async () => {
+      if (running) return;
+      running = true;
+      try {
+        const stats = await sweepPayments(app.log);
+        if (stats.expired || stats.checked) app.log.info(stats, 'Сверка оплат');
+      } catch (err) {
+        app.log.error({ err: String(err) }, 'Сверка оплат: сбой');
+      } finally {
+        running = false;
+      }
+    };
+    sweepTimer = setInterval(sweep, 60_000);
+    sweepTimer.unref();
+  }
+  if (!apiPayConfigured()) {
+    app.log.warn('APIPAY_API_KEY не задан — регистрации создаются без счёта Kaspi (заглушка)');
+  } else if (!process.env.APIPAY_WEBHOOK_SECRET) {
+    app.log.warn('APIPAY_WEBHOOK_SECRET не задан — вебхуки ApiPay отклоняются, оплата подтверждается только опросом');
+  }
+
   app.addHook('onClose', async () => {
+    if (sweepTimer) clearInterval(sweepTimer);
     await prisma.$disconnect();
   });
 

@@ -3,7 +3,15 @@ import type { Event, SeasonPass, User } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../prisma';
 import { ageProfileFields, parseBirthDate } from '../lib/birthDate';
+import { KASPI_PHONE_ERROR, normalizeKzPhone } from '../lib/apipay';
 import { deliver, seasonPassText } from '../lib/notify';
+import {
+  apiPayConfigured,
+  findActivePayment,
+  invoiceDescription,
+  serializePayment,
+  startPayment,
+} from '../lib/payments';
 import {
   birthDateField,
   emailField,
@@ -40,7 +48,7 @@ const bodySchema = z.object({
 // Причина, по которой абонемент нельзя оформить (all-or-nothing).
 class SeasonPassBlocked extends Error {
   constructor(
-    public reason: 'no_slots' | 'already_registered' | 'already_has_pass',
+    public reason: 'no_slots' | 'already_registered' | 'already_has_pass' | 'empty_season',
     public eventTitle?: string,
   ) {
     super(reason);
@@ -73,9 +81,10 @@ export async function seasonsRoutes(app: FastifyInstance) {
     };
   });
 
-  // POST /season-passes — оформить абонемент на весь сезон.
+  // POST /season-passes — оформить абонемент на весь сезон и выставить ОДИН счёт.
   // Стратегия «всё или ничего»: если хоть один старт недоступен — 409, ничего не создаётся.
-  // Оплата — заглушка (paymentStatus PENDING).
+  // Места держатся, пока счёт не оплачен или не истёк (см. lib/payments.ts).
+  // Без APIPAY_API_KEY — прежняя заглушка: абонемент PENDING без счёта.
   app.post('/season-passes', { preHandler: requireTelegramAuth }, async (req, reply) => {
     const parsed = bodySchema.safeParse(req.body);
     if (!parsed.success) return sendValidationError(reply, parsed.error);
@@ -87,6 +96,17 @@ export async function seasonsRoutes(app: FastifyInstance) {
     const season = await prisma.season.findUnique({ where: { id: data.seasonId } });
     if (!season) {
       return reply.code(404).send({ error: 'Season not found' });
+    }
+
+    const price = Math.round(Number(season.price));
+    const paid = price > 0 && apiPayConfigured();
+    const kaspiPhone = normalizeKzPhone(data.phone);
+    if (paid && !kaspiPhone) {
+      return reply.code(400).send({
+        error: KASPI_PHONE_ERROR,
+        reason: 'validation',
+        fields: { phone: KASPI_PHONE_ERROR },
+      });
     }
 
     try {
@@ -110,41 +130,69 @@ export async function seasonsRoutes(app: FastifyInstance) {
           update: profile,
         });
 
-        // Уже есть абонемент на этот сезон?
+        // Абонемент на сезон у участника один (уникальный ключ). Оплаченный —
+        // отказ; неоплаченный или отменённый — продолжаем с ним же.
         const existingPass = await tx.seasonPass.findUnique({
           where: { userId_seasonId: { userId: user.id, seasonId: season.id } },
         });
-        if (existingPass) throw new SeasonPassBlocked('already_has_pass');
+        if (existingPass?.paymentStatus === 'PAID') throw new SeasonPassBlocked('already_has_pass');
+        if (existingPass?.paymentStatus === 'PENDING' && !paid) {
+          throw new SeasonPassBlocked('already_has_pass');
+        }
 
         // Свежие данные по стартам сезона.
         const events: Event[] = await tx.event.findMany({
           where: { seasonId: season.id },
           orderBy: { date: 'asc' },
         });
+        if (events.length === 0) throw new SeasonPassBlocked('empty_season');
 
-        // Проверка доступности — «всё или ничего».
+        const pass = existingPass
+          ? await tx.seasonPass.update({
+              where: { id: existingPass.id },
+              data: { paymentStatus: 'PENDING', price: season.price },
+            })
+          : await tx.seasonPass.create({
+              data: {
+                userId: user.id,
+                seasonId: season.id,
+                price: season.price,
+                paymentStatus: 'PENDING',
+              },
+            });
+
+        // По каждому старту: место уже за этим абонементом — оставляем;
+        // занято другой живой регистрацией — отказ; иначе занимаем.
+        // Любой отказ откатывает транзакцию целиком — «всё или ничего».
+        const registrations = [];
         for (const e of events) {
-          if (e.slotsTaken >= e.slotsTotal) {
-            throw new SeasonPassBlocked('no_slots', e.title);
-          }
           const reg = await tx.registration.findUnique({
             where: { userId_eventId: { userId: user.id, eventId: e.id } },
           });
-          if (reg) throw new SeasonPassBlocked('already_registered', e.title);
-        }
 
-        // Создать абонемент + регистрации на все старты + занять слоты.
-        const pass = await tx.seasonPass.create({
-          data: {
-            userId: user.id,
-            seasonId: season.id,
-            price: season.price,
-            paymentStatus: 'PENDING',
-          },
-        });
+          if (reg && reg.paymentStatus === 'PENDING' && reg.seasonPassId === pass.id) {
+            registrations.push(reg);
+            continue;
+          }
+          if (reg && reg.paymentStatus !== 'CANCELLED') {
+            throw new SeasonPassBlocked('already_registered', e.title);
+          }
 
-        const registrations = [];
-        for (const e of events) {
+          const taken = await tx.event.updateMany({
+            where: { id: e.id, slotsTaken: { lt: e.slotsTotal } },
+            data: { slotsTaken: { increment: 1 } },
+          });
+          if (taken.count === 0) throw new SeasonPassBlocked('no_slots', e.title);
+
+          if (reg) {
+            registrations.push(
+              await tx.registration.update({
+                where: { id: reg.id },
+                data: { paymentStatus: 'PENDING', seasonPassId: pass.id },
+              }),
+            );
+            continue;
+          }
           const created = await tx.registration.create({
             data: {
               userId: user.id,
@@ -153,40 +201,77 @@ export async function seasonsRoutes(app: FastifyInstance) {
               paymentStatus: 'PENDING',
             },
           });
-          const withQr = await tx.registration.update({
-            where: { id: created.id },
-            data: { qrCode: `fiveandfive://ticket/${created.id}` },
-          });
-          await tx.event.update({
-            where: { id: e.id },
-            data: { slotsTaken: { increment: 1 } },
-          });
-          registrations.push(withQr);
+          registrations.push(
+            await tx.registration.update({
+              where: { id: created.id },
+              data: { qrCode: `fiveandfive://ticket/${created.id}` },
+            }),
+          );
         }
 
         return { user, pass, registrations, events };
       });
 
-      // Одно сообщение на весь абонемент, а не пять подряд: eventId = null,
-      // потому что оно относится к сезону целиком. Конкретные даты выдачи
-      // придут в напоминаниях по каждому старту.
-      await deliver({
-        userId: result.user.id,
-        telegramId: result.user.telegramId,
-        eventId: null,
-        kind: 'SEASON_PASS',
-        text: seasonPassText(result.events),
-        log: req.log,
-      });
+      // Бесплатный сезон или оплата не настроена — без счёта, как раньше.
+      if (!paid) {
+        let pass = result.pass;
+        if (price <= 0) {
+          pass = await prisma.seasonPass.update({
+            where: { id: pass.id },
+            data: { paymentStatus: 'PAID' },
+          });
+          await prisma.registration.updateMany({
+            where: { seasonPassId: pass.id, paymentStatus: 'PENDING' },
+            data: { paymentStatus: 'PAID' },
+          });
+        }
+        // Одно сообщение на весь абонемент, а не пять подряд: eventId = null,
+        // потому что оно относится к сезону целиком.
+        await deliver({
+          userId: result.user.id,
+          telegramId: result.user.telegramId,
+          eventId: null,
+          kind: 'SEASON_PASS',
+          text: seasonPassText(result.events),
+          log: req.log,
+        });
+        return reply.code(201).send({
+          user: serializeUser(result.user),
+          seasonPass: serializeSeasonPass(pass),
+          registrations: result.registrations,
+          payment: null,
+        });
+      }
 
+      const target = { purpose: 'SEASON_PASS' as const, seasonPassId: result.pass.id };
+      const active = await findActivePayment(target);
+      const payment =
+        active && active.phone === kaspiPhone && Number(active.amount) === price
+          ? active
+          : await startPayment({
+              userId: result.user.id,
+              target,
+              amount: price,
+              phone: kaspiPhone!,
+              description: invoiceDescription(`абонемент ${season.title}`),
+              clientName: `${data.lastName} ${data.firstName}`,
+              log: req.log,
+            });
+
+      if (!['PENDING', 'CREATED', 'PAID'].includes(payment.state)) {
+        return reply.code(502).send({
+          error: serializePayment(payment).message,
+          reason: 'payment_failed',
+          payment: serializePayment(payment),
+        });
+      }
+
+      const pass = await prisma.seasonPass.findUnique({ where: { id: result.pass.id } });
       return reply.code(201).send({
         user: serializeUser(result.user),
-        seasonPass: serializeSeasonPass(result.pass),
+        seasonPass: serializeSeasonPass(pass ?? result.pass),
         registrations: result.registrations,
-        payment: {
-          status: 'stub',
-          message: 'Payment not implemented yet; season pass created as PENDING',
-        },
+        payment: serializePayment(payment),
       });
     } catch (err) {
       if (err instanceof SeasonPassBlocked) {
@@ -194,6 +279,7 @@ export async function seasonsRoutes(app: FastifyInstance) {
           already_has_pass: 'У вас уже есть абонемент на этот сезон',
           no_slots: `Нет мест на старт «${err.eventTitle}». Абонемент оформляется только на все старты сразу`,
           already_registered: `Вы уже зарегистрированы на старт «${err.eventTitle}». Абонемент оформляется только на все старты сразу`,
+          empty_season: 'В сезоне пока нет стартов',
         };
         return reply.code(409).send({ error: messages[err.reason], reason: err.reason });
       }

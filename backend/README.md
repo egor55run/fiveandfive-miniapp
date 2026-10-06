@@ -31,7 +31,10 @@ API поднимется на `http://localhost:3000`.
 | GET | `/health` | статус сервиса + проверка БД |
 | GET | `/events` | список стартов |
 | GET | `/events/:id` | один старт |
-| POST | `/registrations` | регистрация на старт (оплата — заглушка) |
+| POST | `/registrations` | регистрация на старт + счёт в Kaspi |
+| POST | `/season-passes` | абонемент на сезон + один счёт в Kaspi |
+| GET | `/payments/:id` | статус оплаты (приложение опрашивает, пока счёт открыт) |
+| POST | `/payments/apipay/webhook` | уведомление ApiPay об оплате (подпись HMAC) |
 | GET | `/uploads/routes/<файл>` | загруженная карта трассы (см. ниже) |
 | POST | `/admin/events/:id/route-image` | загрузить карту трассы (multipart, поле `file`) |
 | DELETE | `/admin/events/:id/route-image` | убрать карту трассы |
@@ -42,6 +45,35 @@ curl -X POST http://localhost:3000/registrations \
   -H 'Content-Type: application/json' \
   -d '{"eventId":1,"firstName":"Егор","lastName":"Кадыров","email":"e@example.com","age":28,"phone":"+77000000000"}'
 ```
+
+## Оплата через Kaspi (ApiPay)
+
+Регистрация занимает место и выставляет участнику счёт в Kaspi по номеру
+телефона (через [ApiPay.kz](https://apipay.kz)). Оплатил — регистрация `PAID`
+и сообщение в Telegram. Не оплатил за `PAYMENT_TTL_MINUTES` (30 мин) — счёт
+отменяется, место освобождается. Логика — `src/lib/payments.ts`, HTTP к ApiPay —
+`src/lib/apipay.ts`.
+
+Об оплате сервер узнаёт тремя путями, все идемпотентны: вебхук ApiPay, опрос
+`GET /payments/:id` из приложения и фоновая сверка раз в минуту (она же
+освобождает места по просроченным счетам).
+
+Подключение:
+1. Кабинет ApiPay: подключить Kaspi Pay (роль «Кассир»), взять API-ключ.
+   Каталог товаров в Kaspi Pay **не включать**: с ним ApiPay требует позиции
+   корзины вместо суммы, а код выставляет счёт на сумму.
+2. Там же указать webhook URL `https://fiveandfive.kz/api/payments/apipay/webhook`
+   и скопировать секрет подписи.
+3. В `backend/.env`: `APIPAY_API_KEY`, `APIPAY_WEBHOOK_SECRET` (см. `.env.example`).
+4. `npx prisma migrate deploy` (таблица `payments`), перезапуск бэкенда.
+5. Сначала проверить в режиме песочницы ApiPay, потом переключить на боевой.
+
+Без `APIPAY_API_KEY` всё работает по-старому: регистрация `PENDING` без счёта.
+Бесплатные старты (цена 0) счёт не выставляют и сразу `PAID`.
+
+Если участник оплатил уже после того, как его место отдали, а свободных мест
+нет, в логе будет `ОПЛАЧЕНО, НО МЕСТА НЕТ`, а в `payments.error` —
+`paid_but_no_slot`: нужен ручной возврат или дополнительное место.
 
 ## Скрипты
 - `npm run dev` — dev-сервер (tsx watch)

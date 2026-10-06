@@ -8,6 +8,7 @@ import {
   createSeasonPass,
   getCurrentSeason,
   type EventDto,
+  type PaymentDto,
   type SeasonDto,
   type UserDto,
 } from '../lib/api';
@@ -22,6 +23,8 @@ type Props = {
   event: EventDto;
   onBack: () => void;
   onRegistered: (outcome: RegistrationOutcome) => void;
+  /** Счёт выставлен в Kaspi — дальше экран ожидания оплаты. */
+  onPaymentStarted: (outcome: RegistrationOutcome, payment: PaymentDto) => void;
   /** Что уже известно об участнике: ФИО из Telegram, контакты из профиля в БД. */
   prefill?: RegistrationPrefill;
 };
@@ -105,7 +108,13 @@ function mapServerError(err: unknown): string {
   return 'Не удалось зарегистрироваться. Попробуйте ещё раз';
 }
 
-function RegistrationScreen({ event, onBack, onRegistered, prefill }: Props) {
+function RegistrationScreen({
+  event,
+  onBack,
+  onRegistered,
+  onPaymentStarted,
+  prefill,
+}: Props) {
   // Формы входа пользователь не видит: имя приходит из Telegram, а контакты —
   // из профиля, если он уже регистрировался раньше.
   const [values, setValues] = useState<FormValues>(() => withPrefill(prefill));
@@ -184,15 +193,31 @@ function RegistrationScreen({ event, onBack, onRegistered, prefill }: Props) {
     setSubmitting(true);
     setServerError(null);
     try {
-      if (useSeason && season) {
-        const result = await createSeasonPass({ seasonId: season.id, ...participant });
-        onRegistered({ user: result.user, events: season.events, seasonPass: true });
+      const { result, outcome } =
+        useSeason && season
+          ? {
+              result: await createSeasonPass({ seasonId: season.id, ...participant }),
+              outcome: { events: season.events, seasonPass: true },
+            }
+          : {
+              result: await createRegistration({ eventId: event.id, ...participant }),
+              outcome: { events: [event], seasonPass: false },
+            };
+      const full: RegistrationOutcome = { user: result.user, ...outcome };
+      // Счёт ещё не оплачен — ждём оплату в Kaspi. Без счёта (бесплатный старт
+      // или оплата не настроена) — сразу экран успеха.
+      if (result.payment && result.payment.state !== 'PAID') {
+        onPaymentStarted(full, result.payment);
       } else {
-        const result = await createRegistration({ eventId: event.id, ...participant });
-        onRegistered({ user: result.user, events: [event], seasonPass: false });
+        onRegistered(full);
       }
     } catch (err) {
-      setServerError(mapServerError(err));
+      // Ошибка про конкретное поле (например, номер без Kaspi) — под это поле.
+      if (err instanceof ApiError && err.fields.phone) {
+        setErrors((prev) => ({ ...prev, phone: err.fields.phone }));
+      } else {
+        setServerError(mapServerError(err));
+      }
       setSubmitting(false);
     }
   };
@@ -270,7 +295,7 @@ function RegistrationScreen({ event, onBack, onRegistered, prefill }: Props) {
         </div>
 
         <label className={`rfield${errors.phone ? ' rfield--error' : ''}`}>
-          <span className="rfield__label">Телефон</span>
+          <span className="rfield__label">Телефон (Kaspi)</span>
           <input
             className="rfield__input"
             type="tel"
@@ -280,7 +305,11 @@ function RegistrationScreen({ event, onBack, onRegistered, prefill }: Props) {
             disabled={submitting}
             onChange={(e) => setField('phone', e.target.value)}
           />
-          {errors.phone && <span className="rfield__err">{errors.phone}</span>}
+          {errors.phone ? (
+            <span className="rfield__err">{errors.phone}</span>
+          ) : (
+            <span className="rfield__hint">На этот номер придёт счёт в Kaspi</span>
+          )}
         </label>
 
         <label className={`rfield${errors.email ? ' rfield--error' : ''}`}>
@@ -414,7 +443,7 @@ function RegistrationScreen({ event, onBack, onRegistered, prefill }: Props) {
           disabled={submitting}
           whileTap={reduceMotion || submitting ? undefined : { scale: 0.985 }}
         >
-          {submitting ? 'Отправляем…' : 'Оплатить и зарегистрироваться'}
+          {submitting ? 'Выставляем счёт…' : 'Оплатить через Kaspi'}
         </motion.button>
       </form>
     </motion.main>

@@ -630,6 +630,11 @@ select.rfield__input {
   color: var(--state-error);
 }
 
+.rfield__hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 /* Апсейл «весь сезон» */
 .upsell {
   display: flex;
@@ -1542,4 +1547,106 @@ select.rfield__input {
   flex-direction: column;
   gap: var(--sp-md);
   margin-top: var(--sp-xs);
+}
+
+/* ===================================================================
+   Ожидание оплаты в Kaspi
+   =================================================================== */
+.pay-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-sm);
+  padding: 28px var(--sp-xl);
+  text-align: center;
+}
+
+.pay-hero__badge {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  margin-bottom: var(--sp-xs);
+  color: var(--text-on-brand);
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: var(--r-full);
+}
+
+.pay-hero__title {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.05;
+  color: var(--text-on-brand);
+  overflow-wrap: anywhere;
+}
+
+.pay-hero__amount {
+  margin: var(--sp-xs) 0 0;
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 600;
+  color: var(--text-on-brand);
+}
+
+.pay-hero__text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.85);
+  overflow-wrap: anywhere;
+}
+
+.pay-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+  margin: 0;
+  padding-left: 20px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.pay-steps b {
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.pay-wait {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.pay-wait__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--brand-highlight);
+  border-radius: var(--r-full);
+  animation: pay-pulse 1.4s var(--ease) infinite;
+}
+
+@keyframes pay-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pay-wait__dot {
+    animation: none;
+  }
 }

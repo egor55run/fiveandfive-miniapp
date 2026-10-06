@@ -1,8 +1,17 @@
 import type { FastifyInstance } from 'fastify';
+import type { Registration } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../prisma';
+import { KASPI_PHONE_ERROR, normalizeKzPhone } from '../lib/apipay';
 import { ageProfileFields, parseBirthDate } from '../lib/birthDate';
 import { deliver, registrationText } from '../lib/notify';
+import {
+  apiPayConfigured,
+  findActivePayment,
+  invoiceDescription,
+  serializePayment,
+  startPayment,
+} from '../lib/payments';
 import {
   birthDateField,
   emailField,
@@ -27,9 +36,30 @@ const bodySchema = z.object({
   phone: phoneField,
 });
 
+/** Почему место занять нельзя — ответ 409 с готовой фразой. */
+class RegistrationBlocked extends Error {
+  constructor(public reason: 'no_slots' | 'already_registered' | 'in_season_pass') {
+    super(reason);
+  }
+}
+
+const BLOCKED_MESSAGES: Record<RegistrationBlocked['reason'], string> = {
+  no_slots: 'Мест на этот старт больше нет',
+  already_registered: 'Вы уже зарегистрированы на этот старт',
+  in_season_pass:
+    'Этот старт входит в ваш неоплаченный абонемент — оплатите абонемент или дождитесь, пока счёт истечёт',
+};
+
 export async function registrationsRoutes(app: FastifyInstance) {
-  // POST /registrations — create a registration.
-  // Payment is a STUB for now (status PENDING, no real charge).
+  /**
+   * POST /registrations — занять место и выставить счёт в Kaspi.
+   *
+   * Место занимается сразу (регистрация PENDING) и держится PAYMENT_TTL_MINUTES.
+   * Оплатил — PAID и сообщение в Telegram (lib/payments.ts). Не оплатил —
+   * место освобождается, и повторный POST просто выставит новый счёт.
+   *
+   * Без APIPAY_API_KEY работает прежняя заглушка: регистрация PENDING без счёта.
+   */
   app.post(
     '/registrations',
     { preHandler: requireTelegramAuth },
@@ -44,8 +74,16 @@ export async function registrationsRoutes(app: FastifyInstance) {
       if (!event) {
         return reply.code(404).send({ error: 'Event not found' });
       }
-      if (event.slotsTaken >= event.slotsTotal) {
-        return reply.code(409).send({ error: 'No slots left for this event' });
+
+      const price = Math.round(Number(event.price));
+      const paid = price > 0 && apiPayConfigured();
+      const kaspiPhone = normalizeKzPhone(data.phone);
+      if (paid && !kaspiPhone) {
+        return reply.code(400).send({
+          error: KASPI_PHONE_ERROR,
+          reason: 'validation',
+          fields: { phone: KASPI_PHONE_ERROR },
+        });
       }
 
       // Участник опознаётся по telegram_id. Раньше здесь был upsert по email —
@@ -69,59 +107,108 @@ export async function registrationsRoutes(app: FastifyInstance) {
         update: profile,
       });
 
-      // One registration per (user, event).
-      const existing = await prisma.registration.findUnique({
-        where: { userId_eventId: { userId: user.id, eventId: event.id } },
-      });
-      if (existing) {
-        return reply
-          .code(409)
-          .send({ error: 'User already registered for this event' });
+      // Занять место. Одна регистрация на (участник, старт): неоплаченную
+      // продолжаем, отменённую (не успел оплатить) — оживляем.
+      let registration: Registration;
+      try {
+        registration = await prisma.$transaction(async (tx) => {
+          const existing = await tx.registration.findUnique({
+            where: { userId_eventId: { userId: user.id, eventId: event.id } },
+          });
+
+          if (existing?.paymentStatus === 'PAID') {
+            throw new RegistrationBlocked('already_registered');
+          }
+          if (existing?.paymentStatus === 'PENDING') {
+            if (existing.seasonPassId !== null) throw new RegistrationBlocked('in_season_pass');
+            // Без оплаты PENDING — это и есть «зарегистрирован».
+            if (!paid) throw new RegistrationBlocked('already_registered');
+            return existing; // место уже за участником
+          }
+
+          // Новое место: условный инкремент, чтобы двое не заняли последнее.
+          const taken = await tx.event.updateMany({
+            where: { id: event.id, slotsTaken: { lt: event.slotsTotal } },
+            data: { slotsTaken: { increment: 1 } },
+          });
+          if (taken.count === 0) throw new RegistrationBlocked('no_slots');
+
+          if (existing) {
+            return tx.registration.update({
+              where: { id: existing.id },
+              data: { paymentStatus: 'PENDING', seasonPassId: null },
+            });
+          }
+          const created = await tx.registration.create({
+            data: { userId: user.id, eventId: event.id, paymentStatus: 'PENDING' },
+          });
+          // Stub QR — later this becomes a real ticket/QR URL.
+          return tx.registration.update({
+            where: { id: created.id },
+            data: { qrCode: `fiveandfive://ticket/${created.id}` },
+          });
+        });
+      } catch (err) {
+        if (err instanceof RegistrationBlocked) {
+          return reply
+            .code(409)
+            .send({ error: BLOCKED_MESSAGES[err.reason], reason: err.reason });
+        }
+        throw err;
       }
 
-      // Create registration and reserve a slot atomically.
-      const registration = await prisma.$transaction(async (tx) => {
-        const created = await tx.registration.create({
-          data: {
-            userId: user.id,
-            eventId: event.id,
-            paymentStatus: 'PENDING',
-          },
+      // Бесплатный старт или оплата не настроена — без счёта.
+      if (!paid) {
+        if (price <= 0) {
+          registration = await prisma.registration.update({
+            where: { id: registration.id },
+            data: { paymentStatus: 'PAID' },
+          });
+        }
+        await deliver({
+          userId: user.id,
+          telegramId: user.telegramId,
+          eventId: event.id,
+          kind: 'REGISTERED',
+          text: registrationText(event),
+          log: req.log,
         });
-        // Stub QR — later this becomes a real ticket/QR URL.
-        const withQr = await tx.registration.update({
-          where: { id: created.id },
-          data: { qrCode: `fiveandfive://ticket/${created.id}` },
+        return reply.code(201).send({
+          user: serializeUser(user),
+          registration,
+          payment: null,
         });
-        await tx.event.update({
-          where: { id: event.id },
-          data: { slotsTaken: { increment: 1 } },
-        });
-        return withQr;
-      });
+      }
 
-      // После коммита: место занято, регистрация существует. Сообщение —
-      // best effort, его судьба на ответ участнику не влияет.
-      // TODO: когда появится реальная оплата, отправку надо перевесить с
-      // создания регистрации на успешный платёж — сейчас статус PENDING, и
-      // текст говорит «регистрация принята», а не «оплачено».
-      await deliver({
-        userId: user.id,
-        telegramId: user.telegramId,
-        eventId: event.id,
-        kind: 'REGISTERED',
-        text: registrationText(event),
-        log: req.log,
-      });
+      // Повторное нажатие с тем же номером — тот же счёт, а не второй в Kaspi.
+      const target = { purpose: 'REGISTRATION' as const, registrationId: registration.id };
+      const active = await findActivePayment(target);
+      const payment =
+        active && active.phone === kaspiPhone && Number(active.amount) === price
+          ? active
+          : await startPayment({
+              userId: user.id,
+              target,
+              amount: price,
+              phone: kaspiPhone!,
+              description: invoiceDescription(event.title),
+              clientName: `${data.lastName} ${data.firstName}`,
+              log: req.log,
+            });
 
+      if (!['PENDING', 'CREATED', 'PAID'].includes(payment.state)) {
+        return reply.code(502).send({
+          error: serializePayment(payment).message,
+          reason: 'payment_failed',
+          payment: serializePayment(payment),
+        });
+      }
+
+      const fresh = await prisma.registration.findUnique({ where: { id: registration.id } });
       return reply.code(201).send({
         user: serializeUser(user),
-        registration,
-        // Payment stub — no real gateway wired up yet.
-        payment: {
-          status: 'stub',
-          message: 'Payment not implemented yet; registration created as PENDING',
-        },
+        registration: fresh ?? registration,
+        payment: serializePayment(payment),
       });
     },
   );
