@@ -32,3 +32,7 @@ backend/_figma/
 # Файлы, загруженные через админку (карты трасс). Это данные, не код: на каждой
 # машине свои. Каталог переопределяется через UPLOAD_DIR в backend/.env.
 backend/uploads/
+
+# Next.js
+.next
+next-env.d.ts

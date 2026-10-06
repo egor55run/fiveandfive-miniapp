@@ -1,6 +1,6 @@
 // Клиент админского API. Авторизация — httpOnly cookie, поставленная
 // POST /admin/session; в JS токена нет и достать его нельзя.
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 
 export class AdminApiError extends Error {
   status: number;

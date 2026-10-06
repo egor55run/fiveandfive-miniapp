@@ -37,7 +37,7 @@ export function useTelegramAuth() {
 
     // Вне Telegram initData пустой. В dev-сборке всё равно пробуем: локальный
     // бэкенд может пускать по DEV_AUTH_TELEGRAM_ID. В прод-сборке — сразу заглушка.
-    if (!isInsideTelegram() && !import.meta.env.DEV) {
+    if (!isInsideTelegram() && process.env.NODE_ENV === 'production') {
       setState('outside');
       return;
     }

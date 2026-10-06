@@ -1,8 +1,8 @@
-// Базовый URL бэкенда. Переопределяется через VITE_API_URL (.env),
+// Базовый URL бэкенда. Переопределяется через NEXT_PUBLIC_API_URL (.env),
 // с запасным значением для локальной разработки.
 import { getInitData } from './telegram';
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 
 export type EventDto = {
   id: number;
