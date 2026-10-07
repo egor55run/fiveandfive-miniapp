@@ -23,7 +23,9 @@ rev=$(git rev-parse --short HEAD)
 
 echo "==> next build ($branch @ $rev)"
 rm -rf .next
-npm run build
+# Staging обслуживает тестовый бот: его имя видно на экране «Откройте в
+# Telegram» и нужно виджету входа в админку (см. src/lib/telegram.ts).
+NEXT_PUBLIC_BOT_USERNAME=fiveandfive_test_bot npm run build
 
 release=$(mktemp -d)
 trap 'rm -rf "$release"' EXIT
@@ -40,7 +42,8 @@ name="$(date -u +%Y%m%dT%H%M%SZ)-$rev"
 echo "==> upload $name"
 tar -C "$release" -czf - . | ssh "$HOST" "set -e
   mkdir -p ~/$REMOTE_DIR/releases/$name
-  tar -C ~/$REMOTE_DIR/releases/$name -xzf -
+  # Часы машины разработчика могут спешить — без шума про «время в будущем».
+  tar -C ~/$REMOTE_DIR/releases/$name --warning=no-timestamp -xzf -
   ln -sfn ~/$REMOTE_DIR/releases/$name ~/$REMOTE_DIR/current
   # Последние 3 сборки оставляем для отката (ln -sfn на нужную + рестарт).
   ls -1dt ~/$REMOTE_DIR/releases/* | tail -n +4 | xargs -r rm -rf

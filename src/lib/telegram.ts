@@ -37,7 +37,10 @@ declare global {
   }
 }
 
-export const BOT_USERNAME = 'fiveandfive_run_bot';
+// Бот, которому принадлежит этот экземпляр: на staging — тестовый. Должен
+// совпадать с BOT_TOKEN бэкенда, иначе вход через виджет в админке не пройдёт
+// проверку подписи. Вшивается при сборке (NEXT_PUBLIC_*).
+export const BOT_USERNAME = process.env.NEXT_PUBLIC_BOT_USERNAME || 'fiveandfive_run_bot';
 export const BOT_LINK = `https://t.me/${BOT_USERNAME}`;
 
 function webApp(): TelegramWebApp | null {
