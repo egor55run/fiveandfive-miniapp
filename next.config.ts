@@ -5,6 +5,11 @@ const nextConfig: NextConfig = {
   // package-lock.json уровнем выше (в домашнем каталоге) и считает корнем его.
   turbopack: { root: import.meta.dirname },
 
+  // Самодостаточная сборка (.next/standalone/server.js + нужные node_modules):
+  // собираем не на сервере — там 2 ГБ памяти без swap, и next build рядом с
+  // продом рискует разбудить OOM-killer, — а готовый каталог копируем туда.
+  output: 'standalone',
+
   // Пока сайта нет, корень — это Mini App: на него смотрит кнопка в BotFather
   // и ссылки «подробнее в приложении» в уже отправленных уведомлениях.
   // Именно rewrite, а не redirect: адрес в WebView не меняется, и Telegram-
