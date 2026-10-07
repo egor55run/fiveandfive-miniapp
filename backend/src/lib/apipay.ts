@@ -4,12 +4,18 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
  * Клиент ApiPay.kz — сервис, который выставляет счёт в Kaspi по номеру
  * телефона и сообщает об оплате вебхуком.
  *
- * Документация: https://apipay.kz/openapi.json
- *   POST /invoices          — выставить счёт (phone 8XXXXXXXXXX, amount строкой)
+ * Документация: https://apipay.kz/openapi.json (сверено с версией 2.1.0)
+ *   POST /invoices          — выставить счёт (phone_number 8XXXXXXXXXX, amount
+ *                             числом). Асинхронно: сначала status=processing,
+ *                             затем pending или error.
  *   GET  /invoices/{id}     — текущий статус (лимит 1000 запросов в минуту)
  *   POST /invoices/{id}/cancel
  * Авторизация — заголовок X-API-Key. Вебхук подписан
  * `X-Webhook-Signature: sha256=<hmac_sha256(raw_body, webhook_secret)>`.
+ *
+ * Песочница — режим организации в кабинете ApiPay, а не отдельный адрес: в
+ * Kaspi она не ходит, у счетов is_sandbox=true, оплату можно симулировать
+ * через POST /invoices/{id}/simulate-status.
  *
  * Здесь только HTTP и форматы ApiPay. Что делать с регистрацией после оплаты —
  * в lib/payments.ts.
@@ -33,7 +39,7 @@ export type ApiPayInvoice = {
   id: number;
   status: ApiPayStatus | string;
   amount?: string;
-  phone?: string | null;
+  phone_number?: string | null;
   external_order_id?: string | null;
   paid_at?: string | null;
   error_code?: string | null;
@@ -97,8 +103,15 @@ async function call<T>(method: 'GET' | 'POST', path: string, body?: unknown): Pr
   }
 
   if (!res.ok) {
-    const obj = (data ?? {}) as { message?: unknown; error?: unknown; error_code?: unknown };
+    const obj = (data ?? {}) as {
+      message?: unknown;
+      error?: unknown;
+      error_code?: unknown;
+      errors?: unknown;
+    };
     const message =
+      // 422: message всегда «Validation failed», суть — в errors по полям.
+      fieldErrors(obj.errors) ||
       (typeof obj.message === 'string' && obj.message) ||
       (typeof obj.error === 'string' && obj.error) ||
       text.slice(0, 300) ||
@@ -110,8 +123,18 @@ async function call<T>(method: 'GET' | 'POST', path: string, body?: unknown): Pr
   return unwrapInvoice(data) as T;
 }
 
+/** `{ phone_number: ['…'] }` → «phone_number: …». null — ошибок по полям нет. */
+function fieldErrors(errors: unknown): string | null {
+  if (!errors || typeof errors !== 'object') return null;
+  const parts = Object.entries(errors as Record<string, unknown>).map(
+    ([field, list]) => `${field}: ${Array.isArray(list) ? list.join('; ') : String(list)}`,
+  );
+  return parts.length > 0 ? parts.join(' | ') : null;
+}
+
 /**
- * Некоторые ответы ApiPay могут заворачивать объект в `data` или `invoice`.
+ * Некоторые ответы ApiPay заворачивают счёт в `invoice` (отмена и симуляция
+ * в песочнице — `{ message, invoice }`), создание и GET отдают его как есть.
  * Достаём сам счёт, чтобы остальной код не гадал о форме ответа.
  */
 function unwrapInvoice(data: unknown): unknown {
@@ -138,6 +161,10 @@ export type CreateInvoiceInput = {
   description: string;
   /** Наш id платежа — для сверки в кабинете ApiPay. */
   externalOrderId: string;
+  /**
+   * Кто платит — в internal_comment: видно только нам в кабинете ApiPay, в Kaspi
+   * не уходит. Поля client_name при создании счёта у ApiPay нет.
+   */
   clientName?: string;
 };
 
@@ -146,11 +173,13 @@ export function createInvoice(input: CreateInvoiceInput): Promise<ApiPayInvoice>
     throw new ApiPayError('Сумма счёта должна быть целым числом тенге', 0, 'bad_amount');
   }
   return call<ApiPayInvoice>('POST', '/invoices', {
-    phone: input.phone,
-    amount: String(input.amount),
+    phone_number: input.phone,
+    // Число, а не строка: дробная сумма → 422 amount_must_be_whole_tenge.
+    amount: input.amount,
+    // Длиннее 60 символов ApiPay отклоняет (422 description_too_long).
     description: input.description.slice(0, 60),
     external_order_id: input.externalOrderId,
-    ...(input.clientName ? { client_name: input.clientName.slice(0, 100) } : {}),
+    ...(input.clientName ? { internal_comment: input.clientName.slice(0, 255) } : {}),
   });
 }
 
