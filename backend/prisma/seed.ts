@@ -45,7 +45,7 @@ async function main() {
           },
           {
             title: 'Центральный парк',
-            date: new Date('2027-08-19T08:00:00+05:00'),
+            date: new Date('2027-08-22T08:00:00+05:00'),
             location: 'Центральный парк, Астана',
             distance: '5 км',
             slotsTotal: 2000,
@@ -53,7 +53,7 @@ async function main() {
           },
           {
             title: 'Триатлон Парк — финал сезона',
-            date: new Date('2027-09-05T08:00:00+05:00'),
+            date: new Date('2027-09-05T09:00:00+05:00'),
             location: 'Триатлон Парк, Астана',
             distance: '5 км',
             slotsTotal: 2000,
