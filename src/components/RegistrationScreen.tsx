@@ -8,6 +8,7 @@ import {
   createSeasonPass,
   getCurrentSeason,
   type EventDto,
+  type Gender,
   type PaymentDto,
   type SeasonDto,
   type UserDto,
@@ -34,7 +35,7 @@ type FormValues = {
   lastName: string;
   firstName: string;
   birthDate: string; // yyyy-mm-dd (input[type=date])
-  gender: string;
+  gender: Gender | '';
   phone: string;
   email: string;
   finishTime: string;
@@ -56,7 +57,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Поля, которые можно подставить заранее — из Telegram и из профиля в БД. */
 export type RegistrationPrefill = Partial<
-  Pick<FormValues, 'lastName' | 'firstName' | 'birthDate' | 'phone' | 'email'>
+  Pick<FormValues, 'lastName' | 'firstName' | 'birthDate' | 'gender' | 'phone' | 'email'>
 >;
 
 /** Пустые и отсутствующие значения не должны затирать EMPTY. */
@@ -68,7 +69,10 @@ function withPrefill(prefill?: RegistrationPrefill): FormValues {
   return { ...EMPTY, ...filled };
 }
 
-const GENDERS = ['Мужской', 'Женский'];
+const GENDERS: { value: Gender; label: string }[] = [
+  { value: 'MALE', label: 'Мужской' },
+  { value: 'FEMALE', label: 'Женский' },
+];
 const FINISH_TIMES = ['~20 минут', '~25 минут', '~30 минут', '~40 минут', '~50 минут', '60+ минут'];
 
 type FieldErrors = Partial<Record<keyof FormValues | 'consents', string>>;
@@ -208,6 +212,8 @@ function RegistrationScreen({
       age: ageFromDob(values.birthDate),
       birthDate: values.birthDate,
       phone: values.phone.trim(),
+      // validate() уже не пустит пустое значение.
+      gender: values.gender as Gender,
     };
 
     setSubmitting(true);
@@ -331,8 +337,8 @@ function RegistrationScreen({
                 Выбрать
               </option>
               {GENDERS.map((g) => (
-                <option key={g} value={g}>
-                  {g}
+                <option key={g.value} value={g.value}>
+                  {g.label}
                 </option>
               ))}
             </select>

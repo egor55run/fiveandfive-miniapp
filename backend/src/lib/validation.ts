@@ -45,6 +45,11 @@ export function personNameField(kind: PersonNameKind) {
     });
 }
 
+/** Пол. Значения enum Gender из схемы Prisma. */
+export const genderField = z.enum(['MALE', 'FEMALE'], {
+  errorMap: () => ({ message: 'Выберите пол' }),
+});
+
 /** Дата рождения в формате input[type=date]. Разбор и границы — в lib/birthDate. */
 export const birthDateField = z
   .string()

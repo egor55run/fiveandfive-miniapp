@@ -15,6 +15,7 @@ import {
 import {
   birthDateField,
   emailField,
+  genderField,
   phoneField,
   sendValidationError,
   personNameField,
@@ -34,6 +35,8 @@ const bodySchema = z.object({
   // и как запасной вариант: когда дата пришла, возраст считает сервер.
   age: z.number().int().min(1).max(120),
   birthDate: birthDateField.optional(),
+  // Необязателен: прод-фронт до этого поля его не присылает. Нет — не затираем.
+  gender: genderField.optional(),
   phone: phoneField,
 });
 
@@ -100,6 +103,7 @@ export async function registrationsRoutes(app: FastifyInstance) {
         lastName: data.lastName,
         email: data.email,
         phone: data.phone,
+        ...(data.gender ? { gender: data.gender } : {}),
         ...ageProfileFields(birthDate, known?.birthDate ?? null, data.age),
       };
       const user = await prisma.user.upsert({

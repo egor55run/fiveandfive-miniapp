@@ -6,6 +6,7 @@ import { ageFromBirthDate, formatBirthDate, parseBirthDate } from '../lib/birthD
 import {
   birthDateField,
   emailField,
+  genderField,
   personNameField,
   phoneField,
   sendValidationError,
@@ -31,6 +32,7 @@ export function serializeUser(u: User) {
     // и в этом же формате её ждёт input[type=date] на фронте.
     birthDate: formatBirthDate(u.birthDate),
     phone: u.phone,
+    gender: u.gender,
     createdAt: u.createdAt,
   };
 }
@@ -41,6 +43,7 @@ const patchSchema = z
     lastName: personNameField('lastName').optional(),
     email: emailField.optional(),
     birthDate: birthDateField.optional(),
+    gender: genderField.optional(),
     phone: phoneField.optional(),
   })
   .refine((v) => Object.keys(v).length > 0, {

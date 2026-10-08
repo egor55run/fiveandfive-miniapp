@@ -7,6 +7,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Gender {
+  MALE
+  FEMALE
+}
+
 model User {
   id         Int      @id @default(autoincrement())
   // Личность из подписанного Telegram initData — основной идентификатор.
@@ -28,6 +33,10 @@ model User {
   // бы день на границе TZ — 14.12.1999 в Алматы стало бы 13-м в UTC.
   birthDate  DateTime? @map("birth_date") @db.Date
   phone      String?
+  // Пол из формы регистрации — подставляется в следующую, как дата рождения.
+  // Пригодится и для зачёта «среди мужчин/женщин». Nullable: у записей,
+  // сделанных до этого поля, пола нет.
+  gender     Gender?
   createdAt  DateTime @default(now()) @map("created_at")
 
   registrations Registration[]

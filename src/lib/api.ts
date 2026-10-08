@@ -45,8 +45,12 @@ export type UserDto = {
   /** «1999-12-14» — тот же формат, что у input[type=date]. */
   birthDate: string | null;
   phone: string | null;
+  /** Из прошлой регистрации; null — ещё не указывал. */
+  gender: Gender | null;
   createdAt: string;
 };
+
+export type Gender = 'MALE' | 'FEMALE';
 
 export type RegistrationDto = {
   id: number;
@@ -95,6 +99,7 @@ export type RegistrationPayload = {
   age: number;
   birthDate: string; // yyyy-mm-dd
   phone: string;
+  gender: Gender;
 };
 
 // Ошибка с HTTP-статусом от сервера — чтобы UI мог различать 409/400 и т.д.
@@ -248,6 +253,7 @@ export type ProfilePatch = Partial<{
   email: string;
   birthDate: string; // yyyy-mm-dd
   phone: string;
+  gender: Gender;
 }>;
 
 export function patchMe(patch: ProfilePatch): Promise<{ user: UserDto }> {
@@ -306,6 +312,7 @@ export type SeasonPassPayload = {
   age: number;
   birthDate: string; // yyyy-mm-dd
   phone: string;
+  gender: Gender;
 };
 
 export type SeasonPassResult = {
