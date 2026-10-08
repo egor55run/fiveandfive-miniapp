@@ -1,0 +1,2 @@
+# Скрипты запускает bash (Git Bash и сервер): с CRLF он падает на «$'\r': command not found».
+*.sh text eol=lf
