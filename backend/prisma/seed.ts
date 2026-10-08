@@ -21,7 +21,7 @@ async function main() {
         create: [
           {
             title: 'Триатлон Парк Астана',
-            date: new Date('2027-05-23T08:00:00+05:00'),
+            date: new Date('2027-05-23T09:00:00+05:00'),
             location: 'Триатлон Парк, Астана',
             distance: '5 км',
             slotsTotal: 2000,
@@ -52,7 +52,7 @@ async function main() {
             price: 5000,
           },
           {
-            title: 'Триатлон парк — финал сезона',
+            title: 'Триатлон Парк — финал сезона',
             date: new Date('2027-09-05T08:00:00+05:00'),
             location: 'Триатлон Парк, Астана',
             distance: '5 км',
