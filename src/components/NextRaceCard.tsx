@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Map } from 'lucide-react';
-import { apiAsset, type EventDto } from '../lib/api';
+import { apiAsset, type EventDto, REGISTRATION_CLOSED_TEXT, isRegistrationOpen } from '../lib/api';
 
 type Props = {
   event: EventDto;
@@ -47,6 +47,7 @@ function NextRaceCard({ event, onRegister }: Props) {
   const [showRoute, setShowRoute] = useState(false);
 
   const soldOut = event.slotsLeft <= 0;
+  const closed = !isRegistrationOpen(event);
   // Карту загружает организатор в админке; у стартов без неё показываем
   // плейсхолдер, а не чужой маршрут.
   const routeSrc = event.routeImageUrl ? apiAsset(event.routeImageUrl) : null;
@@ -126,10 +127,10 @@ function NextRaceCard({ event, onRegister }: Props) {
           type="button"
           className="btn-register"
           onClick={onRegister}
-          disabled={soldOut}
+          disabled={soldOut || closed}
           whileTap={reduceMotion ? undefined : { scale: 0.985 }}
         >
-          {soldOut ? 'Мест нет' : 'Зарегистрироваться'}
+          {closed ? REGISTRATION_CLOSED_TEXT : soldOut ? 'Мест нет' : 'Зарегистрироваться'}
         </motion.button>
       )}
     </motion.section>

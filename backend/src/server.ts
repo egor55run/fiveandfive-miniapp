@@ -20,6 +20,7 @@ import { authRoutes } from './routes/auth';
 import { eventsRoutes } from './routes/events';
 import { paymentsRoutes } from './routes/payments';
 import { apiPayConfigured, sweepPayments } from './lib/payments';
+import { registrationOpen } from './lib/registrationWindow';
 import { registrationsRoutes } from './routes/registrations';
 import { seasonsRoutes } from './routes/seasons';
 
@@ -128,6 +129,9 @@ async function main() {
     };
     sweepTimer = setInterval(sweep, 60_000);
     sweepTimer.unref();
+  }
+  if (!registrationOpen()) {
+    app.log.warn('Регистрация на старты ЗАКРЫТА (нет оплаты или REGISTRATION_OPEN=false)');
   }
   if (!apiPayConfigured()) {
     app.log.warn('APIPAY_API_KEY не задан — регистрации создаются без счёта Kaspi (заглушка)');

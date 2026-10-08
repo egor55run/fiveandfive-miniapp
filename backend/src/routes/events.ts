@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Event } from '@prisma/client';
 import { prisma } from '../prisma';
+import { registrationOpen } from '../lib/registrationWindow';
 
 export function serializeEvent(e: Event) {
   return {
@@ -16,6 +17,10 @@ export function serializeEvent(e: Event) {
     // Путь относительно корня API («/uploads/routes/…») или null, если карты у
     // старта нет. Базовый адрес приклеивает клиент — см. apiAsset в src/lib/api.ts.
     routeImageUrl: e.routeImageUrl,
+    // Пока общий для всех стартов (см. lib/registrationWindow). Полем у старта,
+    // а не отдельным ответом: старый фронт ждёт от /events массив и лишнее
+    // поле просто не заметит.
+    registrationOpen: registrationOpen(),
     createdAt: e.createdAt,
   };
 }

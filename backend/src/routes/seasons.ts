@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Event, SeasonPass, User } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../prisma';
+import { REGISTRATION_CLOSED_MESSAGE, registrationOpen } from '../lib/registrationWindow';
 import { ageProfileFields, parseBirthDate } from '../lib/birthDate';
 import { KASPI_PHONE_ERROR, normalizeKzPhone } from '../lib/apipay';
 import { deliver, seasonPassText } from '../lib/notify';
@@ -90,6 +91,11 @@ export async function seasonsRoutes(app: FastifyInstance) {
   // Места держатся, пока счёт не оплачен или не истёк (см. lib/payments.ts).
   // Без APIPAY_API_KEY — прежняя заглушка: абонемент PENDING без счёта.
   app.post('/season-passes', { preHandler: requireTelegramAuth }, async (req, reply) => {
+    if (!registrationOpen()) {
+      return reply
+        .code(403)
+        .send({ error: REGISTRATION_CLOSED_MESSAGE, reason: 'registration_closed' });
+    }
     const parsed = bodySchema.safeParse(req.body);
     if (!parsed.success) return sendValidationError(reply, parsed.error);
     const data = parsed.data;

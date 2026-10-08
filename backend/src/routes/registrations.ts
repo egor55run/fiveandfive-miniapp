@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Registration } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../prisma';
+import { REGISTRATION_CLOSED_MESSAGE, registrationOpen } from '../lib/registrationWindow';
 import { KASPI_PHONE_ERROR, normalizeKzPhone } from '../lib/apipay';
 import { ageProfileFields, parseBirthDate } from '../lib/birthDate';
 import { deliver, registrationText } from '../lib/notify';
@@ -68,6 +69,11 @@ export async function registrationsRoutes(app: FastifyInstance) {
     '/registrations',
     { preHandler: requireTelegramAuth },
     async (req, reply) => {
+      if (!registrationOpen()) {
+        return reply
+          .code(403)
+          .send({ error: REGISTRATION_CLOSED_MESSAGE, reason: 'registration_closed' });
+      }
       const parsed = bodySchema.safeParse(req.body);
       if (!parsed.success) return sendValidationError(reply, parsed.error);
       const data = parsed.data;

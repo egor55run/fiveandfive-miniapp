@@ -7,6 +7,8 @@ import {
   createRegistration,
   createSeasonPass,
   getCurrentSeason,
+  isRegistrationOpen,
+  REGISTRATION_CLOSED_TEXT,
   type EventDto,
   type Gender,
   type PaymentDto,
@@ -275,230 +277,244 @@ function RegistrationScreen({
         </div>
       </section>
 
-      <form onSubmit={handleSubmit} noValidate className="reg-fields">
-        <p className="reg-group-label">Ваши данные:</p>
+      {!isRegistrationOpen(event) ? (
+        // Регистрация закрыта (оплата ещё не включена): дата, дистанция и цена
+        // видны в шапке выше, а формы нет — отправить её всё равно нельзя.
+        <section className="reg-closed">
+          <p className="reg-closed__title">{REGISTRATION_CLOSED_TEXT}</p>
+          <p className="reg-closed__text">
+            Записаться можно будет прямо здесь, как только откроем регистрацию.
+          </p>
+          <button type="button" className="btn-secondary" onClick={onBack}>
+            Вернуться к стартам
+          </button>
+        </section>
+      ) : (
+        <form onSubmit={handleSubmit} noValidate className="reg-fields">
+          <p className="reg-group-label">Ваши данные:</p>
 
-        <label className={`rfield${errors.lastName ? ' rfield--error' : ''}`}>
-          <span className="rfield__label">Фамилия</span>
-          <input
-            className="rfield__input"
-            type="text"
-            placeholder="Иванова"
-            autoComplete="family-name"
-            autoCapitalize="words"
-            maxLength={50}
-            value={values.lastName}
-            disabled={submitting}
-            onChange={(e) => setNameField('lastName', e.target.value)}
-            onBlur={() => finishNameField('lastName')}
-          />
-          {errors.lastName && <span className="rfield__err">{errors.lastName}</span>}
-        </label>
-
-        <label className={`rfield${errors.firstName ? ' rfield--error' : ''}`}>
-          <span className="rfield__label">Имя</span>
-          <input
-            className="rfield__input"
-            type="text"
-            placeholder="Анна"
-            autoComplete="given-name"
-            autoCapitalize="words"
-            maxLength={50}
-            value={values.firstName}
-            disabled={submitting}
-            onChange={(e) => setNameField('firstName', e.target.value)}
-            onBlur={() => finishNameField('firstName')}
-          />
-          {errors.firstName && <span className="rfield__err">{errors.firstName}</span>}
-        </label>
-
-        <div className="reg-row">
-          <label className={`rfield${errors.birthDate ? ' rfield--error' : ''}`}>
-            <span className="rfield__label">Дата рождения</span>
+          <label className={`rfield${errors.lastName ? ' rfield--error' : ''}`}>
+            <span className="rfield__label">Фамилия</span>
             <input
               className="rfield__input"
-              type="date"
-              value={values.birthDate}
+              type="text"
+              placeholder="Иванова"
+              autoComplete="family-name"
+              autoCapitalize="words"
+              maxLength={50}
+              value={values.lastName}
               disabled={submitting}
-              onChange={(e) => setField('birthDate', e.target.value)}
+              onChange={(e) => setNameField('lastName', e.target.value)}
+              onBlur={() => finishNameField('lastName')}
             />
-            {errors.birthDate && <span className="rfield__err">{errors.birthDate}</span>}
+            {errors.lastName && <span className="rfield__err">{errors.lastName}</span>}
           </label>
 
-          <div className={`rfield rfield--select${errors.gender ? ' rfield--error' : ''}`}>
-            <span className="rfield__label">Пол</span>
+          <label className={`rfield${errors.firstName ? ' rfield--error' : ''}`}>
+            <span className="rfield__label">Имя</span>
+            <input
+              className="rfield__input"
+              type="text"
+              placeholder="Анна"
+              autoComplete="given-name"
+              autoCapitalize="words"
+              maxLength={50}
+              value={values.firstName}
+              disabled={submitting}
+              onChange={(e) => setNameField('firstName', e.target.value)}
+              onBlur={() => finishNameField('firstName')}
+            />
+            {errors.firstName && <span className="rfield__err">{errors.firstName}</span>}
+          </label>
+
+          <div className="reg-row">
+            <label className={`rfield${errors.birthDate ? ' rfield--error' : ''}`}>
+              <span className="rfield__label">Дата рождения</span>
+              <input
+                className="rfield__input"
+                type="date"
+                value={values.birthDate}
+                disabled={submitting}
+                onChange={(e) => setField('birthDate', e.target.value)}
+              />
+              {errors.birthDate && <span className="rfield__err">{errors.birthDate}</span>}
+            </label>
+
+            <div className={`rfield rfield--select${errors.gender ? ' rfield--error' : ''}`}>
+              <span className="rfield__label">Пол</span>
+              <select
+                className="rfield__input"
+                value={values.gender}
+                disabled={submitting}
+                onChange={(e) => setField('gender', e.target.value)}
+              >
+                <option value="" disabled>
+                  Выбрать
+                </option>
+                {GENDERS.map((g) => (
+                  <option key={g.value} value={g.value}>
+                    {g.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="rfield__chevron" size={18} strokeWidth={2} />
+              {errors.gender && <span className="rfield__err">{errors.gender}</span>}
+            </div>
+          </div>
+
+          <label className={`rfield${errors.phone ? ' rfield--error' : ''}`}>
+            <span className="rfield__label">Телефон (Kaspi)</span>
+            <input
+              className="rfield__input"
+              type="tel"
+              inputMode="tel"
+              placeholder="+7 700 000 00 00"
+              value={values.phone}
+              disabled={submitting}
+              onChange={(e) => setField('phone', e.target.value)}
+            />
+            {errors.phone ? (
+              <span className="rfield__err">{errors.phone}</span>
+            ) : (
+              <span className="rfield__hint">На этот номер придёт счёт в Kaspi</span>
+            )}
+          </label>
+
+          <label className={`rfield${errors.email ? ' rfield--error' : ''}`}>
+            <span className="rfield__label">Email</span>
+            <input
+              className="rfield__input"
+              type="email"
+              inputMode="email"
+              placeholder="you@example.com"
+              value={values.email}
+              disabled={submitting}
+              onChange={(e) => setField('email', e.target.value)}
+            />
+            {errors.email && <span className="rfield__err">{errors.email}</span>}
+          </label>
+
+          <p className="reg-group-label">Детали забега:</p>
+
+          <div className="rfield rfield--select">
+            <span className="rfield__label">Ожидаемое время финиша</span>
             <select
               className="rfield__input"
-              value={values.gender}
+              value={values.finishTime}
               disabled={submitting}
-              onChange={(e) => setField('gender', e.target.value)}
+              onChange={(e) => setField('finishTime', e.target.value)}
             >
-              <option value="" disabled>
-                Выбрать
-              </option>
-              {GENDERS.map((g) => (
-                <option key={g.value} value={g.value}>
-                  {g.label}
+              <option value="">Не знаю</option>
+              {FINISH_TIMES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
                 </option>
               ))}
             </select>
             <ChevronDown className="rfield__chevron" size={18} strokeWidth={2} />
-            {errors.gender && <span className="rfield__err">{errors.gender}</span>}
           </div>
-        </div>
 
-        <label className={`rfield${errors.phone ? ' rfield--error' : ''}`}>
-          <span className="rfield__label">Телефон (Kaspi)</span>
-          <input
-            className="rfield__input"
-            type="tel"
-            inputMode="tel"
-            placeholder="+7 700 000 00 00"
-            value={values.phone}
-            disabled={submitting}
-            onChange={(e) => setField('phone', e.target.value)}
-          />
-          {errors.phone ? (
-            <span className="rfield__err">{errors.phone}</span>
-          ) : (
-            <span className="rfield__hint">На этот номер придёт счёт в Kaspi</span>
+          <label className="rfield">
+            <span className="rfield__label">Промокод</span>
+            <input
+              className="rfield__input"
+              type="text"
+              placeholder="необязательно"
+              value={values.promocode}
+              disabled={submitting}
+              onChange={(e) => setField('promocode', e.target.value)}
+            />
+          </label>
+
+          {seasonAvailable && season && (
+            <button
+              type="button"
+              className="upsell"
+              aria-pressed={seasonChecked}
+              onClick={() => setSeasonChecked((s) => !s)}
+            >
+              <span
+                className={`checkbox${seasonChecked ? ' checkbox--on' : ''}`}
+                aria-hidden="true"
+              >
+                {seasonChecked && <Check size={16} strokeWidth={3} />}
+              </span>
+              <span className="upsell__body">
+                <span className="upsell__title u-display">
+                  Взять весь сезон 5&5 за {priceFmt.format(season.price)} ₸
+                </span>
+                <span className="upsell__desc">
+                  Оплати все {season.events.length} стартов сезона одним платежом
+                  {season.savings > 0 ? ` и сэкономь ${priceFmt.format(season.savings)} ₸.` : '.'}
+                </span>
+              </span>
+            </button>
           )}
-        </label>
 
-        <label className={`rfield${errors.email ? ' rfield--error' : ''}`}>
-          <span className="rfield__label">Email</span>
-          <input
-            className="rfield__input"
-            type="email"
-            inputMode="email"
-            placeholder="you@example.com"
-            value={values.email}
-            disabled={submitting}
-            onChange={(e) => setField('email', e.target.value)}
-          />
-          {errors.email && <span className="rfield__err">{errors.email}</span>}
-        </label>
-
-        <p className="reg-group-label">Детали забега:</p>
-
-        <div className="rfield rfield--select">
-          <span className="rfield__label">Ожидаемое время финиша</span>
-          <select
-            className="rfield__input"
-            value={values.finishTime}
-            disabled={submitting}
-            onChange={(e) => setField('finishTime', e.target.value)}
-          >
-            <option value="">Не знаю</option>
-            {FINISH_TIMES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="rfield__chevron" size={18} strokeWidth={2} />
-        </div>
-
-        <label className="rfield">
-          <span className="rfield__label">Промокод</span>
-          <input
-            className="rfield__input"
-            type="text"
-            placeholder="необязательно"
-            value={values.promocode}
-            disabled={submitting}
-            onChange={(e) => setField('promocode', e.target.value)}
-          />
-        </label>
-
-        {seasonAvailable && season && (
-          <button
-            type="button"
-            className="upsell"
-            aria-pressed={seasonChecked}
-            onClick={() => setSeasonChecked((s) => !s)}
-          >
-            <span
-              className={`checkbox${seasonChecked ? ' checkbox--on' : ''}`}
-              aria-hidden="true"
+          <div className="consents">
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={consentRules}
+              className={`consent${errors.consents && !consentRules ? ' consent--error' : ''}`}
+              onClick={() => {
+                setConsentRules((v) => !v);
+                setErrors((p) => ({ ...p, consents: undefined }));
+              }}
             >
-              {seasonChecked && <Check size={16} strokeWidth={3} />}
-            </span>
-            <span className="upsell__body">
-              <span className="upsell__title u-display">
-                Взять весь сезон 5&5 за {priceFmt.format(season.price)} ₸
+              <span
+                className={`checkbox${consentRules ? ' checkbox--on' : ''}`}
+                aria-hidden="true"
+              >
+                {consentRules && <Check size={16} strokeWidth={3} />}
               </span>
-              <span className="upsell__desc">
-                Оплати все {season.events.length} стартов сезона одним платежом
-                {season.savings > 0 ? ` и сэкономь ${priceFmt.format(season.savings)} ₸.` : '.'}
+              <span className="consent__text">Принимаю правила участия и оферту</span>
+            </button>
+
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={consentData}
+              className={`consent${errors.consents && !consentData ? ' consent--error' : ''}`}
+              onClick={() => {
+                setConsentData((v) => !v);
+                setErrors((p) => ({ ...p, consents: undefined }));
+              }}
+            >
+              <span
+                className={`checkbox${consentData ? ' checkbox--on' : ''}`}
+                aria-hidden="true"
+              >
+                {consentData && <Check size={16} strokeWidth={3} />}
               </span>
-            </span>
-          </button>
-        )}
-
-        <div className="consents">
-          <button
-            type="button"
-            role="checkbox"
-            aria-checked={consentRules}
-            className={`consent${errors.consents && !consentRules ? ' consent--error' : ''}`}
-            onClick={() => {
-              setConsentRules((v) => !v);
-              setErrors((p) => ({ ...p, consents: undefined }));
-            }}
-          >
-            <span
-              className={`checkbox${consentRules ? ' checkbox--on' : ''}`}
-              aria-hidden="true"
-            >
-              {consentRules && <Check size={16} strokeWidth={3} />}
-            </span>
-            <span className="consent__text">Принимаю правила участия и оферту</span>
-          </button>
-
-          <button
-            type="button"
-            role="checkbox"
-            aria-checked={consentData}
-            className={`consent${errors.consents && !consentData ? ' consent--error' : ''}`}
-            onClick={() => {
-              setConsentData((v) => !v);
-              setErrors((p) => ({ ...p, consents: undefined }));
-            }}
-          >
-            <span
-              className={`checkbox${consentData ? ' checkbox--on' : ''}`}
-              aria-hidden="true"
-            >
-              {consentData && <Check size={16} strokeWidth={3} />}
-            </span>
-            <span className="consent__text">Согласен на обработку персональных данных</span>
-          </button>
-        </div>
-
-        {errors.consents && <span className="rfield__err">{errors.consents}</span>}
-
-        {serverError && (
-          <div className="form-error" role="alert">
-            <AlertCircle size={16} strokeWidth={2.2} />
-            <span>{serverError}</span>
+              <span className="consent__text">Согласен на обработку персональных данных</span>
+            </button>
           </div>
-        )}
 
-        <div className="reg-pay">
-          <span className="reg-pay__label">К оплате</span>
-          <span className="reg-pay__amount">{priceFmt.format(total)} ₸</span>
-        </div>
+          {errors.consents && <span className="rfield__err">{errors.consents}</span>}
 
-        <motion.button
-          type="submit"
-          className="btn-register btn-register--gradient btn-pay"
-          disabled={submitting}
-          whileTap={reduceMotion || submitting ? undefined : { scale: 0.985 }}
-        >
-          {submitting ? 'Выставляем счёт…' : 'Оплатить через Kaspi'}
-        </motion.button>
-      </form>
+          {serverError && (
+            <div className="form-error" role="alert">
+              <AlertCircle size={16} strokeWidth={2.2} />
+              <span>{serverError}</span>
+            </div>
+          )}
+
+          <div className="reg-pay">
+            <span className="reg-pay__label">К оплате</span>
+            <span className="reg-pay__amount">{priceFmt.format(total)} ₸</span>
+          </div>
+
+          <motion.button
+            type="submit"
+            className="btn-register btn-register--gradient btn-pay"
+            disabled={submitting}
+            whileTap={reduceMotion || submitting ? undefined : { scale: 0.985 }}
+          >
+            {submitting ? 'Выставляем счёт…' : 'Оплатить через Kaspi'}
+          </motion.button>
+        </form>
+      )}
     </motion.main>
   );
 }

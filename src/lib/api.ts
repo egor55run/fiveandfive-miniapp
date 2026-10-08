@@ -20,8 +20,20 @@ export type EventDto = {
    * Для <img src> прогонять через apiAsset — базового адреса в значении нет.
    */
   routeImageUrl: string | null;
+  /**
+   * Можно ли записаться. Сервер закрывает регистрацию, пока не включена оплата
+   * (или вручную, REGISTRATION_OPEN=false). Нет поля — старый сервер, открыто.
+   */
+  registrationOpen?: boolean;
   createdAt: string;
 };
+
+/** Текст на месте кнопки регистрации, пока она закрыта. */
+export const REGISTRATION_CLOSED_TEXT = 'Регистрация скоро откроется';
+
+export function isRegistrationOpen(e: EventDto): boolean {
+  return e.registrationOpen !== false;
+}
 
 /**
  * Абсолютная ссылка на файл, загруженный через админку. В БД лежит путь без
