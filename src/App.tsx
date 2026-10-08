@@ -23,7 +23,7 @@ import {
 } from './lib/api';
 import { toRaceResults } from './data/results';
 import { useTelegramAuth } from './hooks/useTelegramAuth';
-import { isValidPersonName } from './lib/personName';
+import { firstValidName, splitLegacyName } from './lib/personName';
 import { getUnsafeTelegramUser } from './lib/telegram';
 
 type Screen = 'analytics' | 'home' | 'profile' | 'registration' | 'payment' | 'success';
@@ -133,14 +133,17 @@ function App() {
   // Имя и фамилию берём из профиля в БД (их ввели при прошлой регистрации), а
   // если там их нет — из Telegram. Только если они уже кириллицей: имя из
   // Telegram часто латиницей («Egor»), и подставить его — значит сразу
-  // показать ошибку. Контакты — из профиля, Telegram их не даёт.
+  // показать ошибку. Контакты и пол — из профиля, Telegram их не даёт.
   // Контакты и дату рождения берём из participant, а не из me: после правки
   // карандашом в профиле он свежее (в нём ответ PATCH /me), а me перечитывается
   // не на каждое изменение.
   const tgUser = getUnsafeTelegramUser();
+  // Записи старой формы «ФИО» хранят отчество внутри имени — подставляем без него.
+  const stored = splitLegacyName(participant?.lastName, participant?.firstName);
   const prefill: RegistrationPrefill = {
-    lastName: [participant?.lastName, tgUser?.last_name].find(isValidPersonName),
-    firstName: [participant?.firstName, tgUser?.first_name].find(isValidPersonName),
+    lastName: firstValidName(stored.lastName, tgUser?.last_name),
+    firstName: firstValidName(stored.firstName, tgUser?.first_name),
+    gender: participant?.gender ?? me?.user.gender ?? undefined,
     email: participant?.email ?? me?.user.email ?? undefined,
     phone: participant?.phone ?? me?.user.phone ?? undefined,
     birthDate: participant?.birthDate ?? me?.user.birthDate ?? undefined,
