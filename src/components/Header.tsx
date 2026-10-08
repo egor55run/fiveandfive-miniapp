@@ -20,7 +20,7 @@ function Header({ onBack }: Props) {
       {onBack ? (
         <button type="button" className="topbar__back" onClick={onBack}>
           <ChevronLeft size={22} strokeWidth={2.4} />
-          Back
+          Назад
         </button>
       ) : (
         <span />
@@ -28,7 +28,7 @@ function Header({ onBack }: Props) {
 
       <span className="topbar__title">
         <b>5&5</b>
-        <span>application</span>
+        <span>приложение</span>
       </span>
 
       <button type="button" className="topbar__menu" aria-label="Меню">

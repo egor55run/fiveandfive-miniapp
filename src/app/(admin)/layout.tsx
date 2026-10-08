@@ -20,7 +20,9 @@ export const viewport: Viewport = {
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="ru">
+    // SDK Telegram ещё до гидратации пишет в <html> свои CSS-переменные
+    // (--tg-viewport-height и т.п.) — это ожидаемо, а не расхождение разметки.
+    <html lang="ru" suppressHydrationWarning>
       <head>
         {/* Mini App SDK нужен только для одного случая: если /admin открыли
             внутри Telegram, вход пройдёт по initData и кнопка-виджет не

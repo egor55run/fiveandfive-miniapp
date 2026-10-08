@@ -22,7 +22,9 @@ export const viewport: Viewport = {
  */
 export default function TelegramLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="ru">
+    // SDK Telegram ещё до гидратации пишет в <html> свои CSS-переменные
+    // (--tg-viewport-height и т.п.) — это ожидаемо, а не расхождение разметки.
+    <html lang="ru" suppressHydrationWarning>
       <head>
         {/* Mini App SDK. Обязательно внешним синхронным тегом с telegram.org и
             до бандла приложения: npm-копия не создаёт рабочий

@@ -9,9 +9,9 @@ type Props = {
 };
 
 const TABS = [
-  { id: 'analytics', label: 'analytics', icon: BarChart3 },
-  { id: 'home', label: 'home', icon: Home },
-  { id: 'profile', label: 'profile', icon: User },
+  { id: 'analytics', label: 'Аналитика', icon: BarChart3 },
+  { id: 'home', label: 'Главная', icon: Home },
+  { id: 'profile', label: 'Профиль', icon: User },
 ] as const;
 
 function TabBar({ active, onNavigate }: Props) {
