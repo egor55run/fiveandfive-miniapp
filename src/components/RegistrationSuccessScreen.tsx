@@ -2,6 +2,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { Check, Home, Share2 } from 'lucide-react';
 import Header from './Header';
 import type { EventDto, UserDto } from '../lib/api';
+import FitTitle from './FitTitle';
 
 type Props = {
   user: UserDto;
@@ -81,7 +82,9 @@ function RegistrationSuccessScreen({ user, events, seasonPass, onBackHome }: Pro
           <div className="su-races">
             {events.map((e) => (
               <div className="su-race" key={e.id}>
-                <span className="su-race__title u-display">{e.title}</span>
+                <FitTitle as="span" className="su-race__title u-display">
+                  {e.title}
+                </FitTitle>
                 <span className="su-race__date">{dateShort.format(new Date(e.date))}</span>
               </div>
             ))}

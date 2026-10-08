@@ -1718,3 +1718,18 @@ select.rfield__input {
     animation: none;
   }
 }
+
+/* Названия стартов — компонент FitTitle: уменьшает шрифт, если слово не
+   влезает. Внутри flex-строк (название + дата) элемент по умолчанию не
+   сжимается уже самого длинного слова и раздвигает строку — тогда FitTitle
+   нечего было бы мерить. */
+.hero__title,
+.race-item__title,
+.reg-hero__title,
+.su-race__title,
+.pf-next__title,
+.pf-past__title,
+.an-detail__title,
+.an-item__title {
+  min-width: 0;
+}

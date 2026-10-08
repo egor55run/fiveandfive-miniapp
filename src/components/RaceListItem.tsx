@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import type { EventDto } from '../lib/api';
+import FitTitle from './FitTitle';
 
 type Props = {
   event: EventDto;
@@ -22,7 +23,9 @@ function RaceListItem({ event, onSelect }: Props) {
       onClick={onSelect}
       whileTap={reduceMotion ? undefined : { scale: 0.99 }}
     >
-      <h3 className="race-item__title u-display">{event.title}</h3>
+      <FitTitle as="h3" className="race-item__title u-display">
+        {event.title}
+      </FitTitle>
       <div className="race-item__meta">
         <span>{dateShort.format(date)}</span>
         <span className="dot">•</span>

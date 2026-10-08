@@ -8,6 +8,7 @@ import {
   REGISTRATION_ENDED_TEXT,
   registrationState,
 } from '../lib/api';
+import FitTitle from './FitTitle';
 
 type Props = {
   event: EventDto;
@@ -68,7 +69,9 @@ function NextRaceCard({ event, onRegister, registrationOpenForMe }: Props) {
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1], delay: 0.05 }}
     >
       <span className="hero__eyebrow">Ближайший старт</span>
-      <h2 className="hero__title u-display">{event.title}</h2>
+      <FitTitle as="h2" className="hero__title u-display">
+        {event.title}
+      </FitTitle>
 
       <div className="hero__meta">
         <span>{dateShort.format(target)}</span>

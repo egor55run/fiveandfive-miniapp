@@ -26,6 +26,7 @@ import {
   PARENTAL_CONSENT_TEXT,
   underageMessage,
 } from '../lib/eligibility';
+import FitTitle from './FitTitle';
 
 export type RegistrationOutcome = {
   user: UserDto;
@@ -323,7 +324,9 @@ function RegistrationScreen({
 
       <section className="reg-hero">
         <span className="reg-hero__eyebrow">Регистрация на</span>
-        <h2 className="reg-hero__title u-display">{event.title}</h2>
+        <FitTitle as="h2" className="reg-hero__title u-display">
+          {event.title}
+        </FitTitle>
         <div className="reg-hero__meta">
           <span>{dateFmt.format(date)}</span>
           <span className="dot">•</span>

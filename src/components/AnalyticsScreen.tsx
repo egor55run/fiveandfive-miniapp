@@ -10,6 +10,7 @@ import {
 import Header from './Header';
 import { mmss, personalBestOf, type RaceResult } from '../data/results';
 import { useSeasonProgress } from '../hooks/useSeasonProgress';
+import FitTitle from './FitTitle';
 
 type Props = {
   /** Пройденные старты с внесённым результатом, от старых к новым. */
@@ -149,7 +150,9 @@ function AnalyticsScreen({ results, onBack, onViewRaces }: Props) {
       <p className="an-section-label">По забегам</p>
 
       <article className="glass-card an-detail">
-        <h3 className="an-detail__title u-display">{race.title}</h3>
+        <FitTitle as="h3" className="an-detail__title u-display">
+          {race.title}
+        </FitTitle>
         {/* В макете к дате шла погода на старте, но её бэкенд не хранит —
             см. комментарий в src/data/results.ts. */}
         <p className="an-detail__meta">
@@ -225,7 +228,9 @@ function AnalyticsScreen({ results, onBack, onViewRaces }: Props) {
               onClick={() => setPicked(i)}
             >
               <span className="an-item__main">
-                <span className="an-item__title u-display">{r.title}</span>
+                <FitTitle as="span" className="an-item__title u-display">
+                  {r.title}
+                </FitTitle>
                 <span className="an-item__date">{r.date}</span>
               </span>
               <span className="an-item__result">

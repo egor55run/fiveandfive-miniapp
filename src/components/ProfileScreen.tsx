@@ -8,6 +8,7 @@ import type { RaceResult } from '../data/results';
 import { useSeasonProgress } from '../hooks/useSeasonProgress';
 // TODO: номер участника бэкенд пока не отдаёт — см. комментарий в файле.
 import { profileMock } from '../data/profile';
+import FitTitle from './FitTitle';
 
 type Props = {
   participant: UserDto | null;
@@ -276,7 +277,9 @@ function ProfileScreen({
       {upcoming && upcomingDate && (
         <section className="hero-card pf-next">
           <span className="pf-next__label">Тебе предстоит:</span>
-          <h3 className="pf-next__title u-display">{upcoming.title}</h3>
+          <FitTitle as="h3" className="pf-next__title u-display">
+            {upcoming.title}
+          </FitTitle>
           <div className="pf-next__meta">
             <span>{dateShort.format(upcomingDate)}</span>
             <span className="dot">•</span>
@@ -346,7 +349,9 @@ function ProfileScreen({
             {past.map((race) => (
               <article className="glass-card pf-past__item" key={race.eventId}>
                 <div className="pf-past__main">
-                  <h4 className="pf-past__title u-display">{race.title}</h4>
+                  <FitTitle as="h4" className="pf-past__title u-display">
+                    {race.title}
+                  </FitTitle>
                   <span className="pf-past__date">{race.date}</span>
                 </div>
                 <div className="pf-past__result">
