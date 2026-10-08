@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
 import { requireAdmin } from '../../plugins/adminAuth';
+import { ageOnStartDay } from '../../lib/eligibility';
 
 const statusSchema = z.object({
   paymentStatus: z.enum(['PENDING', 'PAID', 'CANCELLED']),
@@ -52,6 +53,9 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
             phone: r.user.phone,
             email: r.user.email,
             age: r.user.age,
+            // Возраст на день этого старта: 16–17 — нужна письменная справка
+            // от родителя при выдаче стартового пакета (lib/eligibility).
+            ageOnStart: r.user.birthDate ? ageOnStartDay(r.user.birthDate, event.date) : null,
             telegramId: r.user.telegramId?.toString() ?? null,
             username: r.user.username,
             paymentStatus: r.paymentStatus,

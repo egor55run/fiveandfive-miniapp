@@ -107,6 +107,10 @@ export type AdminEvent = {
   price: number;
   /** Путь к загруженной карте трассы относительно корня API, или null. */
   routeImageUrl: string | null;
+  /** Когда закрывается регистрация — итоговая дата (заданная или за 7 дней до старта). */
+  registrationClosesAt: string;
+  /** Как задано в админке; null — по умолчанию. */
+  registrationClosesAtCustom: string | null;
   createdAt: string;
   season: { id: number; title: string; year: number } | null;
   registrations: { total: number; pending: number; paid: number; cancelled: number };
@@ -121,6 +125,8 @@ export type EventInput = {
   price: number;
   slotsTotal: number;
   seasonId: number | null;
+  /** ISO или null — по умолчанию за 7 дней до старта. */
+  registrationClosesAt: string | null;
 };
 
 export const getSeasons = () => request<SeasonOption[]>('/admin/seasons');
@@ -207,6 +213,8 @@ export type Participant = {
   phone: string | null;
   email: string | null;
   age: number | null;
+  /** Полных лет на день этого старта; null — дата рождения неизвестна. */
+  ageOnStart: number | null;
   telegramId: string | null;
   username: string | null;
   paymentStatus: PaymentStatus;

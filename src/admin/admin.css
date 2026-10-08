@@ -336,6 +336,14 @@ select:focus {
   letter-spacing: 0.5px;
 }
 
+/* Участник 16–17 лет: заметно — организатору нужно не забыть про справку. */
+.ad-tag--minor {
+  background: transparent;
+  border-color: var(--brand-highlight);
+  color: var(--brand-highlight);
+  letter-spacing: 0;
+}
+
 /* ─── Сообщения ──────────────────────────────────────────────────────────── */
 
 .ad-msg {

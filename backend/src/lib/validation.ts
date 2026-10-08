@@ -63,6 +63,9 @@ export const consentsField = z.object(
     privacy: z.literal(true, {
       errorMap: () => ({ message: 'Нужно согласие на обработку персональных данных' }),
     }),
+    // Обещание родителя: обязательно только для 16–17 лет — это решает роут
+    // по возрасту на день старта (lib/eligibility), не схема.
+    parent: z.literal(true).optional(),
   },
   { errorMap: () => ({ message: 'Подтвердите оба согласия' }) },
 );

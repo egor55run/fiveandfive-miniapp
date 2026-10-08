@@ -64,22 +64,25 @@ model Season {
 }
 
 model Event {
-  id            Int      @id @default(autoincrement())
-  title         String
-  date          DateTime
-  location      String
-  distance      String
-  slotsTotal    Int      @map("slots_total")
-  slotsTaken    Int      @default(0) @map("slots_taken")
-  price         Decimal  @default(0) @db.Decimal(10, 2)
-  seasonId      Int?     @map("season_id")
+  id                   Int       @id @default(autoincrement())
+  title                String
+  date                 DateTime
+  /// Когда закрывается регистрация. null — по умолчанию за 7 дней до старта
+  /// (lib/eligibility). Задаётся в админке, если нужно иначе.
+  registrationClosesAt DateTime? @map("registration_closes_at")
+  location             String
+  distance             String
+  slotsTotal           Int       @map("slots_total")
+  slotsTaken           Int       @default(0) @map("slots_taken")
+  price                Decimal   @default(0) @db.Decimal(10, 2)
+  seasonId             Int?      @map("season_id")
   /// Карта трассы: путь относительно корня API — «/uploads/routes/<файл>».
   /// Не абсолютный URL осознанно: одно и то же значение работает и локально
   /// (localhost:3000), и в проде, где nginx проксирует /api/ на бэкенд.
   /// Сам файл лежит на диске (UPLOAD_DIR, см. lib/routeImages.ts), в БД только
   /// ссылка. null — карты у старта нет, приложение покажет плейсхолдер.
-  routeImageUrl String?  @map("route_image_url")
-  createdAt     DateTime @default(now()) @map("created_at")
+  routeImageUrl        String?   @map("route_image_url")
+  createdAt            DateTime  @default(now()) @map("created_at")
 
   season        Season?        @relation(fields: [seasonId], references: [id], onDelete: SetNull)
   registrations Registration[]
@@ -279,6 +282,9 @@ enum LegalDocumentKind {
   OFERTA
   /// Политика обработки персональных данных — legal/privacy.md.
   PRIVACY
+  /// Обещание участника 16–17 лет принести письменное согласие родителя или
+  /// законного представителя. «Документ» — сам текст галочки (lib/legal).
+  PARENTAL_CONSENT
 }
 
 /// Редакция юридического документа: точный текст, под которым участник ставит

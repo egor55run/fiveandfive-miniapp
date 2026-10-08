@@ -25,18 +25,34 @@ export type EventDto = {
    * (или вручную, REGISTRATION_OPEN=false). Нет поля — старый сервер, открыто.
    */
   registrationOpen?: boolean;
+  /** Когда закрывается регистрация на этот старт (по умолчанию — за 7 дней до него). */
+  registrationClosesAt?: string;
+  /** Срок прошёл — запись закрыта для всех, включая администраторов. */
+  registrationDeadlinePassed?: boolean;
   createdAt: string;
 };
 
 /** Текст на месте кнопки регистрации, пока она закрыта. */
 export const REGISTRATION_CLOSED_TEXT = 'Регистрация скоро откроется';
+/** Текст на месте кнопки, когда срок регистрации на старт прошёл. */
+export const REGISTRATION_ENDED_TEXT = 'Регистрация закрыта';
 
 /**
- * Открыта ли запись на старт для текущего пользователя: открыта для всех —
- * или закрыта, но сервер при входе разрешил именно ему (администратор).
+ * Можно ли сейчас записаться на старт:
+ *  - 'open' — да;
+ *  - 'soon' — регистрация ещё не открыта (нет оплаты); администратору
+ *    (openForMe) при этом можно;
+ *  - 'ended' — срок регистрации на старт прошёл — закрыто для всех.
  */
+export type RegistrationState = 'open' | 'soon' | 'ended';
+
+export function registrationState(e: EventDto, openForMe = false): RegistrationState {
+  if (e.registrationDeadlinePassed) return 'ended';
+  return e.registrationOpen !== false || openForMe ? 'open' : 'soon';
+}
+
 export function isRegistrationOpen(e: EventDto, openForMe = false): boolean {
-  return e.registrationOpen !== false || openForMe;
+  return registrationState(e, openForMe) === 'open';
 }
 
 /**
@@ -117,7 +133,8 @@ export type RegistrationPayload = {
   phone: string;
   gender: Gender;
   /** Обе галочки формы — без них сервер ответит 400. */
-  consents: { oferta: true; privacy: true };
+  /** parent — обещание согласия родителя, обязательно для 16–17 лет на день старта. */
+  consents: { oferta: true; privacy: true; parent?: true };
 };
 
 // Ошибка с HTTP-статусом от сервера — чтобы UI мог различать 409/400 и т.д.
@@ -337,7 +354,8 @@ export type SeasonPassPayload = {
   phone: string;
   gender: Gender;
   /** Обе галочки формы — без них сервер ответит 400. */
-  consents: { oferta: true; privacy: true };
+  /** parent — обещание согласия родителя, обязательно для 16–17 лет на день старта. */
+  consents: { oferta: true; privacy: true; parent?: true };
 };
 
 export type SeasonPassResult = {

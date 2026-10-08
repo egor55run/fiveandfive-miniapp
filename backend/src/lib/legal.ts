@@ -14,9 +14,22 @@ import { prisma } from '../prisma';
  * legal_documents (если её там ещё нет), а каждое согласие ссылается на неё.
  */
 
-const FILES: Record<LegalDocumentKind, string> = {
+/** Документы-файлы: их тексты показываются на сайте. */
+const FILES: Partial<Record<LegalDocumentKind, string>> = {
   OFERTA: 'oferta.md',
   PRIVACY: 'privacy.md',
+};
+
+/**
+ * Обещание участника 16–17 лет. «Документ» — сам текст галочки: если он
+ * изменится, это новая редакция, и видно, какое именно обещание дал человек.
+ * Тот же текст — в приложении (src/lib/eligibility.ts).
+ */
+export const PARENTAL_CONSENT_TEXT =
+  'Принесу письменное согласие родителя или законного представителя на выдачу стартового пакета';
+
+const STATEMENTS: Partial<Record<LegalDocumentKind, string>> = {
+  PARENTAL_CONSENT: PARENTAL_CONSENT_TEXT,
 };
 
 /** backend/dist/lib и backend/src/lib — на одной глубине от корня репозитория. */
@@ -40,11 +53,20 @@ function editionOf(text: string): string {
  */
 export async function loadLegalDocuments(): Promise<Record<LegalDocumentKind, CurrentDocument>> {
   const loaded = {} as Record<LegalDocumentKind, CurrentDocument>;
-  for (const kind of Object.keys(FILES) as LegalDocumentKind[]) {
-    // CRLF → LF: редакция не должна зависеть от того, на какой ОС лежит файл.
-    const content = readFileSync(path.join(legalDir(), FILES[kind]), 'utf8').replace(/\r\n/g, '\n');
+  const sources: [LegalDocumentKind, string][] = [
+    ...(Object.entries(FILES) as [LegalDocumentKind, string][]).map(
+      ([kind, file]): [LegalDocumentKind, string] => [
+        kind,
+        // CRLF → LF: редакция не должна зависеть от того, на какой ОС лежит файл.
+        readFileSync(path.join(legalDir(), file), 'utf8').replace(/\r\n/g, '\n'),
+      ],
+    ),
+    ...(Object.entries(STATEMENTS) as [LegalDocumentKind, string][]),
+  ];
+  for (const [kind, content] of sources) {
     const version = createHash('sha256').update(content).digest('hex').slice(0, 16);
-    const edition = editionOf(content);
+    // У галочки нет строки «Редакция от …» — её редакция только хеш.
+    const edition = FILES[kind] ? editionOf(content) : 'текст галочки';
     const doc = await prisma.legalDocument.upsert({
       where: { kind_version: { kind, version } },
       create: { kind, version, edition, content },
@@ -62,16 +84,20 @@ function currentDocuments(): Record<LegalDocumentKind, CurrentDocument> {
 }
 
 /**
- * Записать согласия участника с обоими документами — в той же транзакции, что
- * и регистрация/абонемент: регистрации без записанного согласия быть не должно.
+ * Записать согласия участника — оферта и политика всегда, обещание родителя —
+ * если участнику на день старта 16–17. В той же транзакции, что и
+ * регистрация/абонемент: регистрации без записанного согласия быть не должно.
  */
 export async function recordConsents(
   tx: Prisma.TransactionClient,
   target: { userId: number; registrationId?: number; seasonPassId?: number },
+  options: { parentalConsent: boolean },
 ): Promise<void> {
   const docs = currentDocuments();
+  const kinds: LegalDocumentKind[] = ['OFERTA', 'PRIVACY'];
+  if (options.parentalConsent) kinds.push('PARENTAL_CONSENT');
   await tx.consent.createMany({
-    data: (Object.keys(docs) as LegalDocumentKind[]).map((kind) => ({
+    data: kinds.map((kind) => ({
       userId: target.userId,
       documentId: docs[kind].id,
       registrationId: target.registrationId ?? null,

@@ -15,7 +15,7 @@ import {
   type EventInput,
   type SeasonOption,
 } from './api';
-import { formatDate, priceFmt, toDateTimeLocal } from './helpers';
+import { formatDate, formatDateTime, priceFmt, toDateTimeLocal } from './helpers';
 
 type FormState = {
   title: string;
@@ -25,6 +25,7 @@ type FormState = {
   price: string;
   slotsTotal: string;
   seasonId: string; // '' = без сезона
+  closesAt: string; // datetime-local; '' = за 7 дней до старта
 };
 
 const EMPTY_FORM: FormState = {
@@ -35,6 +36,7 @@ const EMPTY_FORM: FormState = {
   price: '5000',
   slotsTotal: '2000',
   seasonId: '',
+  closesAt: '',
 };
 
 function toInput(form: FormState): EventInput | string {
@@ -48,6 +50,9 @@ function toInput(form: FormState): EventInput | string {
 
   const slotsTotal = Number(form.slotsTotal);
   if (!Number.isInteger(slotsTotal) || slotsTotal < 1) return 'Некорректный лимит слотов';
+  if (form.closesAt && new Date(form.closesAt) > new Date(form.date)) {
+    return 'Регистрация должна закрываться не позже старта';
+  }
 
   return {
     title: form.title.trim(),
@@ -59,6 +64,7 @@ function toInput(form: FormState): EventInput | string {
     price,
     slotsTotal,
     seasonId: form.seasonId === '' ? null : Number(form.seasonId),
+    registrationClosesAt: form.closesAt ? new Date(form.closesAt).toISOString() : null,
   };
 }
 
@@ -170,6 +176,9 @@ export default function EventsSection() {
       price: String(event.price),
       slotsTotal: String(event.slotsTotal),
       seasonId: event.season ? String(event.season.id) : '',
+      closesAt: event.registrationClosesAtCustom
+        ? toDateTimeLocal(event.registrationClosesAtCustom)
+        : '',
     });
     setFormOpen(true);
     setError(null);
@@ -305,6 +314,19 @@ export default function EventsSection() {
                 value={form.date}
                 onChange={(e) => field('date', e.target.value)}
               />
+            </label>
+            <label>
+              <span>Регистрация закрывается</span>
+              <input
+                type="datetime-local"
+                value={form.closesAt}
+                onChange={(e) => field('closesAt', e.target.value)}
+              />
+              <span className="ad-hint ad-hint--dim">
+                {form.closesAt
+                  ? 'Задано вручную. Очистите поле — вернётся «за 7 дней до старта»'
+                  : 'Пусто — за 7 дней до старта (по Положению)'}
+              </span>
             </label>
             <label>
               <span>Локация</span>
@@ -451,7 +473,12 @@ export default function EventsSection() {
                 <tr key={e.id}>
                   <td className="num">{e.id}</td>
                   <td>{e.title}</td>
-                  <td>{formatDate(e.date)}</td>
+                  <td>
+                    {formatDate(e.date)}
+                    <div className="ad-hint ad-hint--dim">
+                      рег. до {formatDateTime(e.registrationClosesAt)}
+                    </div>
+                  </td>
                   <td>{e.location}</td>
                   <td>{e.distance}</td>
                   <td className="num">{priceFmt.format(e.price)} ₸</td>

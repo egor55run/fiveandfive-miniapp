@@ -556,10 +556,19 @@
   gap: 12px;
 }
 
+/* Колонки строго поровну: с 1fr 1fr поле даты растягивало свою колонку под
+   содержимое, и в узкой «Пол» обрезалось «Женский». Поровну от 360px влезают
+   оба (дате нужно ~119px, «Женскому» ~118px); уже — встают друг под другом. */
 .reg-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
+}
+
+@media (max-width: 359px) {
+  .reg-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* Поле-бокс: лейбл сверху, значение снизу */
@@ -730,6 +739,12 @@ select.rfield__input {
 
 .consent--error .checkbox {
   border-color: var(--state-error);
+}
+
+/* «Регистрация до 16 мая, 9:00» под мета-строкой старта */
+.reg-hero__deadline {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 /* Админ записывается при закрытой регистрации */

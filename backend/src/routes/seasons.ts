@@ -10,6 +10,7 @@ import {
 import { ageProfileFields, parseBirthDate } from '../lib/birthDate';
 import { KASPI_PHONE_ERROR, normalizeKzPhone } from '../lib/apipay';
 import { recordConsents } from '../lib/legal';
+import { checkAge, registrationDeadlinePassed } from '../lib/eligibility';
 import { deliver, seasonPassText } from '../lib/notify';
 import {
   apiPayConfigured,
@@ -130,6 +131,35 @@ export async function seasonsRoutes(app: FastifyInstance) {
       });
     }
 
+    // Срок регистрации и возраст — до любой записи в базу (lib/eligibility).
+    // Абонемент — на все старты сразу: закрыта регистрация хоть на один — отказ.
+    // Возраст — на день первого старта сезона: с него участник уже бежит.
+    const seasonEvents = await prisma.event.findMany({
+      where: { seasonId: season.id },
+      orderBy: { date: 'asc' },
+    });
+    const closedEvent = seasonEvents.find((e) => registrationDeadlinePassed(e));
+    if (closedEvent) {
+      return reply.code(409).send({
+        error: `Регистрация на старт «${closedEvent.title}» закрыта. Абонемент оформляется только на все старты сразу`,
+        reason: 'registration_deadline',
+      });
+    }
+    let minor = false;
+    if (seasonEvents.length > 0) {
+      const known = await prisma.user.findUnique({
+        where: { telegramId },
+        select: { birthDate: true },
+      });
+      const age = checkAge(
+        birthDate ?? known?.birthDate ?? null,
+        seasonEvents[0].date,
+        data.consents.parent === true,
+      );
+      if (!age.ok) return reply.code(400).send(age.body);
+      minor = age.minor;
+    }
+
     try {
       const result = await prisma.$transaction(async (tx) => {
         // Участник опознаётся по подтверждённому telegram_id, а не по email
@@ -232,7 +262,11 @@ export async function seasonsRoutes(app: FastifyInstance) {
         }
 
         // Согласия — в той же транзакции, что и абонемент (lib/legal).
-        await recordConsents(tx, { userId: user.id, seasonPassId: pass.id });
+        await recordConsents(
+          tx,
+          { userId: user.id, seasonPassId: pass.id },
+          { parentalConsent: minor },
+        );
 
         return { user, pass, registrations, events };
       });

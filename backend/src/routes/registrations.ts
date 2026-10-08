@@ -9,6 +9,11 @@ import {
 } from '../lib/registrationWindow';
 import { KASPI_PHONE_ERROR, normalizeKzPhone } from '../lib/apipay';
 import { recordConsents } from '../lib/legal';
+import {
+  checkAge,
+  REGISTRATION_DEADLINE_MESSAGE,
+  registrationDeadlinePassed,
+} from '../lib/eligibility';
 import { ageProfileFields, parseBirthDate } from '../lib/birthDate';
 import { deliver, registrationText } from '../lib/notify';
 import {
@@ -107,6 +112,15 @@ export async function registrationsRoutes(app: FastifyInstance) {
         });
       }
 
+      // Срок регистрации и возраст — до любой записи в базу (lib/eligibility).
+      // Срок действует и для администраторов: если нужно дописать кого-то
+      // после него, дата закрытия сдвигается в админке.
+      if (registrationDeadlinePassed(event)) {
+        return reply
+          .code(409)
+          .send({ error: REGISTRATION_DEADLINE_MESSAGE, reason: 'registration_deadline' });
+      }
+
       // Участник опознаётся по telegram_id. Раньше здесь был upsert по email —
       // то есть кто угодно мог, указав чужой email, дописаться в чужой профиль.
       // Дата рождения проверена схемой, поэтому разбор здесь не может дать null.
@@ -115,6 +129,12 @@ export async function registrationsRoutes(app: FastifyInstance) {
         where: { telegramId },
         select: { birthDate: true },
       });
+      const age = checkAge(
+        birthDate ?? known?.birthDate ?? null,
+        event.date,
+        data.consents.parent === true,
+      );
+      if (!age.ok) return reply.code(400).send(age.body);
       const profile = {
         firstName: data.firstName,
         lastName: data.lastName,
@@ -175,7 +195,11 @@ export async function registrationsRoutes(app: FastifyInstance) {
           const reg = await claimSlot(tx);
           // Согласия с офертой и политикой — в той же транзакции: регистрации
           // без записанного согласия быть не должно (lib/legal).
-          await recordConsents(tx, { userId: user.id, registrationId: reg.id });
+          await recordConsents(
+            tx,
+            { userId: user.id, registrationId: reg.id },
+            { parentalConsent: age.minor },
+          );
           return reg;
         });
       } catch (err) {

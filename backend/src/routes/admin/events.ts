@@ -18,6 +18,8 @@ const eventFields = {
   price: z.number().min(0).max(10_000_000),
   slotsTotal: z.number().int().min(1).max(1_000_000),
   seasonId: z.number().int().positive().nullable(),
+  // null — по умолчанию за 7 дней до старта (lib/eligibility).
+  registrationClosesAt: z.coerce.date().nullable(),
 };
 
 // routeImageUrl в eventFields сознательно нет: карту ставит только загрузка
@@ -30,6 +32,8 @@ const updateSchema = z.object(eventFields).partial().refine(
   (v) => Object.keys(v).length > 0,
   { message: 'Нужно передать хотя бы одно поле' },
 );
+
+const CLOSES_AFTER_START = 'Регистрация должна закрываться не позже старта';
 
 function parseId(raw: string): number | null {
   const id = Number(raw);
@@ -84,6 +88,9 @@ export async function adminEventsRoutes(app: FastifyInstance) {
       const counts = byEvent.get(e.id) ?? {};
       return {
         ...serializeEvent(e),
+        // Как задано в админке; null — «по умолчанию за 7 дней до старта».
+        // Итоговая дата — registrationClosesAt из serializeEvent.
+        registrationClosesAtCustom: e.registrationClosesAt,
         season: e.season,
         registrations: {
           total: (counts.PENDING ?? 0) + (counts.PAID ?? 0) + (counts.CANCELLED ?? 0),
@@ -111,6 +118,10 @@ export async function adminEventsRoutes(app: FastifyInstance) {
       if (!season) {
         return reply.code(400).send({ error: 'Сезон не найден', reason: 'no_season' });
       }
+    }
+
+    if (data.registrationClosesAt && data.registrationClosesAt > data.date) {
+      return reply.code(400).send({ error: CLOSES_AFTER_START, reason: 'closes_after_start' });
     }
 
     const event = await prisma.event.create({ data });
@@ -148,6 +159,12 @@ export async function adminEventsRoutes(app: FastifyInstance) {
       if (!season) {
         return reply.code(400).send({ error: 'Сезон не найден', reason: 'no_season' });
       }
+    }
+
+    const closesAt =
+      data.registrationClosesAt !== undefined ? data.registrationClosesAt : event.registrationClosesAt;
+    if (closesAt && closesAt > (data.date ?? event.date)) {
+      return reply.code(400).send({ error: CLOSES_AFTER_START, reason: 'closes_after_start' });
     }
 
     const updated = await prisma.event.update({ where: { id }, data });

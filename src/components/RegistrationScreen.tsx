@@ -8,8 +8,9 @@ import {
   createRegistration,
   createSeasonPass,
   getCurrentSeason,
-  isRegistrationOpen,
   REGISTRATION_CLOSED_TEXT,
+  REGISTRATION_ENDED_TEXT,
+  registrationState,
   type EventDto,
   type Gender,
   type PaymentDto,
@@ -17,6 +18,13 @@ import {
   type UserDto,
 } from '../lib/api';
 import { hasLatin, normalizePersonName, personNameError } from '../lib/personName';
+import {
+  ADULT_AGE,
+  ageOnStartDay,
+  MIN_AGE,
+  PARENTAL_CONSENT_TEXT,
+  underageMessage,
+} from '../lib/eligibility';
 
 export type RegistrationOutcome = {
   user: UserDto;
@@ -95,6 +103,13 @@ function ageFromDob(dob: string): number {
 type NameField = 'lastName' | 'firstName';
 
 const priceFmt = new Intl.NumberFormat('ru-RU');
+const deadlineFmt = new Intl.DateTimeFormat('ru-RU', {
+  day: 'numeric',
+  month: 'long',
+  hour: 'numeric',
+  minute: '2-digit',
+  timeZone: 'Asia/Almaty',
+});
 const dateFmt = new Intl.DateTimeFormat('ru-RU', {
   day: 'numeric',
   month: 'long',
@@ -139,6 +154,12 @@ function RegistrationScreen({
     setConsentData((v) => !v);
     setErrors((p) => ({ ...p, consents: undefined }));
   };
+  // Третья галочка — только для 16–17 лет на день старта.
+  const [consentParent, setConsentParent] = useState(false);
+  const toggleParent = () => {
+    setConsentParent((v) => !v);
+    setErrors((p) => ({ ...p, consents: undefined }));
+  };
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -158,11 +179,23 @@ function RegistrationScreen({
     };
   }, []);
 
-  // Абонемент предлагаем, только если старт входит в активный сезон.
-  const seasonAvailable = Boolean(season?.events.some((e) => e.id === event.id));
+  // Абонемент предлагаем, только если старт входит в активный сезон и
+  // регистрация открыта на все его старты (абонемент — всё или ничего).
+  const seasonAvailable = Boolean(
+    season?.events.some((e) => e.id === event.id) &&
+      season.events.every((e) => !e.registrationDeadlinePassed),
+  );
   const useSeason = seasonAvailable && seasonChecked;
   const total = useSeason && season ? season.price : event.price;
   const date = new Date(event.date);
+  const state = registrationState(event, registrationOpenForMe);
+
+  // Возраст — на день старта; для абонемента — на день первого старта сезона.
+  const ageStart = useSeason && season?.events[0] ? season.events[0].date : event.date;
+  const ageAtStart = values.birthDate ? ageOnStartDay(values.birthDate, ageStart) : null;
+  const underageText =
+    ageAtStart !== null && ageAtStart < MIN_AGE ? underageMessage(ageAtStart) : null;
+  const minor = ageAtStart !== null && ageAtStart >= MIN_AGE && ageAtStart < ADULT_AGE;
 
   const setField = (name: keyof FormValues, value: string) => {
     setValues((prev) => ({ ...prev, [name]: value }));
@@ -200,12 +233,14 @@ function RegistrationScreen({
     else {
       const age = ageFromDob(values.birthDate);
       if (!Number.isFinite(age) || age < 1 || age > 120) e.birthDate = 'Проверьте дату';
+      else if (underageText) e.birthDate = underageText;
     }
     if (!values.gender) e.gender = 'Выберите пол';
     if (!values.phone.trim()) e.phone = 'Укажите телефон';
     if (!values.email.trim()) e.email = 'Укажите email';
     else if (!EMAIL_RE.test(values.email.trim())) e.email = 'Некорректный email';
     if (!consentRules || !consentData) e.consents = 'Подтвердите оба согласия';
+    else if (minor && !consentParent) e.consents = 'Подтвердите согласие родителя';
     return e;
   };
 
@@ -230,7 +265,9 @@ function RegistrationScreen({
       gender: values.gender as Gender,
       // validate() не пускает без обеих галочек; сервер проверяет ещё раз и
       // записывает, с какой редакцией документов человек согласился.
-      consents: { oferta: true, privacy: true } as const,
+      consents: minor
+        ? ({ oferta: true, privacy: true, parent: true } as const)
+        : ({ oferta: true, privacy: true } as const),
     };
 
     setSubmitting(true);
@@ -259,7 +296,7 @@ function RegistrationScreen({
       const fieldErrors =
         err instanceof ApiError
           ? Object.fromEntries(
-              Object.entries(err.fields).filter(([name]) => name in EMPTY),
+              Object.entries(err.fields).filter(([name]) => name in EMPTY || name === 'consents'),
             )
           : {};
       if (Object.keys(fieldErrors).length > 0) {
@@ -290,15 +327,26 @@ function RegistrationScreen({
           <span className="dot">•</span>
           <span>{priceFmt.format(event.price)} ₸</span>
         </div>
+        {state !== 'ended' && event.registrationClosesAt && (
+          <span className="reg-hero__deadline">
+            Регистрация до {deadlineFmt.format(new Date(event.registrationClosesAt))}
+          </span>
+        )}
       </section>
 
-      {!isRegistrationOpen(event, registrationOpenForMe) ? (
-        // Регистрация закрыта (оплата ещё не включена): дата, дистанция и цена
-        // видны в шапке выше, а формы нет — отправить её всё равно нельзя.
+      {state !== 'open' ? (
+        // Регистрация ещё не открыта (нет оплаты) или срок на этот старт прошёл:
+        // дата, дистанция и цена видны в шапке выше, а формы нет.
         <section className="reg-closed">
-          <p className="reg-closed__title">{REGISTRATION_CLOSED_TEXT}</p>
+          <p className="reg-closed__title">
+            {state === 'ended' ? REGISTRATION_ENDED_TEXT : REGISTRATION_CLOSED_TEXT}
+          </p>
           <p className="reg-closed__text">
-            Записаться можно будет прямо здесь, как только откроем регистрацию.
+            {state === 'ended'
+              ? `Регистрация на этот старт закрылась ${deadlineFmt.format(
+                  new Date(event.registrationClosesAt ?? event.date),
+                )}.`
+              : 'Записаться можно будет прямо здесь, как только откроем регистрацию.'}
           </p>
           <button type="button" className="btn-secondary" onClick={onBack}>
             Вернуться к стартам
@@ -306,7 +354,7 @@ function RegistrationScreen({
         </section>
       ) : (
         <form onSubmit={handleSubmit} noValidate className="reg-fields">
-          {!isRegistrationOpen(event) && (
+          {registrationState(event) === 'soon' && (
             // Админ записывается до открытия — например, ради тестового платежа.
             <p className="reg-admin-note">
               Регистрация закрыта для участников — вы записываетесь как администратор
@@ -358,7 +406,10 @@ function RegistrationScreen({
                 disabled={submitting}
                 onChange={(e) => setField('birthDate', e.target.value)}
               />
-              {errors.birthDate && <span className="rfield__err">{errors.birthDate}</span>}
+              {/* Младше 16 на день старта — говорим сразу, как дата введена. */}
+              {(errors.birthDate ?? underageText) && (
+                <span className="rfield__err">{errors.birthDate ?? underageText}</span>
+              )}
             </label>
 
             <div className={`rfield rfield--select${errors.gender ? ' rfield--error' : ''}`}>
@@ -508,6 +559,28 @@ function RegistrationScreen({
                 <DocLink doc="privacy">обработку персональных данных</DocLink>
               </span>
             </div>
+
+            {minor && (
+              // 16–17 лет на день старта: по Положению стартовый пакет выдают
+              // только с письменным согласием родителя. Сервер запишет и это.
+              <div
+                className={`consent${errors.consents && !consentParent ? ' consent--error' : ''}`}
+              >
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={consentParent}
+                  aria-labelledby="consent-parent"
+                  className={`checkbox${consentParent ? ' checkbox--on' : ''}`}
+                  onClick={toggleParent}
+                >
+                  {consentParent && <Check size={16} strokeWidth={3} />}
+                </button>
+                <span id="consent-parent" className="consent__text" onClick={toggleParent}>
+                  {PARENTAL_CONSENT_TEXT}
+                </span>
+              </div>
+            )}
           </div>
 
           {errors.consents && <span className="rfield__err">{errors.consents}</span>}

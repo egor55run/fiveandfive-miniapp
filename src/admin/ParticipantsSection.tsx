@@ -142,7 +142,7 @@ export default function ParticipantsSection() {
                 <th>ФИО</th>
                 <th>Телефон</th>
                 <th>Email</th>
-                <th className="num">Возр.</th>
+                <th className="num" title="Полных лет на день старта">Возр.</th>
                 <th>Telegram</th>
                 <th>Записался</th>
                 <th>Результат</th>
@@ -157,6 +157,14 @@ export default function ParticipantsSection() {
                 >
                   <td>
                     {fullName(p.lastName, p.firstName)}
+                    {p.ageOnStart !== null && p.ageOnStart >= 16 && p.ageOnStart < 18 && (
+                      <span
+                        className="ad-tag ad-tag--minor"
+                        title="16–17 лет на день старта: при выдаче стартового пакета — письменное согласие родителя или законного представителя"
+                      >
+                        16–17
+                      </span>
+                    )}
                     {p.seasonPassId !== null && (
                       <span className="ad-tag" title={`Абонемент #${p.seasonPassId}`}>
                         абонемент
@@ -165,7 +173,7 @@ export default function ParticipantsSection() {
                   </td>
                   <td className="ad-nowrap">{p.phone ?? '—'}</td>
                   <td>{p.email ?? '—'}</td>
-                  <td className="num">{p.age ?? '—'}</td>
+                  <td className="num">{p.ageOnStart ?? p.age ?? '—'}</td>
                   <td className="ad-nowrap">
                     {p.username ? `@${p.username}` : (p.telegramId ?? '—')}
                   </td>

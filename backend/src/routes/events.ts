@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Event } from '@prisma/client';
 import { prisma } from '../prisma';
 import { registrationOpen } from '../lib/registrationWindow';
+import { registrationClosesAt, registrationDeadlinePassed } from '../lib/eligibility';
 
 export function serializeEvent(e: Event) {
   return {
@@ -21,6 +22,10 @@ export function serializeEvent(e: Event) {
     // а не отдельным ответом: старый фронт ждёт от /events массив и лишнее
     // поле просто не заметит.
     registrationOpen: registrationOpen(),
+    // Срок регистрации на этот старт (заданный в админке или за 7 дней до
+    // старта) и прошёл ли он — с ним запись закрыта для всех, включая админов.
+    registrationClosesAt: registrationClosesAt(e),
+    registrationDeadlinePassed: registrationDeadlinePassed(e),
     createdAt: e.createdAt,
   };
 }
