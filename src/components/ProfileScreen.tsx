@@ -1,16 +1,8 @@
 import { useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import {
-  ArrowRight,
-  CalendarX2,
-  FileText,
-  Map,
-  Pencil,
-  PersonStanding,
-  ShoppingBag,
-  Ticket,
-} from 'lucide-react';
+import { ArrowRight, CalendarX2, FileText, Map, Pencil, PersonStanding, ShieldCheck, ShoppingBag, Ticket } from 'lucide-react';
 import Header from './Header';
+import DocLink from './legal/DocLink';
 import { ApiError, patchMe, type EventDto, type UserDto } from '../lib/api';
 import type { RaceResult } from '../data/results';
 import { useSeasonProgress } from '../hooks/useSeasonProgress';
@@ -367,16 +359,20 @@ function ProfileScreen({
         </>
       )}
 
-      {/* TODO: ссылки-заглушки — истории платежей и документов на бэкенде нет. */}
       <div className="pf-links">
+        {/* TODO: заглушка — истории платежей на бэкенде пока нет. */}
         <button type="button" className="pf-link pf-link--ink">
           <Ticket size={20} strokeWidth={2} />
           История платежей
         </button>
-        <button type="button" className="pf-link pf-link--ink">
+        <DocLink doc="oferta" className="pf-link pf-link--ink">
           <FileText size={20} strokeWidth={2} />
           Оферта и правила
-        </button>
+        </DocLink>
+        <DocLink doc="privacy" className="pf-link pf-link--ink">
+          <ShieldCheck size={20} strokeWidth={2} />
+          Обработка персональных данных
+        </DocLink>
       </div>
     </motion.main>
   );

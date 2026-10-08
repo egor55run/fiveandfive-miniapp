@@ -703,24 +703,35 @@ select.rfield__input {
   display: flex;
   align-items: flex-start;
   gap: 12px;
+}
+
+/* Квадратик здесь — сама кнопка-галочка. */
+.consent .checkbox {
   padding: 0;
-  text-align: left;
-  background: none;
-  border: none;
-  cursor: pointer;
+}
+
+.consent .checkbox:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
 }
 
 .consent__text {
+  padding-top: 3px;
   font-size: 15px;
   line-height: 1.3;
   color: var(--text-primary);
+  cursor: pointer;
+}
+
+.consent__text a {
+  color: var(--brand-highlight);
+  text-underline-offset: 3px;
 }
 
 .consent--error .checkbox {
   border-color: var(--state-error);
 }
 
-/* Футер оплаты */
 /* Админ записывается при закрытой регистрации */
 .reg-admin-note {
   margin: 0;
@@ -760,6 +771,7 @@ select.rfield__input {
   color: var(--text-muted);
 }
 
+/* Футер оплаты */
 .reg-pay {
   display: flex;
   align-items: baseline;
@@ -1133,9 +1145,11 @@ select.rfield__input {
 }
 
 /* ---------- Нижние ссылки ---------- */
+/* Столбиком: три пункта с длинными подписями в строку на телефоне не влезают. */
 .pf-links {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: flex-start;
   gap: var(--sp-md);
   margin-top: var(--sp-xs);
 }

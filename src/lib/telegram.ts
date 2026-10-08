@@ -25,6 +25,8 @@ type TelegramWebApp = {
    */
   initDataUnsafe?: { user?: TelegramWebAppUser };
   ready: () => void;
+  /** Открыть ссылку во встроенном браузере Telegram поверх Mini App. */
+  openLink?: (url: string) => void;
   expand: () => void;
   colorScheme?: 'light' | 'dark';
   platform?: string;
@@ -70,4 +72,17 @@ export function telegramReady(): void {
   if (!app) return;
   app.ready();
   app.expand();
+}
+
+/**
+ * Открыть страницу сайта (оферту, политику) так, чтобы не потерять Mini App:
+ * внутри Telegram — встроенным браузером поверх приложения (форма с уже
+ * введёнными данными остаётся), вне Telegram — новой вкладкой.
+ * true — ссылку открыли сами, обычный переход по <a> не нужен.
+ */
+export function openExternalPage(path: string): boolean {
+  const app = webApp();
+  if (!app?.openLink || !isInsideTelegram()) return false;
+  app.openLink(new URL(path, window.location.origin).toString());
+  return true;
 }

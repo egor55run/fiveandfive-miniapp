@@ -116,6 +116,8 @@ export type RegistrationPayload = {
   birthDate: string; // yyyy-mm-dd
   phone: string;
   gender: Gender;
+  /** Обе галочки формы — без них сервер ответит 400. */
+  consents: { oferta: true; privacy: true };
 };
 
 // Ошибка с HTTP-статусом от сервера — чтобы UI мог различать 409/400 и т.д.
@@ -334,6 +336,8 @@ export type SeasonPassPayload = {
   birthDate: string; // yyyy-mm-dd
   phone: string;
   gender: Gender;
+  /** Обе галочки формы — без них сервер ответит 400. */
+  consents: { oferta: true; privacy: true };
 };
 
 export type SeasonPassResult = {

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import type { Registration } from '@prisma/client';
+import type { Prisma, Registration } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../prisma';
 import {
@@ -8,6 +8,7 @@ import {
   registrationOpenFor,
 } from '../lib/registrationWindow';
 import { KASPI_PHONE_ERROR, normalizeKzPhone } from '../lib/apipay';
+import { recordConsents } from '../lib/legal';
 import { ageProfileFields, parseBirthDate } from '../lib/birthDate';
 import { deliver, registrationText } from '../lib/notify';
 import {
@@ -23,6 +24,7 @@ import {
   genderField,
   phoneField,
   sendValidationError,
+  consentsField,
   personNameField,
 } from '../lib/validation';
 import { requireTelegramAuth, tgUserOf } from '../plugins/telegramAuth';
@@ -43,6 +45,7 @@ const bodySchema = z.object({
   // Необязателен: прод-фронт до этого поля его не присылает. Нет — не затираем.
   gender: genderField.optional(),
   phone: phoneField,
+  consents: consentsField,
 });
 
 /** Почему место занять нельзя — ответ 409 с готовой фразой. */
@@ -128,44 +131,52 @@ export async function registrationsRoutes(app: FastifyInstance) {
 
       // Занять место. Одна регистрация на (участник, старт): неоплаченную
       // продолжаем, отменённую (не успел оплатить) — оживляем.
+      const claimSlot = async (tx: Prisma.TransactionClient): Promise<Registration> => {
+        const existing = await tx.registration.findUnique({
+          where: { userId_eventId: { userId: user.id, eventId: event.id } },
+        });
+
+        if (existing?.paymentStatus === 'PAID') {
+          throw new RegistrationBlocked('already_registered');
+        }
+        if (existing?.paymentStatus === 'PENDING') {
+          if (existing.seasonPassId !== null) throw new RegistrationBlocked('in_season_pass');
+          // Без оплаты PENDING — это и есть «зарегистрирован».
+          if (!paid) throw new RegistrationBlocked('already_registered');
+          return existing; // место уже за участником
+        }
+
+        // Новое место: условный инкремент, чтобы двое не заняли последнее.
+        const taken = await tx.event.updateMany({
+          where: { id: event.id, slotsTaken: { lt: event.slotsTotal } },
+          data: { slotsTaken: { increment: 1 } },
+        });
+        if (taken.count === 0) throw new RegistrationBlocked('no_slots');
+
+        if (existing) {
+          return tx.registration.update({
+            where: { id: existing.id },
+            data: { paymentStatus: 'PENDING', seasonPassId: null },
+          });
+        }
+        const created = await tx.registration.create({
+          data: { userId: user.id, eventId: event.id, paymentStatus: 'PENDING' },
+        });
+        // Stub QR — later this becomes a real ticket/QR URL.
+        return tx.registration.update({
+          where: { id: created.id },
+          data: { qrCode: `fiveandfive://ticket/${created.id}` },
+        });
+      };
+
       let registration: Registration;
       try {
         registration = await prisma.$transaction(async (tx) => {
-          const existing = await tx.registration.findUnique({
-            where: { userId_eventId: { userId: user.id, eventId: event.id } },
-          });
-
-          if (existing?.paymentStatus === 'PAID') {
-            throw new RegistrationBlocked('already_registered');
-          }
-          if (existing?.paymentStatus === 'PENDING') {
-            if (existing.seasonPassId !== null) throw new RegistrationBlocked('in_season_pass');
-            // Без оплаты PENDING — это и есть «зарегистрирован».
-            if (!paid) throw new RegistrationBlocked('already_registered');
-            return existing; // место уже за участником
-          }
-
-          // Новое место: условный инкремент, чтобы двое не заняли последнее.
-          const taken = await tx.event.updateMany({
-            where: { id: event.id, slotsTaken: { lt: event.slotsTotal } },
-            data: { slotsTaken: { increment: 1 } },
-          });
-          if (taken.count === 0) throw new RegistrationBlocked('no_slots');
-
-          if (existing) {
-            return tx.registration.update({
-              where: { id: existing.id },
-              data: { paymentStatus: 'PENDING', seasonPassId: null },
-            });
-          }
-          const created = await tx.registration.create({
-            data: { userId: user.id, eventId: event.id, paymentStatus: 'PENDING' },
-          });
-          // Stub QR — later this becomes a real ticket/QR URL.
-          return tx.registration.update({
-            where: { id: created.id },
-            data: { qrCode: `fiveandfive://ticket/${created.id}` },
-          });
+          const reg = await claimSlot(tx);
+          // Согласия с офертой и политикой — в той же транзакции: регистрации
+          // без записанного согласия быть не должно (lib/legal).
+          await recordConsents(tx, { userId: user.id, registrationId: reg.id });
+          return reg;
         });
       } catch (err) {
         if (err instanceof RegistrationBlocked) {

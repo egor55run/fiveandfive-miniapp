@@ -50,6 +50,23 @@ export const genderField = z.enum(['MALE', 'FEMALE'], {
   errorMap: () => ({ message: 'Выберите пол' }),
 });
 
+/**
+ * Обе галочки формы: оферта и обработка ПДн. Без них регистрация не проходит —
+ * проверка здесь, а не только в приложении, иначе запрос в обход формы
+ * зарегистрировал бы без согласия. Что именно принято, пишет lib/legal.
+ */
+export const consentsField = z.object(
+  {
+    oferta: z.literal(true, {
+      errorMap: () => ({ message: 'Нужно принять правила участия и оферту' }),
+    }),
+    privacy: z.literal(true, {
+      errorMap: () => ({ message: 'Нужно согласие на обработку персональных данных' }),
+    }),
+  },
+  { errorMap: () => ({ message: 'Подтвердите оба согласия' }) },
+);
+
 /** Дата рождения в формате input[type=date]. Разбор и границы — в lib/birthDate. */
 export const birthDateField = z
   .string()

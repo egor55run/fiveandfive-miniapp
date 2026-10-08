@@ -13,14 +13,14 @@ enum Gender {
 }
 
 model User {
-  id         Int      @id @default(autoincrement())
+  id         Int       @id @default(autoincrement())
   // Личность из подписанного Telegram initData — основной идентификатор.
   // Nullable только ради legacy-строк, созданных до Mini App: весь новый код
   // (plugins/telegramAuth.ts) заводит пользователя исключительно по нему.
-  telegramId BigInt?  @unique @map("telegram_id")
+  telegramId BigInt?   @unique @map("telegram_id")
   username   String?
-  firstName  String   @map("first_name")
-  lastName   String?  @map("last_name")
+  firstName  String    @map("first_name")
+  lastName   String?   @map("last_name")
   // email/age/phone заполняются не при входе, а при регистрации на старт,
   // поэтому опциональны. @unique с email снят: идентификатор теперь telegram_id,
   // и два Telegram-аккаунта вправе указать один и тот же email.
@@ -37,13 +37,14 @@ model User {
   // Пригодится и для зачёта «среди мужчин/женщин». Nullable: у записей,
   // сделанных до этого поля, пола нет.
   gender     Gender?
-  createdAt  DateTime @default(now()) @map("created_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
 
   registrations Registration[]
   results       Result[]
   seasonPasses  SeasonPass[]
   notifications Notification[]
   payments      Payment[]
+  consents      Consent[]
 
   @@map("users")
 }
@@ -63,22 +64,22 @@ model Season {
 }
 
 model Event {
-  id         Int      @id @default(autoincrement())
-  title      String
-  date       DateTime
-  location   String
-  distance   String
-  slotsTotal Int      @map("slots_total")
-  slotsTaken Int      @default(0) @map("slots_taken")
-  price      Decimal  @default(0) @db.Decimal(10, 2)
-  seasonId   Int?     @map("season_id")
+  id            Int      @id @default(autoincrement())
+  title         String
+  date          DateTime
+  location      String
+  distance      String
+  slotsTotal    Int      @map("slots_total")
+  slotsTaken    Int      @default(0) @map("slots_taken")
+  price         Decimal  @default(0) @db.Decimal(10, 2)
+  seasonId      Int?     @map("season_id")
   /// Карта трассы: путь относительно корня API — «/uploads/routes/<файл>».
   /// Не абсолютный URL осознанно: одно и то же значение работает и локально
   /// (localhost:3000), и в проде, где nginx проксирует /api/ на бэкенд.
   /// Сам файл лежит на диске (UPLOAD_DIR, см. lib/routeImages.ts), в БД только
   /// ссылка. null — карты у старта нет, приложение покажет плейсхолдер.
-  routeImageUrl String? @map("route_image_url")
-  createdAt  DateTime @default(now()) @map("created_at")
+  routeImageUrl String?  @map("route_image_url")
+  createdAt     DateTime @default(now()) @map("created_at")
 
   season        Season?        @relation(fields: [seasonId], references: [id], onDelete: SetNull)
   registrations Registration[]
@@ -107,6 +108,7 @@ model Registration {
   event      Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
   seasonPass SeasonPass? @relation(fields: [seasonPassId], references: [id], onDelete: SetNull)
   payments   Payment[]
+  consents   Consent[]
 
   // Один пользователь — одна регистрация на конкретный старт
   @@unique([userId, eventId])
@@ -125,6 +127,7 @@ model SeasonPass {
   season        Season         @relation(fields: [seasonId], references: [id], onDelete: Cascade)
   registrations Registration[]
   payments      Payment[]
+  consents      Consent[]
 
   // Один абонемент на сезон на пользователя
   @@unique([userId, seasonId])
@@ -198,7 +201,7 @@ model Notification {
 /// Telegram (Login Widget в браузере или initData внутри Telegram), а дальше
 /// живёт эта сессия — её, в отличие от JWT, можно отозвать.
 model AdminSession {
-  id Int @id @default(autoincrement())
+  id         Int      @id @default(autoincrement())
   // Только sha256 от токена: дамп БД не даёт войти, сам токен есть лишь в cookie.
   tokenHash  String   @unique @map("token_hash")
   telegramId BigInt   @map("telegram_id")
@@ -238,28 +241,28 @@ enum PaymentState {
 /// не оплатил вовремя и пробует снова. Решает только последняя активная, но
 /// старые строки остаются — по ним видно, что происходило со счётом.
 model Payment {
-  id             Int            @id @default(autoincrement())
-  userId         Int            @map("user_id")
-  purpose        PaymentPurpose
-  registrationId Int?           @map("registration_id")
-  seasonPassId   Int?           @map("season_pass_id")
+  id                Int            @id @default(autoincrement())
+  userId            Int            @map("user_id")
+  purpose           PaymentPurpose
+  registrationId    Int?           @map("registration_id")
+  seasonPassId      Int?           @map("season_pass_id")
   /// Сумма в тенге, только целые: Kaspi не принимает тиыны в счёте по номеру.
-  amount         Decimal        @db.Decimal(10, 2)
+  amount            Decimal        @db.Decimal(10, 2)
   /// Номер в формате ApiPay: 8XXXXXXXXXX.
-  phone          String
-  state          PaymentState   @default(CREATED)
+  phone             String
+  state             PaymentState   @default(CREATED)
   /// id счёта в ApiPay. Уникален: вебхук находит платёж по нему.
-  providerInvoiceId Int?        @unique @map("provider_invoice_id")
+  providerInvoiceId Int?           @unique @map("provider_invoice_id")
   /// Последний сырой статус из ApiPay — для разбора без логов.
-  providerStatus String?        @map("provider_status")
-  error          String?
+  providerStatus    String?        @map("provider_status")
+  error             String?
   /// До какого момента держим место за участником.
-  expiresAt      DateTime       @map("expires_at")
-  paidAt         DateTime?      @map("paid_at")
+  expiresAt         DateTime       @map("expires_at")
+  paidAt            DateTime?      @map("paid_at")
   /// Когда последний раз спрашивали статус у ApiPay (ограничиваем частоту опроса).
-  checkedAt      DateTime?      @map("checked_at")
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
+  checkedAt         DateTime?      @map("checked_at")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   registration Registration? @relation(fields: [registrationId], references: [id], onDelete: Cascade)
@@ -269,4 +272,54 @@ model Payment {
   @@index([registrationId])
   @@index([seasonPassId])
   @@map("payments")
+}
+
+enum LegalDocumentKind {
+  /// Публичная оферта (правила участия) — legal/oferta.md.
+  OFERTA
+  /// Политика обработки персональных данных — legal/privacy.md.
+  PRIVACY
+}
+
+/// Редакция юридического документа: точный текст, под которым участник ставит
+/// галочку. Сервер при запуске сохраняет сюда текущий текст из legal/*.md, если
+/// такой редакции ещё нет, — так по согласию всегда можно показать, какой
+/// именно текст человек принял. Записи не меняются и не удаляются.
+model LegalDocument {
+  id        Int               @id @default(autoincrement())
+  kind      LegalDocumentKind
+  /// sha256 текста (первые 16 hex-символов). Любая правка текста — новая редакция.
+  version   String
+  /// Строка «Редакция от …» из самого текста — для людей; различает редакции version.
+  edition   String
+  content   String
+  createdAt DateTime          @default(now()) @map("created_at")
+
+  consents Consent[]
+
+  @@unique([kind, version])
+  @@map("legal_documents")
+}
+
+/// Согласие участника с одним документом при регистрации на старт или при
+/// оформлении абонемента: кто, с какой редакцией, когда. По строке на документ.
+/// Регистрацию или абонемент могут удалить (тестовые записи) — согласие при
+/// этом остаётся: это след того, что человек его давал.
+model Consent {
+  id             Int      @id @default(autoincrement())
+  userId         Int      @map("user_id")
+  documentId     Int      @map("document_id")
+  registrationId Int?     @map("registration_id")
+  seasonPassId   Int?     @map("season_pass_id")
+  acceptedAt     DateTime @default(now()) @map("accepted_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document     LegalDocument @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  registration Registration? @relation(fields: [registrationId], references: [id], onDelete: SetNull)
+  seasonPass   SeasonPass?   @relation(fields: [seasonPassId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([registrationId])
+  @@index([seasonPassId])
+  @@map("consents")
 }

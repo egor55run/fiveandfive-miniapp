@@ -9,6 +9,7 @@ import {
 } from '../lib/registrationWindow';
 import { ageProfileFields, parseBirthDate } from '../lib/birthDate';
 import { KASPI_PHONE_ERROR, normalizeKzPhone } from '../lib/apipay';
+import { recordConsents } from '../lib/legal';
 import { deliver, seasonPassText } from '../lib/notify';
 import {
   apiPayConfigured,
@@ -23,6 +24,7 @@ import {
   genderField,
   phoneField,
   sendValidationError,
+  consentsField,
   personNameField,
 } from '../lib/validation';
 import { serializeEvent } from './events';
@@ -52,6 +54,7 @@ const bodySchema = z.object({
   // Необязателен: прод-фронт до этого поля его не присылает. Нет — не затираем.
   gender: genderField.optional(),
   phone: phoneField,
+  consents: consentsField,
 });
 
 // Причина, по которой абонемент нельзя оформить (all-or-nothing).
@@ -227,6 +230,9 @@ export async function seasonsRoutes(app: FastifyInstance) {
             }),
           );
         }
+
+        // Согласия — в той же транзакции, что и абонемент (lib/legal).
+        await recordConsents(tx, { userId: user.id, seasonPassId: pass.id });
 
         return { user, pass, registrations, events };
       });

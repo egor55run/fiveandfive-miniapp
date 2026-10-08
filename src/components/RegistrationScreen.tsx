@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { AlertCircle, Check, ChevronDown } from 'lucide-react';
 import Header from './Header';
+import DocLink from './legal/DocLink';
 import {
   ApiError,
   createRegistration,
@@ -130,6 +131,14 @@ function RegistrationScreen({
   const [seasonChecked, setSeasonChecked] = useState(false);
   const [consentRules, setConsentRules] = useState(false);
   const [consentData, setConsentData] = useState(false);
+  const toggleRules = () => {
+    setConsentRules((v) => !v);
+    setErrors((p) => ({ ...p, consents: undefined }));
+  };
+  const toggleData = () => {
+    setConsentData((v) => !v);
+    setErrors((p) => ({ ...p, consents: undefined }));
+  };
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -219,6 +228,9 @@ function RegistrationScreen({
       phone: values.phone.trim(),
       // validate() уже не пустит пустое значение.
       gender: values.gender as Gender,
+      // validate() не пускает без обеих галочек; сервер проверяет ещё раз и
+      // записывает, с какой редакцией документов человек согласился.
+      consents: { oferta: true, privacy: true } as const,
     };
 
     setSubmitting(true);
@@ -461,43 +473,41 @@ function RegistrationScreen({
           )}
 
           <div className="consents">
-            <button
-              type="button"
-              role="checkbox"
-              aria-checked={consentRules}
-              className={`consent${errors.consents && !consentRules ? ' consent--error' : ''}`}
-              onClick={() => {
-                setConsentRules((v) => !v);
-                setErrors((p) => ({ ...p, consents: undefined }));
-              }}
-            >
-              <span
+            {/* Квадратик — кнопка-галочка, текст рядом тоже её переключает, а
+                ссылка в тексте открывает документ (внутри <button> ссылке быть
+                нельзя — поэтому строка разделена). */}
+            <div className={`consent${errors.consents && !consentRules ? ' consent--error' : ''}`}>
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={consentRules}
+                aria-labelledby="consent-rules"
                 className={`checkbox${consentRules ? ' checkbox--on' : ''}`}
-                aria-hidden="true"
+                onClick={toggleRules}
               >
                 {consentRules && <Check size={16} strokeWidth={3} />}
+              </button>
+              <span id="consent-rules" className="consent__text" onClick={toggleRules}>
+                Принимаю <DocLink doc="oferta">правила участия и оферту</DocLink>
               </span>
-              <span className="consent__text">Принимаю правила участия и оферту</span>
-            </button>
+            </div>
 
-            <button
-              type="button"
-              role="checkbox"
-              aria-checked={consentData}
-              className={`consent${errors.consents && !consentData ? ' consent--error' : ''}`}
-              onClick={() => {
-                setConsentData((v) => !v);
-                setErrors((p) => ({ ...p, consents: undefined }));
-              }}
-            >
-              <span
+            <div className={`consent${errors.consents && !consentData ? ' consent--error' : ''}`}>
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={consentData}
+                aria-labelledby="consent-data"
                 className={`checkbox${consentData ? ' checkbox--on' : ''}`}
-                aria-hidden="true"
+                onClick={toggleData}
               >
                 {consentData && <Check size={16} strokeWidth={3} />}
+              </button>
+              <span id="consent-data" className="consent__text" onClick={toggleData}>
+                Согласен на{' '}
+                <DocLink doc="privacy">обработку персональных данных</DocLink>
               </span>
-              <span className="consent__text">Согласен на обработку персональных данных</span>
-            </button>
+            </div>
           </div>
 
           {errors.consents && <span className="rfield__err">{errors.consents}</span>}

@@ -21,6 +21,7 @@ import { eventsRoutes } from './routes/events';
 import { paymentsRoutes } from './routes/payments';
 import { apiPayConfigured, sweepPayments } from './lib/payments';
 import { registrationOpen } from './lib/registrationWindow';
+import { loadLegalDocuments } from './lib/legal';
 import { registrationsRoutes } from './routes/registrations';
 import { seasonsRoutes } from './routes/seasons';
 
@@ -54,6 +55,14 @@ function corsOrigins(): string[] | boolean {
 }
 
 async function main() {
+  // Оферта и политика ПДн: без них регистрацию не провести — согласие не на что
+  // записать. Падаем сразу, а не на первой регистрации.
+  const legal = await loadLegalDocuments();
+  app.log.info(
+    { oferta: legal.OFERTA, privacy: legal.PRIVACY },
+    'Юридические документы загружены',
+  );
+
   await app.register(cors, { origin: corsOrigins() });
   await app.register(cookie);
 
