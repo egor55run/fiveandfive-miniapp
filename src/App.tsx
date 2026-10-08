@@ -23,7 +23,8 @@ import {
 } from './lib/api';
 import { toRaceResults } from './data/results';
 import { useTelegramAuth } from './hooks/useTelegramAuth';
-import { fioFromParts, getUnsafeTelegramUser } from './lib/telegram';
+import { isValidPersonName } from './lib/personName';
+import { getUnsafeTelegramUser } from './lib/telegram';
 
 type Screen = 'analytics' | 'home' | 'profile' | 'registration' | 'payment' | 'success';
 
@@ -129,16 +130,17 @@ function App() {
     return <AuthErrorScreen message={authError} onRetry={retryAuth} />;
   }
 
-  // ФИО берём из профиля в БД (пользователь мог поправить его при регистрации),
-  // а если там пусто — из Telegram. Контакты — из профиля, Telegram их не даёт.
+  // Имя и фамилию берём из профиля в БД (их ввели при прошлой регистрации), а
+  // если там их нет — из Telegram. Только если они уже кириллицей: имя из
+  // Telegram часто латиницей («Egor»), и подставить его — значит сразу
+  // показать ошибку. Контакты — из профиля, Telegram их не даёт.
   // Контакты и дату рождения берём из participant, а не из me: после правки
   // карандашом в профиле он свежее (в нём ответ PATCH /me), а me перечитывается
   // не на каждое изменение.
   const tgUser = getUnsafeTelegramUser();
   const prefill: RegistrationPrefill = {
-    fio:
-      fioFromParts(participant?.lastName, participant?.firstName) ||
-      fioFromParts(tgUser?.last_name, tgUser?.first_name),
+    lastName: [participant?.lastName, tgUser?.last_name].find(isValidPersonName),
+    firstName: [participant?.firstName, tgUser?.first_name].find(isValidPersonName),
     email: participant?.email ?? me?.user.email ?? undefined,
     phone: participant?.phone ?? me?.user.phone ?? undefined,
     birthDate: participant?.birthDate ?? me?.user.birthDate ?? undefined,

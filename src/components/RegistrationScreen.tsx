@@ -12,6 +12,7 @@ import {
   type SeasonDto,
   type UserDto,
 } from '../lib/api';
+import { hasLatin, normalizePersonName, personNameError } from '../lib/personName';
 
 export type RegistrationOutcome = {
   user: UserDto;
@@ -25,12 +26,13 @@ type Props = {
   onRegistered: (outcome: RegistrationOutcome) => void;
   /** Счёт выставлен в Kaspi — дальше экран ожидания оплаты. */
   onPaymentStarted: (outcome: RegistrationOutcome, payment: PaymentDto) => void;
-  /** Что уже известно об участнике: ФИО из Telegram, контакты из профиля в БД. */
+  /** Что уже известно об участнике: имя из профиля или Telegram, контакты из профиля в БД. */
   prefill?: RegistrationPrefill;
 };
 
 type FormValues = {
-  fio: string;
+  lastName: string;
+  firstName: string;
   birthDate: string; // yyyy-mm-dd (input[type=date])
   gender: string;
   phone: string;
@@ -40,7 +42,8 @@ type FormValues = {
 };
 
 const EMPTY: FormValues = {
-  fio: '',
+  lastName: '',
+  firstName: '',
   birthDate: '',
   gender: '',
   phone: '',
@@ -53,7 +56,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Поля, которые можно подставить заранее — из Telegram и из профиля в БД. */
 export type RegistrationPrefill = Partial<
-  Pick<FormValues, 'fio' | 'birthDate' | 'phone' | 'email'>
+  Pick<FormValues, 'lastName' | 'firstName' | 'birthDate' | 'phone' | 'email'>
 >;
 
 /** Пустые и отсутствующие значения не должны затирать EMPTY. */
@@ -80,11 +83,7 @@ function ageFromDob(dob: string): number {
   return age;
 }
 
-// «Фамилия Имя Отчество» → бэкенд принимает только firstName/lastName.
-function splitFio(fio: string): { firstName: string; lastName: string } {
-  const parts = fio.trim().split(/\s+/);
-  return { lastName: parts[0] ?? '', firstName: parts.slice(1).join(' ') };
-}
+type NameField = 'lastName' | 'firstName';
 
 const priceFmt = new Intl.NumberFormat('ru-RU');
 const dateFmt = new Intl.DateTimeFormat('ru-RU', {
@@ -153,10 +152,32 @@ function RegistrationScreen({
     if (serverError) setServerError(null);
   };
 
+  // Имя и фамилия. Про латиницу говорим сразу, пока человек печатает, —
+  // иначе он заполнит всю форму и узнает об этом только на отправке.
+  // Остальные ошибки — при уходе с поля и на отправке.
+  const setNameField = (name: NameField, value: string) => {
+    setField(name, value);
+    if (hasLatin(value)) {
+      setErrors((prev) => ({ ...prev, [name]: personNameError(value, name) ?? undefined }));
+    }
+  };
+
+  // Уходя с поля — привести к виду «Анна-Мария» (заглавные, без лишних
+  // пробелов). Не на каждый символ: правка значения под курсором сбивает ввод.
+  const finishNameField = (name: NameField) => {
+    const normalized = normalizePersonName(values[name]);
+    if (normalized !== values[name]) setValues((prev) => ({ ...prev, [name]: normalized }));
+    if (normalized) {
+      setErrors((prev) => ({ ...prev, [name]: personNameError(normalized, name) ?? undefined }));
+    }
+  };
+
   const validate = (): FieldErrors => {
     const e: FieldErrors = {};
-    const { firstName, lastName } = splitFio(values.fio);
-    if (!lastName || !firstName) e.fio = 'Укажите фамилию и имя';
+    for (const name of ['lastName', 'firstName'] as const) {
+      const error = personNameError(normalizePersonName(values[name]), name);
+      if (error) e[name] = error;
+    }
     if (!values.birthDate) e.birthDate = 'Укажите дату рождения';
     else {
       const age = ageFromDob(values.birthDate);
@@ -178,10 +199,9 @@ function RegistrationScreen({
       return;
     }
 
-    const { firstName, lastName } = splitFio(values.fio);
     const participant = {
-      firstName,
-      lastName,
+      firstName: normalizePersonName(values.firstName),
+      lastName: normalizePersonName(values.lastName),
       email: values.email.trim(),
       // Возраст шлём для совместимости, но решает дата: из неё сервер считает
       // age сам и сохраняет саму дату в профиль.
@@ -212,9 +232,15 @@ function RegistrationScreen({
         onRegistered(full);
       }
     } catch (err) {
-      // Ошибка про конкретное поле (например, номер без Kaspi) — под это поле.
-      if (err instanceof ApiError && err.fields.phone) {
-        setErrors((prev) => ({ ...prev, phone: err.fields.phone }));
+      // Ошибка про конкретное поле (номер без Kaspi, имя латиницей) — под это поле.
+      const fieldErrors =
+        err instanceof ApiError
+          ? Object.fromEntries(
+              Object.entries(err.fields).filter(([name]) => name in EMPTY),
+            )
+          : {};
+      if (Object.keys(fieldErrors).length > 0) {
+        setErrors((prev) => ({ ...prev, ...fieldErrors }));
       } else {
         setServerError(mapServerError(err));
       }
@@ -246,17 +272,38 @@ function RegistrationScreen({
       <form onSubmit={handleSubmit} noValidate className="reg-fields">
         <p className="reg-group-label">Ваши данные:</p>
 
-        <label className={`rfield${errors.fio ? ' rfield--error' : ''}`}>
-          <span className="rfield__label">ФИО</span>
+        <label className={`rfield${errors.lastName ? ' rfield--error' : ''}`}>
+          <span className="rfield__label">Фамилия</span>
           <input
             className="rfield__input"
             type="text"
-            placeholder="Иванов Иван Иванович"
-            value={values.fio}
+            placeholder="Иванова"
+            autoComplete="family-name"
+            autoCapitalize="words"
+            maxLength={50}
+            value={values.lastName}
             disabled={submitting}
-            onChange={(e) => setField('fio', e.target.value)}
+            onChange={(e) => setNameField('lastName', e.target.value)}
+            onBlur={() => finishNameField('lastName')}
           />
-          {errors.fio && <span className="rfield__err">{errors.fio}</span>}
+          {errors.lastName && <span className="rfield__err">{errors.lastName}</span>}
+        </label>
+
+        <label className={`rfield${errors.firstName ? ' rfield--error' : ''}`}>
+          <span className="rfield__label">Имя</span>
+          <input
+            className="rfield__input"
+            type="text"
+            placeholder="Анна"
+            autoComplete="given-name"
+            autoCapitalize="words"
+            maxLength={50}
+            value={values.firstName}
+            disabled={submitting}
+            onChange={(e) => setNameField('firstName', e.target.value)}
+            onBlur={() => finishNameField('firstName')}
+          />
+          {errors.firstName && <span className="rfield__err">{errors.firstName}</span>}
         </label>
 
         <div className="reg-row">

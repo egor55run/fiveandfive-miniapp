@@ -17,6 +17,7 @@ import {
   emailField,
   phoneField,
   sendValidationError,
+  personNameField,
 } from '../lib/validation';
 import { serializeEvent } from './events';
 import { requireTelegramAuth, tgUserOf } from '../plugins/telegramAuth';
@@ -35,8 +36,8 @@ function serializeSeasonPass(p: SeasonPass) {
 
 const bodySchema = z.object({
   seasonId: z.number().int().positive(),
-  firstName: z.string().trim().min(1, 'Укажите имя'),
-  lastName: z.string().trim().min(1, 'Укажите фамилию'),
+  firstName: personNameField('firstName'),
+  lastName: personNameField('lastName'),
   email: emailField,
   // См. комментарий в routes/registrations.ts: форма спрашивает дату,
   // возраст остаётся запасным вариантом.

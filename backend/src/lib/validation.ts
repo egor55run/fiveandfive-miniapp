@@ -1,6 +1,7 @@
 import type { FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { parseBirthDate } from './birthDate';
+import { normalizePersonName, personNameError, type PersonNameKind } from './personName';
 
 /**
  * Общие поля форм участника и единый формат ответа на 400.
@@ -29,6 +30,20 @@ export const phoneField = z
     (v) => (v.match(/\d/g) ?? []).length >= 10,
     'В телефоне должно быть минимум 10 цифр',
   );
+
+/**
+ * Имя или фамилия: кириллица, дефис, пробел; приходит нормализованным
+ * («анна-мария» → «Анна-Мария»). Правило — lib/personName.
+ */
+export function personNameField(kind: PersonNameKind) {
+  return z
+    .string()
+    .transform(normalizePersonName)
+    .superRefine((value, ctx) => {
+      const message = personNameError(value, kind);
+      if (message) ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+    });
+}
 
 /** Дата рождения в формате input[type=date]. Разбор и границы — в lib/birthDate. */
 export const birthDateField = z

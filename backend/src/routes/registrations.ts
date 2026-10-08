@@ -17,6 +17,7 @@ import {
   emailField,
   phoneField,
   sendValidationError,
+  personNameField,
 } from '../lib/validation';
 import { requireTelegramAuth, tgUserOf } from '../plugins/telegramAuth';
 import { serializeUser } from './auth';
@@ -26,8 +27,8 @@ import { serializeUser } from './auth';
 // Остальные поля Telegram не выдаёт, поэтому их по-прежнему спрашиваем формой.
 const bodySchema = z.object({
   eventId: z.number().int().positive(),
-  firstName: z.string().trim().min(1, 'Укажите имя'),
-  lastName: z.string().trim().min(1, 'Укажите фамилию'),
+  firstName: personNameField('firstName'),
+  lastName: personNameField('lastName'),
   email: emailField,
   // Форма спрашивает дату рождения, а не возраст. age оставлен для совместимости
   // и как запасной вариант: когда дата пришла, возраст считает сервер.

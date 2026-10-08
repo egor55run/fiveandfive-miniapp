@@ -6,6 +6,7 @@ import { ageFromBirthDate, formatBirthDate, parseBirthDate } from '../lib/birthD
 import {
   birthDateField,
   emailField,
+  personNameField,
   phoneField,
   sendValidationError,
 } from '../lib/validation';
@@ -36,8 +37,8 @@ export function serializeUser(u: User) {
 
 const patchSchema = z
   .object({
-    firstName: z.string().trim().min(1, 'Укажите имя').optional(),
-    lastName: z.string().trim().min(1, 'Укажите фамилию').optional(),
+    firstName: personNameField('firstName').optional(),
+    lastName: personNameField('lastName').optional(),
     email: emailField.optional(),
     birthDate: birthDateField.optional(),
     phone: phoneField.optional(),
@@ -60,20 +61,22 @@ export async function authRoutes(app: FastifyInstance) {
       const tg = tgUserOf(req);
       const telegramId = BigInt(tg.id);
 
-      // Поля, которыми владеет Telegram: перезаписываем на каждом входе,
-      // потому что пользователь мог сменить имя или username.
-      const fromTelegram = {
-        firstName: tg.first_name,
-        lastName: tg.last_name ?? null,
-        username: tg.username ?? null,
-      };
-
+      // Имя из Telegram — только при первом входе, как черновик до регистрации.
+      // Дальше им владеет форма регистрации (кириллица, без отчества): раньше
+      // каждый вход перезаписывал «Кадыров Егор» обратно на «Egor» из Telegram,
+      // и в админке и протоколах оказывалось не то имя. Username — за Telegram,
+      // его обновляем всегда.
       const existing = await prisma.user.findUnique({ where: { telegramId } });
       const user = await prisma.user.upsert({
         where: { telegramId },
-        create: { telegramId, ...fromTelegram },
-        // email/phone/age не трогаем — их ввёл сам пользователь при регистрации.
-        update: fromTelegram,
+        create: {
+          telegramId,
+          firstName: tg.first_name,
+          lastName: tg.last_name ?? null,
+          username: tg.username ?? null,
+        },
+        // Имя, email, телефон и дату рождения не трогаем — их ввёл сам участник.
+        update: { username: tg.username ?? null },
       });
 
       return { user: serializeUser(user), isNew: existing === null };
