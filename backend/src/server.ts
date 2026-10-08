@@ -58,10 +58,7 @@ async function main() {
   // Оферта и политика ПДн: без них регистрацию не провести — согласие не на что
   // записать. Падаем сразу, а не на первой регистрации.
   const legal = await loadLegalDocuments();
-  app.log.info(
-    { oferta: legal.OFERTA, privacy: legal.PRIVACY },
-    'Юридические документы загружены',
-  );
+  app.log.info(legal, 'Юридические документы загружены');
 
   await app.register(cors, { origin: corsOrigins() });
   await app.register(cookie);
