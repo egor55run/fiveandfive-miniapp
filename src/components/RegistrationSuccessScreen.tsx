@@ -65,7 +65,9 @@ function RegistrationSuccessScreen({ user, events, seasonPass, onBackHome }: Pro
             ? `Записали на все ${events.length} стартов сезона`
             : 'Место забронировано'}
           <br />
-          Детали отправили на <b>{user.email}</b>
+          {/* Писем пока нет — подтверждение уходит ботом (lib/notify на бэкенде).
+              Когда подключим почту, вернуть «Детали отправили на {user.email}». */}
+          Детали отправили в Telegram
         </p>
       </section>
 
