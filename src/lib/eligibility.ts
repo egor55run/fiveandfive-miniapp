@@ -37,3 +37,6 @@ export function underageMessage(ageOnStart: number): string {
 /** Текст третьей галочки — тот же записывает сервер (PARENTAL_CONSENT_TEXT). */
 export const PARENTAL_CONSENT_TEXT =
   'Принесу письменное согласие родителя или законного представителя на выдачу стартового пакета';
+
+/** Слова в тексте галочки, которые ведут на бланк согласия (/soglasie-roditelya). */
+export const PARENTAL_CONSENT_LINK_WORDS = 'письменное согласие родителя';

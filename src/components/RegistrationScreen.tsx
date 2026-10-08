@@ -22,6 +22,7 @@ import {
   ADULT_AGE,
   ageOnStartDay,
   MIN_AGE,
+  PARENTAL_CONSENT_LINK_WORDS,
   PARENTAL_CONSENT_TEXT,
   underageMessage,
 } from '../lib/eligibility';
@@ -103,6 +104,9 @@ function ageFromDob(dob: string): number {
 type NameField = 'lastName' | 'firstName';
 
 const priceFmt = new Intl.NumberFormat('ru-RU');
+const [parentConsentBefore, parentConsentAfter] = PARENTAL_CONSENT_TEXT.split(
+  PARENTAL_CONSENT_LINK_WORDS,
+);
 const deadlineFmt = new Intl.DateTimeFormat('ru-RU', {
   day: 'numeric',
   month: 'long',
@@ -577,7 +581,11 @@ function RegistrationScreen({
                   {consentParent && <Check size={16} strokeWidth={3} />}
                 </button>
                 <span id="consent-parent" className="consent__text" onClick={toggleParent}>
-                  {PARENTAL_CONSENT_TEXT}
+                  {/* Текст режем по самой константе: видимые слова не могут
+                      разойтись с текстом, который записывает сервер. */}
+                  {parentConsentBefore}
+                  <DocLink doc="parentConsent">{PARENTAL_CONSENT_LINK_WORDS}</DocLink>
+                  {parentConsentAfter}
                 </span>
               </div>
             )}

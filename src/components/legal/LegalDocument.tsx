@@ -1,7 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { notFound } from 'next/navigation';
 import { marked } from 'marked';
-import { LEGAL_DOCS, type LegalDocKey } from '../../lib/legal';
+import { docPath, KK_ENABLED, LEGAL_DOCS, type Lang, type LegalDocKey } from '../../lib/legal';
+import PrintButton from './PrintButton';
 
 /**
  * Страница юридического документа. Серверный компонент: markdown читается и
@@ -9,21 +11,54 @@ import { LEGAL_DOCS, type LegalDocKey } from '../../lib/legal';
  * ни парсер, ни сам файл. Текст наш (legal/*.md), поэтому вставка HTML как есть
  * безопасна.
  */
-export default async function LegalDocument({ doc }: { doc: LegalDocKey }) {
-  const file = path.join(process.cwd(), 'legal', LEGAL_DOCS[doc].file);
+export default async function LegalDocument({
+  doc,
+  lang = 'ru',
+}: {
+  doc: LegalDocKey;
+  lang?: Lang;
+}) {
+  // Казахские версии — только где включены (staging), см. KK_ENABLED.
+  if (lang === 'kk' && !KK_ENABLED) notFound();
+
+  const info = LEGAL_DOCS[doc];
+  const file = path.join(process.cwd(), 'legal', info.file[lang]);
   const markdown = await readFile(file, 'utf8');
   const html = await marked.parse(markdown, { gfm: true });
+  const printable = 'printable' in info && info.printable;
 
   return (
-    <main className="legal">
-      <span className="legal__brand">5&amp;5</span>
-      <article className="legal__body" dangerouslySetInnerHTML={{ __html: html }} />
-      <nav className="legal__nav" aria-label="Документы">
-        {Object.entries(LEGAL_DOCS)
-          .filter(([key]) => key !== doc)
-          .map(([key, d]) => (
-            <a key={key} href={d.path}>
-              {d.title}
+    <main className={`legal${printable ? ' legal--printable' : ''}`}>
+      <header className="legal__top">
+        <span className="legal__brand">5&amp;5</span>
+        {KK_ENABLED && (
+          <nav className="legal__lang" aria-label="Язык / Тіл">
+            <a href={docPath(doc, 'ru')} aria-current={lang === 'ru' ? 'page' : undefined}>
+              Рус
+            </a>
+            <a href={docPath(doc, 'kk')} aria-current={lang === 'kk' ? 'page' : undefined}>
+              Қаз
+            </a>
+          </nav>
+        )}
+      </header>
+
+      {printable && (
+        <PrintButton label={lang === 'kk' ? 'Басып шығару' : 'Распечатать'} />
+      )}
+
+      <article
+        className="legal__body"
+        lang={lang === 'kk' ? 'kk' : undefined}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+
+      <nav className="legal__nav" aria-label={lang === 'kk' ? 'Құжаттар' : 'Документы'}>
+        {(Object.keys(LEGAL_DOCS) as LegalDocKey[])
+          .filter((key) => key !== doc)
+          .map((key) => (
+            <a key={key} href={docPath(key, lang)}>
+              {LEGAL_DOCS[key].title[lang]}
             </a>
           ))}
       </nav>

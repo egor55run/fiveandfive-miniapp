@@ -14,6 +14,13 @@
   gap: var(--sp-xl);
 }
 
+.legal__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-lg);
+}
+
 .legal__brand {
   align-self: flex-start;
   font-family: var(--font-display);
@@ -47,11 +54,13 @@
 }
 
 .legal__body p,
-.legal__body ul {
+.legal__body ul,
+.legal__body ol {
   margin: 0 0 var(--sp-md);
 }
 
-.legal__body ul {
+.legal__body ul,
+.legal__body ol {
   padding-left: 22px;
 }
 
@@ -104,4 +113,117 @@
   padding-top: var(--sp-lg);
   border-top: 1px solid var(--border-subtle);
   font-size: 15px;
+}
+
+/* Переключатель «Рус / Қаз» (только где включены казахские версии). */
+.legal__lang {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-full);
+  font-size: 14px;
+}
+
+.legal__lang a {
+  padding: 4px 12px;
+  border-radius: var(--r-full);
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.legal__lang a[aria-current='page'] {
+  background: var(--brand-primary);
+  color: var(--text-on-brand);
+}
+
+.legal__lang a:focus-visible,
+.legal__print:focus-visible {
+  outline: 2px solid var(--brand-highlight);
+  outline-offset: 2px;
+}
+
+.legal__print {
+  align-self: flex-start;
+  padding: 12px 22px;
+  font: 600 16px/1 var(--font-ui);
+  color: var(--text-on-brand);
+  background: var(--brand-primary);
+  border: none;
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+
+/* Бланк согласия: при печати — только сам бланк, один лист A4, чёрным по
+   белому, без шапки сайта, переключателя, кнопки и ссылок на документы. */
+@page {
+  size: A4;
+  margin: 12mm 14mm;
+}
+
+@media print {
+  /* index.css ставит :root { color-scheme: dark } — с ним Chrome красит поля
+     листа тёмным даже при белом body. */
+  :root {
+    color-scheme: light;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .site {
+    min-height: 0;
+    padding: 0;
+  }
+
+  .legal {
+    max-width: none;
+    gap: 0;
+  }
+
+  .legal__top,
+  .legal__print,
+  .legal__nav {
+    display: none !important;
+  }
+
+  .legal__body {
+    color: #000;
+    font-size: 10.5pt;
+    line-height: 1.4;
+  }
+
+  .legal__body h1 {
+    margin: 0 0 4mm;
+    font-size: 14pt;
+    line-height: 1.2;
+  }
+
+  .legal__body h2 {
+    margin: 4mm 0 1.5mm;
+    font-size: 11pt;
+    break-after: avoid;
+  }
+
+  .legal__body p,
+  .legal__body ul,
+  .legal__body ol {
+    margin: 0 0 2mm;
+  }
+
+  .legal__body li + li {
+    margin-top: 0.5mm;
+  }
+
+  .legal__body li::marker {
+    color: #000;
+  }
+
+  .legal__body a {
+    color: #000;
+    text-decoration: none;
+  }
 }

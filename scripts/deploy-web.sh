@@ -21,10 +21,15 @@ case "$TARGET" in
     # Staging обслуживает тестовый бот: его имя видно на экране «Откройте в
     # Telegram» и нужно виджету входа в админку (см. src/lib/telegram.ts).
     BOT="fiveandfive_test_bot"
+    # Казахские версии оферты/политики/бланка — пока только на staging:
+    # их ещё проверяет юрист (решение пользователя 2026-10-08).
+    LEGAL_KK=1
     ;;
   prod)
     REMOTE_DIR="web"; APP="fiveandfive-web"; PORT=3001
     BOT="fiveandfive_run_bot"
+    # На прод казахские версии — только по явной команде пользователя.
+    LEGAL_KK=0
     ;;
   *) echo "Использование: $0 staging|prod"; exit 1 ;;
 esac
@@ -46,7 +51,7 @@ rev=$(git rev-parse --short HEAD)
 
 echo "==> next build ($TARGET: $branch @ $rev, бот @$BOT)"
 rm -rf .next
-NEXT_PUBLIC_BOT_USERNAME="$BOT" npm run build
+NEXT_PUBLIC_BOT_USERNAME="$BOT" NEXT_PUBLIC_LEGAL_KK="$LEGAL_KK" npm run build
 
 # Проверки готовой сборки — до того, как она уедет на сервер.
 static=.next/static
@@ -59,6 +64,11 @@ if [ "$TARGET" = prod ]; then
   # (правило 2026-10-08; вернуть строку, когда подключим почту).
   if grep -rqF "Детали отправили на" "$static"; then
     echo "!! В прод-сборке есть «Детали отправили на почту», а почта не подключена"; exit 1
+  fi
+  # Казахские тексты документов ещё не проверены юристом — на прод не пускаем.
+  # «ЖК «5&5»» есть во всех трёх казахских документах и только в них.
+  if grep -rqF "ЖК «5&5»" .next/server .next/static; then
+    echo "!! В прод-сборку попали казахские версии документов — они только для staging"; exit 1
   fi
 fi
 
