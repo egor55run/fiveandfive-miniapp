@@ -31,6 +31,8 @@ type Props = {
   onPaymentStarted: (outcome: RegistrationOutcome, payment: PaymentDto) => void;
   /** Что уже известно об участнике: имя из профиля или Telegram, контакты из профиля в БД. */
   prefill?: RegistrationPrefill;
+  /** Администратор может записаться и при закрытой регистрации. */
+  registrationOpenForMe?: boolean;
 };
 
 type FormValues = {
@@ -119,6 +121,7 @@ function RegistrationScreen({
   onRegistered,
   onPaymentStarted,
   prefill,
+  registrationOpenForMe = false,
 }: Props) {
   // Формы входа пользователь не видит: имя приходит из Telegram, а контакты —
   // из профиля, если он уже регистрировался раньше.
@@ -277,7 +280,7 @@ function RegistrationScreen({
         </div>
       </section>
 
-      {!isRegistrationOpen(event) ? (
+      {!isRegistrationOpen(event, registrationOpenForMe) ? (
         // Регистрация закрыта (оплата ещё не включена): дата, дистанция и цена
         // видны в шапке выше, а формы нет — отправить её всё равно нельзя.
         <section className="reg-closed">
@@ -291,6 +294,12 @@ function RegistrationScreen({
         </section>
       ) : (
         <form onSubmit={handleSubmit} noValidate className="reg-fields">
+          {!isRegistrationOpen(event) && (
+            // Админ записывается до открытия — например, ради тестового платежа.
+            <p className="reg-admin-note">
+              Регистрация закрыта для участников — вы записываетесь как администратор
+            </p>
+          )}
           <p className="reg-group-label">Ваши данные:</p>
 
           <label className={`rfield${errors.lastName ? ' rfield--error' : ''}`}>

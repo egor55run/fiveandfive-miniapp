@@ -2,7 +2,11 @@ import type { FastifyInstance } from 'fastify';
 import type { Event, SeasonPass, User } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../prisma';
-import { REGISTRATION_CLOSED_MESSAGE, registrationOpen } from '../lib/registrationWindow';
+import {
+  REGISTRATION_CLOSED_MESSAGE,
+  registrationOpen,
+  registrationOpenFor,
+} from '../lib/registrationWindow';
 import { ageProfileFields, parseBirthDate } from '../lib/birthDate';
 import { KASPI_PHONE_ERROR, normalizeKzPhone } from '../lib/apipay';
 import { deliver, seasonPassText } from '../lib/notify';
@@ -89,12 +93,16 @@ export async function seasonsRoutes(app: FastifyInstance) {
   // POST /season-passes — оформить абонемент на весь сезон и выставить ОДИН счёт.
   // Стратегия «всё или ничего»: если хоть один старт недоступен — 409, ничего не создаётся.
   // Места держатся, пока счёт не оплачен или не истёк (см. lib/payments.ts).
-  // Без APIPAY_API_KEY — прежняя заглушка: абонемент PENDING без счёта.
+  // Без APIPAY_API_KEY регистрация закрыта — кроме администраторов: у них
+  // абонемент оформляется без счёта (PENDING).
   app.post('/season-passes', { preHandler: requireTelegramAuth }, async (req, reply) => {
-    if (!registrationOpen()) {
+    if (!registrationOpenFor(tgUserOf(req).id)) {
       return reply
         .code(403)
         .send({ error: REGISTRATION_CLOSED_MESSAGE, reason: 'registration_closed' });
+    }
+    if (!registrationOpen()) {
+      req.log.info({ telegramId: tgUserOf(req).id }, 'Запись администратора при закрытой регистрации');
     }
     const parsed = bodySchema.safeParse(req.body);
     if (!parsed.success) return sendValidationError(reply, parsed.error);

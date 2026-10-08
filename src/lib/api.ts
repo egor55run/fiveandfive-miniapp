@@ -31,8 +31,12 @@ export type EventDto = {
 /** Текст на месте кнопки регистрации, пока она закрыта. */
 export const REGISTRATION_CLOSED_TEXT = 'Регистрация скоро откроется';
 
-export function isRegistrationOpen(e: EventDto): boolean {
-  return e.registrationOpen !== false;
+/**
+ * Открыта ли запись на старт для текущего пользователя: открыта для всех —
+ * или закрыта, но сервер при входе разрешил именно ему (администратор).
+ */
+export function isRegistrationOpen(e: EventDto, openForMe = false): boolean {
+  return e.registrationOpen !== false || openForMe;
 }
 
 /**
@@ -206,6 +210,11 @@ export type AuthResult = {
   user: UserDto;
   /** true, если пользователь открыл приложение впервые. */
   isNew: boolean;
+  /**
+   * Может ли этот человек записаться. При закрытой регистрации true только у
+   * администраторов (тестовый платёж до открытия). Нет поля — старый сервер.
+   */
+  registrationOpen?: boolean;
 };
 
 export type MeRegistrationDto = {

@@ -6,6 +6,7 @@ import { apiAsset, type EventDto, REGISTRATION_CLOSED_TEXT, isRegistrationOpen }
 type Props = {
   event: EventDto;
   onRegister: () => void;
+  registrationOpenForMe: boolean;
 };
 
 type Countdown = { days: number; started: boolean };
@@ -40,14 +41,14 @@ const dateShort = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'lon
 const timeFmt = new Intl.DateTimeFormat('ru-RU', { hour: 'numeric', minute: '2-digit', timeZone: TZ });
 const priceFmt = new Intl.NumberFormat('ru-RU');
 
-function NextRaceCard({ event, onRegister }: Props) {
+function NextRaceCard({ event, onRegister, registrationOpenForMe }: Props) {
   const target = useMemo(() => new Date(event.date), [event.date]);
   const { days, started } = useCountdown(target);
   const reduceMotion = useReducedMotion();
   const [showRoute, setShowRoute] = useState(false);
 
   const soldOut = event.slotsLeft <= 0;
-  const closed = !isRegistrationOpen(event);
+  const closed = !isRegistrationOpen(event, registrationOpenForMe);
   // Карту загружает организатор в админке; у стартов без неё показываем
   // плейсхолдер, а не чужой маршрут.
   const routeSrc = event.routeImageUrl ? apiAsset(event.routeImageUrl) : null;

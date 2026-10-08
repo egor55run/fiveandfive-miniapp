@@ -721,6 +721,17 @@ select.rfield__input {
 }
 
 /* Футер оплаты */
+/* Админ записывается при закрытой регистрации */
+.reg-admin-note {
+  margin: 0;
+  padding: var(--sp-sm) var(--sp-md);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--brand-highlight);
+  border: 1px solid currentColor;
+  border-radius: var(--r-sm);
+}
+
 /* Регистрация закрыта (до включения оплаты): вместо формы */
 .reg-closed {
   display: flex;

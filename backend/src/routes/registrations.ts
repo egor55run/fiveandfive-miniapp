@@ -2,7 +2,11 @@ import type { FastifyInstance } from 'fastify';
 import type { Registration } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../prisma';
-import { REGISTRATION_CLOSED_MESSAGE, registrationOpen } from '../lib/registrationWindow';
+import {
+  REGISTRATION_CLOSED_MESSAGE,
+  registrationOpen,
+  registrationOpenFor,
+} from '../lib/registrationWindow';
 import { KASPI_PHONE_ERROR, normalizeKzPhone } from '../lib/apipay';
 import { ageProfileFields, parseBirthDate } from '../lib/birthDate';
 import { deliver, registrationText } from '../lib/notify';
@@ -63,16 +67,20 @@ export async function registrationsRoutes(app: FastifyInstance) {
    * Оплатил — PAID и сообщение в Telegram (lib/payments.ts). Не оплатил —
    * место освобождается, и повторный POST просто выставит новый счёт.
    *
-   * Без APIPAY_API_KEY работает прежняя заглушка: регистрация PENDING без счёта.
+   * Без APIPAY_API_KEY регистрация закрыта (lib/registrationWindow) — кроме
+   * администраторов: у них запись идёт без счёта, регистрация PENDING.
    */
   app.post(
     '/registrations',
     { preHandler: requireTelegramAuth },
     async (req, reply) => {
-      if (!registrationOpen()) {
+      if (!registrationOpenFor(tgUserOf(req).id)) {
         return reply
           .code(403)
           .send({ error: REGISTRATION_CLOSED_MESSAGE, reason: 'registration_closed' });
+      }
+      if (!registrationOpen()) {
+        req.log.info({ telegramId: tgUserOf(req).id }, 'Запись администратора при закрытой регистрации');
       }
       const parsed = bodySchema.safeParse(req.body);
       if (!parsed.success) return sendValidationError(reply, parsed.error);

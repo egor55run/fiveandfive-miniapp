@@ -1,4 +1,5 @@
 import { apiPayConfigured } from './apipay';
+import { isAdminTelegramId } from './telegramLogin';
 
 /**
  * Открыта ли регистрация на старты (и на абонемент).
@@ -17,6 +18,16 @@ export function registrationOpen(): boolean {
   if (flag === 'true') return true;
   if (flag === 'false') return false;
   return apiPayConfigured();
+}
+
+/**
+ * Может ли записаться конкретный человек. Администраторы (ADMIN_TELEGRAM_IDS)
+ * могут и при закрытой регистрации — чтобы сделать тестовый платёж до
+ * открытия (решение пользователя 2026-10-08). Остальные видят «Регистрация
+ * скоро откроется».
+ */
+export function registrationOpenFor(telegramId: number): boolean {
+  return registrationOpen() || isAdminTelegramId(telegramId);
 }
 
 /** Тот же текст на кнопке в приложении. */

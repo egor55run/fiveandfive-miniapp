@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Prisma, User } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../prisma';
+import { registrationOpenFor } from '../lib/registrationWindow';
 import { ageFromBirthDate, formatBirthDate, parseBirthDate } from '../lib/birthDate';
 import {
   birthDateField,
@@ -82,7 +83,14 @@ export async function authRoutes(app: FastifyInstance) {
         update: { username: tg.username ?? null },
       });
 
-      return { user: serializeUser(user), isNew: existing === null };
+      return {
+        user: serializeUser(user),
+        isNew: existing === null,
+        // Открыта ли регистрация именно для этого человека: при закрытой
+        // регистрации администраторы всё равно могут записаться (тестовый
+        // платёж до открытия) — приложение покажет им форму.
+        registrationOpen: registrationOpenFor(tg.id),
+      };
     },
   );
 

@@ -14,6 +14,8 @@ type Props = {
   onRegister: (event: EventDto) => void;
   onJoinSeries: () => void;
   onRetry: () => void;
+  /** Администратор может записаться и при закрытой регистрации. */
+  registrationOpenForMe: boolean;
 };
 
 function HomeScreen({
@@ -24,6 +26,7 @@ function HomeScreen({
   onRegister,
   onJoinSeries,
   onRetry,
+  registrationOpenForMe,
 }: Props) {
   // Остальные старты — все, кроме показанного в hero, по дате.
   const rest = events
@@ -64,7 +67,11 @@ function HomeScreen({
 
       {!loading && !error && nearest && (
         <>
-          <NextRaceCard event={nearest} onRegister={() => onRegister(nearest)} />
+          <NextRaceCard
+            event={nearest}
+            onRegister={() => onRegister(nearest)}
+            registrationOpenForMe={registrationOpenForMe}
+          />
 
           {rest.length > 0 && (
             <div className="races-list">

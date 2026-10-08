@@ -52,6 +52,7 @@ function App() {
     error: authError,
     retry: retryAuth,
     refreshMe,
+    registrationOpenForMe,
   } = useTelegramAuth();
 
   // Кто пользователь — известно сразу после входа, без всякой формы.
@@ -166,6 +167,7 @@ function App() {
         onRegistered={handleRegistered}
         onPaymentStarted={handlePaymentStarted}
         prefill={prefill}
+        registrationOpenForMe={registrationOpenForMe}
       />
     );
   }
@@ -235,6 +237,7 @@ function App() {
           onRegister={openRegistration}
           onJoinSeries={() => nearest && openRegistration(nearest)}
           onRetry={loadEvents}
+          registrationOpenForMe={registrationOpenForMe}
         />
       )}
 
