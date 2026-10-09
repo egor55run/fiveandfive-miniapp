@@ -1,5 +1,7 @@
+import { cache } from 'react';
 import type { EventDto } from '../lib/api';
-import { BOT_USERNAME } from '../lib/telegram';
+
+export { anyRegistrationOpen, botChatLink, botRaceLink } from './links';
 
 /**
  * Данные сайта — с бэкенда, на сервере Next при каждом запросе.
@@ -17,27 +19,31 @@ function apiBase(): string {
   return pub.startsWith('http') ? pub.replace(/\/+$/, '') : 'http://127.0.0.1:3000';
 }
 
-/** Старты, ближайшие первыми. null — бэкенд не ответил (страница покажет заглушку). */
-export async function fetchEvents(): Promise<EventDto[] | null> {
+async function getJson<T>(path: string): Promise<T | null> {
   try {
-    const res = await fetch(`${apiBase()}/events`, {
+    const res = await fetch(`${apiBase()}${path}`, {
       cache: 'no-store',
       signal: AbortSignal.timeout(5000),
     });
-    return res.ok ? ((await res.json()) as EventDto[]) : null;
+    return res.ok ? ((await res.json()) as T) : null;
   } catch {
     return null;
   }
 }
 
-/** Mini App сразу на этом старте (нужен «основной Mini App» в BotFather). */
-export function botRaceLink(slug: string): string {
-  return `https://t.me/${BOT_USERNAME}?startapp=race-${encodeURIComponent(slug)}`;
-}
+/**
+ * Старты, ближайшие первыми. null — бэкенд не ответил (страница покажет заглушку).
+ * cache — один запрос на страницу, хотя старты нужны и шапке, и самой странице.
+ */
+export const fetchEvents = cache(() => getJson<EventDto[]>('/events'));
 
-/** Чат с ботом. payload — для /start (подписка «узнать об открытии», этап 2). */
-export function botChatLink(payload?: string): string {
-  return payload
-    ? `https://t.me/${BOT_USERNAME}?start=${encodeURIComponent(payload)}`
-    : `https://t.me/${BOT_USERNAME}`;
+/** Старт по адресу страницы. null — нет такого (или бэкенд не ответил). */
+export const fetchEventBySlug = cache((slug: string) =>
+  getJson<EventDto>(`/events/by-slug/${encodeURIComponent(slug)}`),
+);
+
+/** Цена абонемента на активный сезон; null — сезона нет или цена не задана. */
+export async function fetchSeasonPrice(): Promise<number | null> {
+  const season = await getJson<{ price: number }>('/seasons/current');
+  return season && season.price > 0 ? season.price : null;
 }

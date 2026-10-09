@@ -1,6 +1,6 @@
 import { registrationState, type EventDto } from '../../lib/api';
 import type { Lang } from '../../lib/legal';
-import { botChatLink, botRaceLink } from '../../site/data';
+import { botChatLink, botRaceLink } from '../../site/links';
 import { siteText } from '../../site/i18n';
 
 /**
