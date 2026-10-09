@@ -40,6 +40,14 @@ export const viewport: Viewport = {
  * Обычный браузер и встроенный браузер Telegram (openLink) этих параметров не
  * несут и остаются на сайте.
  */
+/**
+ * Статистика посещений — Umami на нашем сервере (/stats), без cookies;
+ * «Не отслеживать» в браузере уважаем (data-do-not-track). Счётчик только там,
+ * где при сборке задан id сайта (scripts/deploy-web.sh), и только на страницах
+ * сайта: Mini App и админка — в других layout.
+ */
+const UMAMI_ID = process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID;
+
 const TELEGRAM_TO_APP = `(function(){var s=location.search,h=location.hash;if(/tgWebApp/.test(h)||/tgWebApp/.test(s)){location.replace('/app'+s+h);}})();`;
 
 /**
@@ -52,6 +60,9 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
     <html lang="ru" className={`${ui.variable} ${display.variable} site-fonts`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: TELEGRAM_TO_APP }} />
+        {UMAMI_ID && (
+          <script defer src="/stats/m.js" data-website-id={UMAMI_ID} data-do-not-track="true" />
+        )}
       </head>
       <body>
         <div className="site">
