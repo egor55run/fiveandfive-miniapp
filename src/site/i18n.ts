@@ -15,6 +15,7 @@ const ru = {
     races: 'Старты',
     medal: 'Медаль',
     price: 'Цена',
+    faq: 'Вопросы',
     notify: 'Узнать об открытии',
     register: 'Зарегистрироваться',
   },
@@ -109,6 +110,11 @@ const ru = {
     regulationsLink: 'Открыть Положение (PDF)',
     regulationsLater: 'Ссылка появится позже',
   },
+  faq: {
+    title: 'Вопросы',
+    lead: 'Не нашли ответа?',
+    ask: 'Напишите нам в Telegram',
+  },
   cta: {
     register: 'Зарегистрироваться',
     soon: 'Регистрация скоро откроется',
@@ -119,6 +125,7 @@ const ru = {
   footer: {
     documents: 'Документы',
     telegram: 'Telegram',
+    faq: 'Вопросы',
     oferta: 'Оферта',
     privacy: 'Политика данных',
     parentConsent: 'Согласие родителя',

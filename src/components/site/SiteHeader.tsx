@@ -16,6 +16,7 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
           <a href={`${home}#starty`}>{t.nav.races}</a>
           <a href={`${home}#zvezda`}>{t.nav.medal}</a>
           <a href={`${home}#cena`}>{t.nav.price}</a>
+          <a href={sitePath('/voprosy', lang)}>{t.nav.faq}</a>
         </nav>
         <HeaderCta notify={t.nav.notify} register={t.nav.register} />
       </div>

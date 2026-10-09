@@ -1067,6 +1067,119 @@ html.site-fonts body {
   }
 }
 
+/* ── Вопросы ──────────────────────────────────────────────────────────── */
+
+.faq {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 880px;
+  padding-top: 24px;
+  padding-bottom: 96px;
+}
+
+.faq__lead {
+  margin: 0 0 16px;
+  font-size: 18px;
+  color: var(--muted);
+}
+
+.site .faq__lead a {
+  font-weight: 600;
+}
+
+.faq__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.faq-item {
+  border-radius: 20px;
+  background: #fff;
+}
+
+.faq-item__q {
+  position: relative;
+  padding: 22px 64px 22px 24px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.3;
+  list-style: none;
+  cursor: pointer;
+}
+
+.faq-item__q::-webkit-details-marker {
+  display: none;
+}
+
+/* Плюс, который становится минусом. */
+.faq-item__q::after {
+  content: '+';
+  position: absolute;
+  top: 50%;
+  right: 22px;
+  width: 30px;
+  height: 30px;
+  margin-top: -15px;
+  border-radius: 50%;
+  background: var(--orange);
+  color: var(--ink);
+  font: 700 20px/30px var(--font-ui);
+  text-align: center;
+}
+
+.faq-item[open] .faq-item__q::after {
+  content: '−';
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.faq-item__q:focus-visible {
+  outline: 3px solid var(--orange);
+  outline-offset: 3px;
+  border-radius: 20px;
+}
+
+.faq-item__a {
+  padding: 0 24px 24px;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.faq-item__a p,
+.faq-item__a ul {
+  margin: 0 0 10px;
+}
+
+.faq-item__a > :last-child {
+  margin-bottom: 0;
+}
+
+.faq-item__a ul {
+  padding-left: 22px;
+}
+
+.faq-item__a li::marker {
+  color: var(--orange);
+}
+
+@media (max-width: 639px) {
+  .faq-item__q {
+    padding: 18px 56px 18px 18px;
+    font-size: 16px;
+  }
+
+  .faq-item__q::after {
+    right: 16px;
+  }
+
+  .faq-item__a {
+    padding: 0 18px 20px;
+  }
+}
+
 /* Кнопка регистрации на сайте (RegistrationCta). */
 .site .cta {
   display: inline-block;
