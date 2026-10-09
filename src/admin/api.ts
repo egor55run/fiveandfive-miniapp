@@ -310,3 +310,36 @@ export const putResult = (eventId: number, userId: number, finishTime: number) =
 
 export const deleteResult = (resultId: number) =>
   request<{ results: ResultRow[] }>(`/admin/results/${resultId}`, { method: 'DELETE' });
+
+// ---------- Подписка «Узнать об открытии» ----------
+
+export type OpeningInfo = {
+  stats: {
+    active: number;
+    pending: number;
+    sent: number;
+    blocked: number;
+    failed: number;
+    unsubscribed: number;
+  };
+  broadcast: {
+    running: boolean;
+    total: number;
+    done: number;
+    sent: number;
+    blocked: number;
+    failed: number;
+    startedAt: string | null;
+    finishedAt: string | null;
+  };
+  defaultText: string;
+  registrationOpen: boolean;
+};
+
+export const getOpeningSubscribers = () => request<OpeningInfo>('/admin/opening-subscribers');
+
+export const startOpeningBroadcast = (text: string) =>
+  request<{ broadcast: OpeningInfo['broadcast'] }>('/admin/opening-subscribers/broadcast', {
+    method: 'POST',
+    body: { text },
+  });

@@ -27,6 +27,8 @@ type TelegramWebApp = {
   ready: () => void;
   /** Открыть ссылку во встроенном браузере Telegram поверх Mini App. */
   openLink?: (url: string) => void;
+  /** Попросить у пользователя разрешение боту писать ему (Bot API 6.9+). */
+  requestWriteAccess?: (callback?: (granted: boolean) => void) => void;
   expand: () => void;
   colorScheme?: 'light' | 'dark';
   platform?: string;
@@ -99,4 +101,21 @@ export function requestedRaceSlug(): string | null {
     webApp()?.initDataUnsafe?.start_param ??
     new URLSearchParams(window.location.search).get('tgWebAppStartParam');
   return start?.startsWith('race-') ? start.slice('race-'.length) : null;
+}
+
+/**
+ * Разрешение боту писать пользователю. Telegram сам решает, спрашивать ли:
+ * если диалог с ботом уже есть, ответ «да» приходит сразу. В старых клиентах
+ * без этого метода считаем, что можно, — Mini App там открывают из чата с ботом.
+ */
+export function askWriteAccess(): Promise<boolean> {
+  const app = webApp();
+  if (!app?.requestWriteAccess) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    try {
+      app.requestWriteAccess!((granted) => resolve(Boolean(granted)));
+    } catch {
+      resolve(true);
+    }
+  });
 }

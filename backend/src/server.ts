@@ -15,10 +15,13 @@ import { setupTelegramAuth } from './plugins/telegramAuth';
 import { adminEventsRoutes } from './routes/admin/events';
 import { adminParticipantsRoutes } from './routes/admin/participants';
 import { adminResultsRoutes } from './routes/admin/results';
+import { adminOpeningBroadcastRoutes } from './routes/admin/openingBroadcast';
 import { adminSessionRoutes } from './routes/admin/session';
 import { authRoutes } from './routes/auth';
 import { eventsRoutes } from './routes/events';
 import { paymentsRoutes } from './routes/payments';
+import { openingSubscriptionRoutes } from './routes/openingSubscription';
+import { telegramWebhookRoutes } from './routes/telegramWebhook';
 import { apiPayConfigured, sweepPayments } from './lib/payments';
 import { registrationOpen } from './lib/registrationWindow';
 import { loadLegalDocuments } from './lib/legal';
@@ -115,6 +118,9 @@ async function main() {
   await app.register(registrationsRoutes);
   await app.register(seasonsRoutes);
   await app.register(paymentsRoutes);
+  await app.register(openingSubscriptionRoutes);
+  // Входящие сообщения боту: подписка «узнать об открытии», /start, /stop.
+  await app.register(telegramWebhookRoutes);
 
   // Админка: своя cookie-сессия, к initData участников отношения не имеет.
   // Каждая группа — отдельный плагин, поэтому preHandler requireAdmin внутри
@@ -123,6 +129,7 @@ async function main() {
   await app.register(adminEventsRoutes);
   await app.register(adminParticipantsRoutes);
   await app.register(adminResultsRoutes);
+  await app.register(adminOpeningBroadcastRoutes);
 
   // Фоновая сверка оплат: раз в минуту освобождаем места по просроченным
   // счетам и перепроверяем те, по которым не пришёл вебхук. Процесс бэкенда
@@ -153,6 +160,9 @@ async function main() {
     app.log.warn('APIPAY_API_KEY не задан — регистрации создаются без счёта Kaspi (заглушка)');
   } else if (!process.env.APIPAY_WEBHOOK_SECRET) {
     app.log.warn('APIPAY_WEBHOOK_SECRET не задан — вебхуки ApiPay отклоняются, оплата подтверждается только опросом');
+  }
+  if (!process.env.TELEGRAM_WEBHOOK_SECRET) {
+    app.log.warn('TELEGRAM_WEBHOOK_SECRET не задан — входящие сообщения боту отклоняются (подписка «узнать об открытии» не работает)');
   }
 
   app.addHook('onClose', async () => {

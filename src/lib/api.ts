@@ -407,3 +407,21 @@ export async function getPayment(id: number): Promise<PaymentDto> {
   });
   return res.payment;
 }
+
+// ---------- Подписка «Узнать об открытии» ----------
+
+/** Подписан ли пользователь на сообщение об открытии регистрации. */
+export async function getOpeningSubscription(): Promise<boolean> {
+  const res = await request<{ subscribed: boolean }>('/opening-subscription', {
+    fallback: (s) => `Не удалось проверить подписку (${s})`,
+  });
+  return res.subscribed;
+}
+
+/** Подписаться на сообщение об открытии регистрации (то же, что кнопка в боте). */
+export async function subscribeOpening(): Promise<void> {
+  await request<{ subscribed: boolean }>('/opening-subscription', {
+    method: 'POST',
+    fallback: (s) => `Не удалось подписаться (${s})`,
+  });
+}

@@ -339,3 +339,26 @@ model Consent {
   @@index([seasonPassId])
   @@map("consents")
 }
+
+/// Подписка «Узнать об открытии регистрации». Подписываются через бота (кнопка
+/// на сайте → /start notify-<slug>, или кнопка в самом боте) или кнопкой в Mini
+/// App. Отдельно от User: подписаться можно, ни разу не открыв приложение.
+/// Рассылку «регистрация открыта» запускает администратор (lib/openingSubscribers).
+model OpeningSubscriber {
+  id             Int       @id @default(autoincrement())
+  telegramId     BigInt    @unique @map("telegram_id")
+  firstName      String?   @map("first_name")
+  username       String?
+  /// Откуда пришёл: «notify-<slug>» (сайт), «bot» (кнопка в боте), «app» (Mini App).
+  source         String?
+  subscribedAt   DateTime  @default(now()) @map("subscribed_at")
+  /// Отписался командой /stop — рассылка его пропускает; новая подписка обнуляет.
+  unsubscribedAt DateTime? @map("unsubscribed_at")
+  /// Когда отправили «регистрация открыта». Повторно не отправляем.
+  notifiedAt     DateTime? @map("notified_at")
+  /// Итог отправки: SENT, BLOCKED (бот заблокирован) или FAILED.
+  notifyStatus   String?   @map("notify_status")
+  notifyError    String?   @map("notify_error")
+
+  @@map("opening_subscribers")
+}

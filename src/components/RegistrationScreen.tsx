@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { AlertCircle, Check, ChevronDown } from 'lucide-react';
 import Header from './Header';
 import DocLink from './legal/DocLink';
+import OpeningSubscribe from './OpeningSubscribe';
 import {
   ApiError,
   createRegistration,
@@ -355,6 +356,7 @@ function RegistrationScreen({
                 )}.`
               : 'Записаться можно будет прямо здесь, как только откроем регистрацию.'}
           </p>
+          {state === 'soon' && <OpeningSubscribe />}
           <button type="button" className="btn-secondary" onClick={onBack}>
             Вернуться к стартам
           </button>
