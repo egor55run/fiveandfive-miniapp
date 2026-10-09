@@ -50,10 +50,18 @@ export function botConfigured(): boolean {
   return Boolean(process.env.BOT_TOKEN);
 }
 
+/**
+ * Кнопка под сообщением, открывающая Mini App (inline-кнопка web_app). Работает
+ * в личном чате с ботом без настроек в BotFather; Mini App получает подписанный
+ * initData, как при открытии из меню.
+ */
+export type AppButton = { text: string; url: string };
+
 async function callSendMessage(
   token: string,
   chatId: string,
   text: string,
+  appButton?: AppButton,
 ): Promise<Response> {
   return fetch(`${API_ORIGIN}/bot${token}/sendMessage`, {
     method: 'POST',
@@ -62,9 +70,16 @@ async function callSendMessage(
       chat_id: chatId,
       text,
       parse_mode: 'HTML',
-      // Ссылка на fiveandfive.kz есть почти в каждом сообщении, и превью сайта
-      // раздувало бы его вдвое.
+      // В приложение ведёт кнопка под сообщением; превью ссылок, если они
+      // окажутся в тексте, только раздували бы его.
       link_preview_options: { is_disabled: true },
+      ...(appButton
+        ? {
+            reply_markup: {
+              inline_keyboard: [[{ text: appButton.text, web_app: { url: appButton.url } }]],
+            },
+          }
+        : {}),
     }),
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
@@ -80,6 +95,7 @@ async function callSendMessage(
 export async function sendMessage(
   chatId: string,
   text: string,
+  appButton?: AppButton,
 ): Promise<SendOutcome> {
   const token = process.env.BOT_TOKEN;
   if (!token) return { ok: false, blocked: false, error: 'BOT_TOKEN не задан' };
@@ -87,7 +103,7 @@ export async function sendMessage(
   for (let attempt = 0; attempt < 2; attempt++) {
     let res: Response;
     try {
-      res = await callSendMessage(token, chatId, text);
+      res = await callSendMessage(token, chatId, text, appButton);
     } catch (err) {
       // Таймаут или сетевая ошибка — сюда же попадает AbortError.
       return {

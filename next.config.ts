@@ -10,15 +10,9 @@ const nextConfig: NextConfig = {
   // продом рискует разбудить OOM-killer, — а готовый каталог копируем туда.
   output: 'standalone',
 
-  // Пока сайта нет, корень — это Mini App: на него смотрит кнопка в BotFather
-  // и ссылки «подробнее в приложении» в уже отправленных уведомлениях.
-  // Именно rewrite, а не redirect: адрес в WebView не меняется, и Telegram-
-  // фрагмент #tgWebAppData=… не зависит от того, сохранит ли его клиент при
-  // переходе. Когда на / появится главная сайта, правило уйдёт, а BotFather
-  // переключится на /app.
-  async rewrites() {
-    return [{ source: '/', destination: '/app' }];
-  },
+  // Корень — главная сайта, Mini App живёт на /app. Если главную открыли
+  // внутри Telegram (старая кнопка меню, ссылка из старого сообщения), она
+  // сама уводит в /app — см. скрипт в src/app/(site)/layout.tsx.
 
   async redirects() {
     return [{ source: '/admin.html', destination: '/admin', permanent: true }];

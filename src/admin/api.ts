@@ -107,6 +107,11 @@ export type AdminEvent = {
   price: number;
   /** Путь к загруженной карте трассы относительно корня API, или null. */
   routeImageUrl: string | null;
+  /** Адрес страницы на сайте: /starty/<slug>. */
+  slug: string | null;
+  program: string | null;
+  /** Путь к PDF Положения относительно корня API, или null. */
+  regulationsUrl: string | null;
   /** Когда закрывается регистрация — итоговая дата (заданная или за 7 дней до старта). */
   registrationClosesAt: string;
   /** Как задано в админке; null — по умолчанию. */
@@ -127,6 +132,9 @@ export type EventInput = {
   seasonId: number | null;
   /** ISO или null — по умолчанию за 7 дней до старта. */
   registrationClosesAt: string | null;
+  /** null — сервер составит из названия и года. */
+  slug: string | null;
+  program: string | null;
 };
 
 export const getSeasons = () => request<SeasonOption[]>('/admin/seasons');
@@ -200,6 +208,38 @@ export async function uploadRouteImage(
 /** Убрать карту: в приложении у старта снова будет плейсхолдер. */
 export const deleteRouteImage = (eventId: number) =>
   request<RouteImageResult>(`/admin/events/${eventId}/route-image`, { method: 'DELETE' });
+
+/** Положение — PDF до 7 МБ (backend/src/lib/regulations.ts). */
+export const REGULATIONS_MAX_BYTES = 7 * 1024 * 1024;
+
+export async function uploadRegulations(eventId: number, file: File): Promise<AdminEvent> {
+  const body = new FormData();
+  body.append('file', file);
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/admin/events/${eventId}/regulations`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      body,
+    });
+  } catch {
+    throw new AdminApiError(0, 'Не удалось связаться с сервером');
+  }
+  const data: unknown = await res.json().catch(() => null);
+  if (!res.ok) {
+    const obj = (data ?? {}) as { error?: string; reason?: string };
+    // 413 без JSON — это лимит nginx (8 МБ), до бэкенда файл не дошёл.
+    if (res.status === 413 && !obj.error) {
+      throw new AdminApiError(413, 'Файл больше 8 МБ — веб-сервер его не принял', 'nginx_limit');
+    }
+    throw new AdminApiError(res.status, obj.error ?? `Ошибка ${res.status}`, obj.reason);
+  }
+  return data as AdminEvent;
+}
+
+/** Убрать Положение со страницы старта. */
+export const deleteRegulations = (eventId: number) =>
+  request<AdminEvent>(`/admin/events/${eventId}/regulations`, { method: 'DELETE' });
 
 // ---------- Участники ----------
 

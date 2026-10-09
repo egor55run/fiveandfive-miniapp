@@ -1,0 +1,4 @@
+/* Шрифты Mini App и админки — с Google Fonts. Сайт берёт те же шрифты через
+   next/font со своего сервера (быстрее и без запросов к Google, см.
+   src/app/(site)/layout.tsx), поэтому импорт вынесен из общего index.css. */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600&family=Unbounded:wght@400;600;700&display=swap');

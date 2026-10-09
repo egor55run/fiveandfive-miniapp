@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 // Токены и базовые стили общие с приложением участников — чтобы админка не
 // разъезжалась с брендом. Правило #root оттуда сюда не действует: корневой
 // элемент называется admin-root.
+import '../../styles/google-fonts.css';
 import '../../index.css';
 import '../../admin/admin.css';
 

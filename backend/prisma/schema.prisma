@@ -66,6 +66,10 @@ model Season {
 model Event {
   id                   Int       @id @default(autoincrement())
   title                String
+  /// Адрес страницы старта на сайте: /starty/<slug>. Латиницей, с годом
+  /// («triatlon-park-astana-2027»), чтобы старты следующих сезонов в тех же
+  /// парках получили свои адреса. Пустой — сервер заполнит при запуске (lib/slug).
+  slug                 String?   @unique
   date                 DateTime
   /// Когда закрывается регистрация. null — по умолчанию за 7 дней до старта
   /// (lib/eligibility). Задаётся в админке, если нужно иначе.
@@ -82,6 +86,12 @@ model Event {
   /// Сам файл лежит на диске (UPLOAD_DIR, см. lib/routeImages.ts), в БД только
   /// ссылка. null — карты у старта нет, приложение покажет плейсхолдер.
   routeImageUrl        String?   @map("route_image_url")
+  /// Программа дня (выдача пакетов, разминка, старт, награждение) — текст
+  /// из админки, по строке на пункт. Показывается на странице старта.
+  program              String?
+  /// Положение о забеге — PDF, загруженный в админке: путь вида
+  /// «/uploads/regulations/event-1-a3f9c1d2.pdf» (как у карты трассы).
+  regulationsUrl       String?   @map("regulations_url")
   createdAt            DateTime  @default(now()) @map("created_at")
 
   season        Season?        @relation(fields: [seasonId], references: [id], onDelete: SetNull)

@@ -439,3 +439,19 @@ select:focus {
   color: var(--brand-highlight);
   font-family: var(--font-display);
 }
+
+/* Поле во всю ширину сетки формы (программа дня). */
+.ad-form__wide {
+  grid-column: 1 / -1;
+}
+
+.ad-form textarea {
+  font: inherit;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  resize: vertical;
+}

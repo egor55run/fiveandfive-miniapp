@@ -21,6 +21,10 @@ export function serializeEvent(e: Event) {
     // Пока общий для всех стартов (см. lib/registrationWindow). Полем у старта,
     // а не отдельным ответом: старый фронт ждёт от /events массив и лишнее
     // поле просто не заметит.
+    slug: e.slug,
+    // Программа дня и Положение (путь к PDF относительно корня API, как карта).
+    program: e.program,
+    regulationsUrl: e.regulationsUrl,
     registrationOpen: registrationOpen(),
     // Срок регистрации на этот старт (заданный в админке или за 7 дней до
     // старта) и прошёл ли он — с ним запись закрыта для всех, включая админов.
@@ -35,6 +39,13 @@ export async function eventsRoutes(app: FastifyInstance) {
   app.get('/events', async () => {
     const events = await prisma.event.findMany({ orderBy: { date: 'asc' } });
     return events.map(serializeEvent);
+  });
+
+  // GET /events/by-slug/:slug — старт по адресу страницы на сайте (/starty/<slug>).
+  app.get<{ Params: { slug: string } }>('/events/by-slug/:slug', async (req, reply) => {
+    const event = await prisma.event.findUnique({ where: { slug: req.params.slug } });
+    if (!event) return reply.code(404).send({ error: 'Старт не найден' });
+    return serializeEvent(event);
   });
 
   // GET /events/:id — single race

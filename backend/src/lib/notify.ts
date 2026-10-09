@@ -11,7 +11,18 @@ import { botConfigured, escapeHtml, sendMessage, type SendOutcome } from './tele
  * видно, до кого сообщение не дошло.
  */
 
-const APP_URL = process.env.APP_URL ?? 'https://fiveandfive.kz';
+const APP_URL = (process.env.APP_URL ?? 'https://fiveandfive.kz').replace(/\/+$/, '');
+
+/**
+ * Куда ведёт кнопка «Открыть приложение» под сообщением: на старт, если
+ * уведомление про конкретный старт (Mini App откроет его по ?race=<slug>),
+ * иначе — в приложение. Mini App живёт на /app: корень — это сайт.
+ */
+async function appUrlFor(eventId: number | null): Promise<string> {
+  if (eventId === null) return `${APP_URL}/app`;
+  const event = await prisma.event.findUnique({ where: { id: eventId }, select: { slug: true } });
+  return event?.slug ? `${APP_URL}/app?race=${encodeURIComponent(event.slug)}` : `${APP_URL}/app`;
+}
 
 /**
  * Казахстан целиком живёт в UTC+5 без перехода на летнее время, а отдельной
@@ -135,7 +146,7 @@ export function registrationText(event: Event, now: Date = new Date()): string {
     '',
     packetLine(event, now),
     '',
-    `Номер участника и детали — в приложении: ${APP_URL}`,
+    'Номер участника и детали — в приложении, кнопка ниже.',
   ].join('\n');
 }
 
@@ -153,8 +164,6 @@ export function seasonPassText(events: Event[]): string {
     list,
     '',
     'О каждом напомним за 3 дня и подскажем даты выдачи стартового пакета — её проводят за два дня до старта.',
-    '',
-    `Подробности: ${APP_URL}`,
   ].join('\n');
 }
 
@@ -176,7 +185,7 @@ export function resultText(
     `Время: <b>${escapeHtml(result.finishTime)}</b>`,
     `Место: ${place}`,
     '',
-    `Подробнее в приложении: ${APP_URL}`,
+    'Подробнее — в приложении, кнопка ниже.',
   ].join('\n');
 }
 
@@ -190,7 +199,7 @@ export function reminderText(event: Event, now: Date = new Date()): string {
     '',
     packetLine(event, now),
     '',
-    `До встречи! ${APP_URL}`,
+    'До встречи!',
   ].join('\n');
 }
 
@@ -278,7 +287,10 @@ export async function deliver(input: DeliverInput): Promise<DeliverStatus> {
 
   let outcome: SendOutcome;
   try {
-    outcome = await sendMessage(telegramId.toString(), text);
+    outcome = await sendMessage(telegramId.toString(), text, {
+      text: 'Открыть приложение',
+      url: await appUrlFor(eventId),
+    });
   } catch (err) {
     // sendMessage не бросает, но подстраховка дешевле разбора инцидента.
     outcome = {

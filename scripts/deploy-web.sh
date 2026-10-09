@@ -18,6 +18,8 @@ TARGET="${1:-}"
 case "$TARGET" in
   staging)
     REMOTE_DIR="staging-web"; APP="fiveandfive-staging-web"; PORT=3101
+    # Бэкенд staging — для страниц сайта, которые берут данные на сервере.
+    API_INTERNAL="http://127.0.0.1:3100"
     # Staging обслуживает тестовый бот: его имя видно на экране «Откройте в
     # Telegram» и нужно виджету входа в админку (см. src/lib/telegram.ts).
     BOT="fiveandfive_test_bot"
@@ -27,6 +29,7 @@ case "$TARGET" in
     ;;
   prod)
     REMOTE_DIR="web"; APP="fiveandfive-web"; PORT=3001
+    API_INTERNAL="http://127.0.0.1:3000"
     BOT="fiveandfive_run_bot"
     # На прод казахские версии — только по явной команде пользователя.
     LEGAL_KK=0
@@ -93,7 +96,7 @@ tar -C "$release" -czf - . | ssh "$HOST" "set -e
   ls -1dt ~/$REMOTE_DIR/releases/* | tail -n +4 | xargs -r rm -rf
   cd ~/$REMOTE_DIR/current
   pm2 delete $APP >/dev/null 2>&1 || true
-  PORT=$PORT HOSTNAME=127.0.0.1 NODE_ENV=production pm2 start server.js --name $APP --time --cwd ~/$REMOTE_DIR/current >/dev/null
+  PORT=$PORT HOSTNAME=127.0.0.1 NODE_ENV=production API_INTERNAL_URL=$API_INTERNAL pm2 start server.js --name $APP --time --cwd ~/$REMOTE_DIR/current >/dev/null
   pm2 save --force >/dev/null
   sleep 3
   echo \"==> $APP: \$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:$PORT/app) (\$(cat REVISION))\""

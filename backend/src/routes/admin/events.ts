@@ -9,6 +9,12 @@ import {
   saveRouteImage,
 } from '../../lib/routeImages';
 import { serializeEvent } from '../events';
+import { eventSlug, SLUG_RE, uniqueEventSlug } from '../../lib/slug';
+import {
+  deleteRegulations,
+  RegulationsError,
+  saveRegulations,
+} from '../../lib/regulations';
 
 const eventFields = {
   title: z.string().trim().min(1).max(200),
@@ -20,6 +26,18 @@ const eventFields = {
   seasonId: z.number().int().positive().nullable(),
   // null — по умолчанию за 7 дней до старта (lib/eligibility).
   registrationClosesAt: z.coerce.date().nullable(),
+  // Адрес страницы на сайте: /starty/<slug>. Пусто — сервер составит сам из
+  // названия и года (lib/slug).
+  slug: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .max(120)
+    .refine((v) => v === '' || SLUG_RE.test(v), 'Только латиница, цифры и дефис')
+    .nullable()
+    .optional(),
+  // Программа дня — по строке на пункт («07:00 — выдача пакетов»).
+  program: z.string().trim().max(5000).nullable().optional(),
 };
 
 // routeImageUrl в eventFields сознательно нет: карту ставит только загрузка
@@ -34,6 +52,13 @@ const updateSchema = z.object(eventFields).partial().refine(
 );
 
 const CLOSES_AFTER_START = 'Регистрация должна закрываться не позже старта';
+const SLUG_TAKEN = { error: 'Такой адрес страницы уже занят другим стартом', reason: 'slug_taken' };
+
+/** Адрес занят чужим стартом? (уникальный индекс в БД — последняя линия.) */
+async function slugTaken(slug: string, exceptId?: number): Promise<boolean> {
+  const other = await prisma.event.findUnique({ where: { slug }, select: { id: true } });
+  return Boolean(other && other.id !== exceptId);
+}
 
 function parseId(raw: string): number | null {
   const id = Number(raw);
@@ -124,7 +149,12 @@ export async function adminEventsRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: CLOSES_AFTER_START, reason: 'closes_after_start' });
     }
 
-    const event = await prisma.event.create({ data });
+    if (data.slug && (await slugTaken(data.slug))) return reply.code(409).send(SLUG_TAKEN);
+    const slug = data.slug || (await uniqueEventSlug(eventSlug(data.title, data.date)));
+
+    const event = await prisma.event.create({
+      data: { ...data, slug, program: data.program || null },
+    });
     return reply.code(201).send(serializeEvent(event));
   });
 
@@ -167,7 +197,22 @@ export async function adminEventsRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: CLOSES_AFTER_START, reason: 'closes_after_start' });
     }
 
-    const updated = await prisma.event.update({ where: { id }, data });
+    // Пустой адрес — вернуть составленный из названия и года.
+    let slug = data.slug;
+    if (slug === '' || slug === null) {
+      slug = await uniqueEventSlug(eventSlug(data.title ?? event.title, data.date ?? event.date), id);
+    } else if (slug && (await slugTaken(slug, id))) {
+      return reply.code(409).send(SLUG_TAKEN);
+    }
+
+    const updated = await prisma.event.update({
+      where: { id },
+      data: {
+        ...data,
+        ...(slug !== undefined ? { slug } : {}),
+        ...(data.program !== undefined ? { program: data.program || null } : {}),
+      },
+    });
     return serializeEvent(updated);
   });
 
@@ -266,6 +311,68 @@ export async function adminEventsRoutes(app: FastifyInstance) {
     await deleteRouteImage(event.routeImageUrl);
 
     req.log.info({ eventId: id }, 'Карта трассы убрана');
+    return serializeEvent(updated);
+  });
+
+  /**
+   * POST /admin/events/:id/regulations — загрузить Положение (PDF, до 7 МБ).
+   * Так же, как карта трассы: сначала новый файл, потом ссылка в БД, потом
+   * удаление прежнего файла.
+   */
+  app.post<{ Params: { id: string } }>('/admin/events/:id/regulations', async (req, reply) => {
+    const id = parseId(req.params.id);
+    if (id === null) return reply.code(400).send({ error: 'Некорректный id' });
+    const event = await prisma.event.findUnique({ where: { id } });
+    if (!event) return reply.code(404).send({ error: 'Старт не найден' });
+
+    let data: Awaited<ReturnType<typeof req.file>>;
+    try {
+      data = await req.file();
+    } catch (err) {
+      req.log.warn({ err, eventId: id }, 'Не удалось разобрать multipart с Положением');
+      return reply
+        .code(400)
+        .send({ error: 'Ожидается файл в multipart/form-data', reason: 'bad_multipart' });
+    }
+    if (!data) return reply.code(400).send({ error: 'Файл не приложен', reason: 'no_file' });
+
+    const tooLarge = { error: 'Файл больше 7 МБ', reason: 'file_too_large' };
+    let buffer: Buffer;
+    try {
+      buffer = await data.toBuffer();
+    } catch (err) {
+      if ((err as { code?: string }).code === 'FST_REQ_FILE_TOO_LARGE') {
+        return reply.code(413).send(tooLarge);
+      }
+      throw err;
+    }
+    // Обрезанный по лимиту PDF начинается правильно и прошёл бы проверку формата.
+    if (data.file.truncated) return reply.code(413).send(tooLarge);
+
+    let url: string;
+    try {
+      url = await saveRegulations(id, buffer);
+    } catch (err) {
+      if (err instanceof RegulationsError) {
+        return reply.code(400).send({ error: err.message, reason: err.reason });
+      }
+      throw err;
+    }
+    const updated = await prisma.event.update({ where: { id }, data: { regulationsUrl: url } });
+    await deleteRegulations(event.regulationsUrl);
+    req.log.info({ eventId: id, url, bytes: buffer.length }, 'Положение загружено');
+    return serializeEvent(updated);
+  });
+
+  /** DELETE /admin/events/:id/regulations — убрать Положение. */
+  app.delete<{ Params: { id: string } }>('/admin/events/:id/regulations', async (req, reply) => {
+    const id = parseId(req.params.id);
+    if (id === null) return reply.code(400).send({ error: 'Некорректный id' });
+    const event = await prisma.event.findUnique({ where: { id } });
+    if (!event) return reply.code(404).send({ error: 'Старт не найден' });
+    const updated = await prisma.event.update({ where: { id }, data: { regulationsUrl: null } });
+    await deleteRegulations(event.regulationsUrl);
+    req.log.info({ eventId: id }, 'Положение убрано');
     return serializeEvent(updated);
   });
 

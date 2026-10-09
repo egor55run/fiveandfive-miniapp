@@ -23,7 +23,7 @@ type TelegramWebApp = {
    * полей до ответа сервера; доверять им нельзя — доверенный пользователь
    * приходит из POST /auth/telegram, где подпись проверена.
    */
-  initDataUnsafe?: { user?: TelegramWebAppUser };
+  initDataUnsafe?: { user?: TelegramWebAppUser; start_param?: string };
   ready: () => void;
   /** Открыть ссылку во встроенном браузере Telegram поверх Mini App. */
   openLink?: (url: string) => void;
@@ -85,4 +85,18 @@ export function openExternalPage(path: string): boolean {
   if (!app?.openLink || !isInsideTelegram()) return false;
   app.openLink(new URL(path, window.location.origin).toString());
   return true;
+}
+
+/**
+ * Какой старт открыть сразу при запуске Mini App — его адрес (slug) или null.
+ *  - ссылка с сайта t.me/<бот>?startapp=race-<slug> → start_param «race-<slug>»;
+ *  - кнопка «Открыть приложение» под сообщением бота → /app?race=<slug>.
+ */
+export function requestedRaceSlug(): string | null {
+  const fromQuery = new URLSearchParams(window.location.search).get('race');
+  if (fromQuery) return fromQuery;
+  const start =
+    webApp()?.initDataUnsafe?.start_param ??
+    new URLSearchParams(window.location.search).get('tgWebAppStartParam');
+  return start?.startsWith('race-') ? start.slice('race-'.length) : null;
 }

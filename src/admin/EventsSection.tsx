@@ -14,6 +14,9 @@ import {
   type AdminEvent,
   type EventInput,
   type SeasonOption,
+  deleteRegulations,
+  REGULATIONS_MAX_BYTES,
+  uploadRegulations,
 } from './api';
 import { formatDate, formatDateTime, priceFmt, toDateTimeLocal } from './helpers';
 
@@ -26,6 +29,8 @@ type FormState = {
   slotsTotal: string;
   seasonId: string; // '' = без сезона
   closesAt: string; // datetime-local; '' = за 7 дней до старта
+  slug: string; // '' = составит сервер
+  program: string;
 };
 
 const EMPTY_FORM: FormState = {
@@ -37,6 +42,8 @@ const EMPTY_FORM: FormState = {
   slotsTotal: '2000',
   seasonId: '',
   closesAt: '',
+  slug: '',
+  program: '',
 };
 
 function toInput(form: FormState): EventInput | string {
@@ -53,6 +60,10 @@ function toInput(form: FormState): EventInput | string {
   if (form.closesAt && new Date(form.closesAt) > new Date(form.date)) {
     return 'Регистрация должна закрываться не позже старта';
   }
+  const slug = form.slug.trim().toLowerCase();
+  if (slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+    return 'Адрес страницы — только латиница, цифры и дефис';
+  }
 
   return {
     title: form.title.trim(),
@@ -65,6 +76,8 @@ function toInput(form: FormState): EventInput | string {
     slotsTotal,
     seasonId: form.seasonId === '' ? null : Number(form.seasonId),
     registrationClosesAt: form.closesAt ? new Date(form.closesAt).toISOString() : null,
+    slug: form.slug.trim().toLowerCase() || null,
+    program: form.program.trim() || null,
   };
 }
 
@@ -92,6 +105,36 @@ export default function EventsSection() {
   const [routeSaved, setRouteSaved] = useState<string | null>(null);
   const [routeCleared, setRouteCleared] = useState(false);
   const routeInputRef = useRef<HTMLInputElement>(null);
+  // Положение (PDF) — так же отдельным запросом и так же по «Сохранить».
+  const [regFile, setRegFile] = useState<File | null>(null);
+  const [regSaved, setRegSaved] = useState<string | null>(null);
+  const [regCleared, setRegCleared] = useState(false);
+  const regInputRef = useRef<HTMLInputElement>(null);
+  const resetRegs = (saved: string | null) => {
+    setRegFile(null);
+    setRegCleared(false);
+    setRegSaved(saved);
+    if (regInputRef.current) regInputRef.current.value = '';
+  };
+  const pickRegFile = (file: File | null) => {
+    if (!file) {
+      resetRegs(regSaved);
+      return;
+    }
+    if (file.type && file.type !== 'application/pdf') {
+      setError('Положение должно быть PDF-файлом');
+      if (regInputRef.current) regInputRef.current.value = '';
+      return;
+    }
+    if (file.size > REGULATIONS_MAX_BYTES) {
+      setError('Файл Положения больше 7 МБ');
+      if (regInputRef.current) regInputRef.current.value = '';
+      return;
+    }
+    setError(null);
+    setRegFile(file);
+    setRegCleared(false);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -161,6 +204,7 @@ export default function EventsSection() {
     setEditingId(null);
     setForm(EMPTY_FORM);
     resetRoute(null);
+    resetRegs(null);
     setFormOpen(true);
     setError(null);
   };
@@ -168,6 +212,7 @@ export default function EventsSection() {
   const openEdit = (event: AdminEvent) => {
     setEditingId(event.id);
     resetRoute(event.routeImageUrl);
+    resetRegs(event.regulationsUrl);
     setForm({
       title: event.title,
       date: toDateTimeLocal(event.date),
@@ -179,6 +224,8 @@ export default function EventsSection() {
       closesAt: event.registrationClosesAtCustom
         ? toDateTimeLocal(event.registrationClosesAtCustom)
         : '',
+      slug: event.slug ?? '',
+      program: event.program ?? '',
     });
     setFormOpen(true);
     setError(null);
@@ -234,7 +281,28 @@ export default function EventsSection() {
       return;
     }
 
+    // Положение — тем же порядком и с тем же честным сообщением при сбое.
+    try {
+      if (regFile && eventId !== null) {
+        await uploadRegulations(eventId, regFile);
+        setNotice((prev) => `${prev ?? 'Сохранено'}, Положение загружено`);
+      } else if (regCleared && regSaved && eventId !== null) {
+        await deleteRegulations(eventId);
+        setNotice((prev) => `${prev ?? 'Сохранено'}, Положение убрано`);
+      }
+    } catch (err) {
+      setNotice(null);
+      setError(
+        `Старт сохранён, но Положение не удалось ${regFile ? 'загрузить' : 'убрать'}: ` +
+          (err instanceof Error ? err.message : 'ошибка запроса'),
+      );
+      setSaving(false);
+      await load();
+      return;
+    }
+
     resetRoute(null);
+    resetRegs(null);
     setFormOpen(false);
     setSaving(false);
     await load();
@@ -316,6 +384,17 @@ export default function EventsSection() {
               />
             </label>
             <label>
+              <span>Адрес страницы на сайте</span>
+              <input
+                value={form.slug}
+                onChange={(e) => field('slug', e.target.value)}
+                placeholder="составится из названия и года"
+              />
+              <span className="ad-hint ad-hint--dim">
+                fiveandfive.kz/starty/{form.slug.trim().toLowerCase() || '…'} — латиница, цифры, дефис
+              </span>
+            </label>
+            <label>
               <span>Регистрация закрывается</span>
               <input
                 type="datetime-local"
@@ -376,6 +455,16 @@ export default function EventsSection() {
                 ))}
               </select>
             </label>
+            <label className="ad-form__wide">
+              <span>Программа дня</span>
+              <textarea
+                rows={5}
+                value={form.program}
+                onChange={(e) => field('program', e.target.value)}
+                placeholder={'По строке на пункт:\n07:00 — выдача стартовых пакетов\n08:00 — старт'}
+              />
+              <span className="ad-hint ad-hint--dim">Показывается на странице старта на сайте</span>
+            </label>
           </div>
 
           <div className="ad-route">
@@ -422,6 +511,50 @@ export default function EventsSection() {
             </div>
           </div>
 
+          <div className="ad-route">
+            <span className="ad-route__label">Положение (PDF)</span>
+            <div className="ad-route__body">
+              <p className="ad-hint">
+                {regFile ? (
+                  `Выбран файл: ${regFile.name}`
+                ) : regSaved && !regCleared ? (
+                  <a href={assetUrl(regSaved)} target="_blank" rel="noreferrer">
+                    Открыть загруженное Положение
+                  </a>
+                ) : regCleared ? (
+                  'Положение уберётся после «Сохранить»'
+                ) : (
+                  'Положение не загружено'
+                )}
+              </p>
+              <div className="ad-route__controls">
+                <input
+                  ref={regInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  onChange={(e) => pickRegFile(e.target.files?.[0] ?? null)}
+                />
+                {(regFile || (regSaved && !regCleared)) && (
+                  <button
+                    type="button"
+                    className="ad-btn ad-btn--sm"
+                    onClick={() => {
+                      const hadSaved = regSaved;
+                      resetRegs(hadSaved);
+                      if (!regFile && hadSaved) setRegCleared(true);
+                    }}
+                  >
+                    {regFile ? 'Отменить выбор' : 'Убрать Положение'}
+                  </button>
+                )}
+              </div>
+              <p className="ad-hint">
+                PDF до 7 МБ. Появится на странице старта на сайте.
+                {editingId === null && ' У нового старта загрузится сразу после создания.'}
+              </p>
+            </div>
+          </div>
+
           <div className="ad-actions">
             <button
               type="button"
@@ -436,6 +569,7 @@ export default function EventsSection() {
               className="ad-btn"
               onClick={() => {
                 resetRoute(null);
+                resetRegs(null);
                 setFormOpen(false);
               }}
             >
@@ -472,7 +606,10 @@ export default function EventsSection() {
               {events.map((e) => (
                 <tr key={e.id}>
                   <td className="num">{e.id}</td>
-                  <td>{e.title}</td>
+                  <td>
+                    {e.title}
+                    {e.slug && <div className="ad-hint ad-hint--dim">/starty/{e.slug}</div>}
+                  </td>
                   <td>
                     {formatDate(e.date)}
                     <div className="ad-hint ad-hint--dim">

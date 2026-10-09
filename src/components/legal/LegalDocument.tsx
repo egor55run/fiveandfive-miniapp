@@ -29,9 +29,9 @@ export default async function LegalDocument({
 
   return (
     <main className={`legal${printable ? ' legal--printable' : ''}`}>
-      <header className="legal__top">
-        <span className="legal__brand">5&amp;5</span>
-        {KK_ENABLED && (
+      {/* Логотип и навигация — в шапке сайта; здесь только переключатель языка. */}
+      {KK_ENABLED && (
+        <header className="legal__top">
           <nav className="legal__lang" aria-label="Язык / Тіл">
             <a href={docPath(doc, 'ru')} aria-current={lang === 'ru' ? 'page' : undefined}>
               Рус
@@ -40,8 +40,8 @@ export default async function LegalDocument({
               Қаз
             </a>
           </nav>
-        )}
-      </header>
+        </header>
+      )}
 
       {printable && (
         <PrintButton label={lang === 'kk' ? 'Басып шығару' : 'Распечатать'} />

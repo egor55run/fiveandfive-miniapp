@@ -22,6 +22,8 @@ import { paymentsRoutes } from './routes/payments';
 import { apiPayConfigured, sweepPayments } from './lib/payments';
 import { registrationOpen } from './lib/registrationWindow';
 import { loadLegalDocuments } from './lib/legal';
+import { MAX_REGULATIONS_BYTES } from './lib/regulations';
+import { ensureEventSlugs } from './lib/slug';
 import { registrationsRoutes } from './routes/registrations';
 import { seasonsRoutes } from './routes/seasons';
 
@@ -59,15 +61,23 @@ async function main() {
   // записать. Падаем сразу, а не на первой регистрации.
   const legal = await loadLegalDocuments();
   app.log.info(legal, 'Юридические документы загружены');
+  // Адреса страниц стартов на сайте: пустые заполняются из названия и года.
+  const slugged = await ensureEventSlugs();
+  if (slugged > 0) app.log.info({ count: slugged }, 'Стартам присвоены адреса страниц');
 
   await app.register(cors, { origin: corsOrigins() });
   await app.register(cookie);
 
-  // Загрузка файлов. Единственный потребитель — карта трассы в админке, поэтому
-  // лимиты сразу узкие: один файл, без текстовых полей. Плагин регистрируем на
-  // корневом инстансе — дочерние плагины с роутами наследуют его декораторы.
+  // Загрузка файлов из админки: карта трассы (до 5 МБ) и Положение (PDF, до
+  // 7 МБ). Лимит плагина — больший из двух, свой лимит каждый проверяет сам.
+  // Один файл, без текстовых полей. Плагин регистрируем на корневом инстансе —
+  // дочерние плагины с роутами наследуют его декораторы.
   await app.register(multipart, {
-    limits: { fileSize: MAX_ROUTE_IMAGE_BYTES, files: 1, fields: 0 },
+    limits: {
+      fileSize: Math.max(MAX_ROUTE_IMAGE_BYTES, MAX_REGULATIONS_BYTES),
+      files: 1,
+      fields: 0,
+    },
   });
 
   /**

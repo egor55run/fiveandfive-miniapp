@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
+import '../../styles/google-fonts.css';
 import '../../index.css';
 // App.tsx импортирует его и сам, но он грузится только в браузере (ssr: false),
 // и без этого импорта стили приходили бы позже разметки — экран мигал бы.

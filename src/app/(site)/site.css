@@ -1,8 +1,216 @@
 /* Публичный сайт. Токены и шрифты — из src/index.css (общие с Mini App). */
 
+/* Шрифты сайта — next/font (src/app/(site)/layout.tsx), со своего сервера.
+   Перекрывают токены из index.css: html.site-fonts специфичнее :root. */
+html.site-fonts {
+  --font-ui: var(--font-site-ui), system-ui, 'Segoe UI', sans-serif;
+  --font-display: var(--font-site-display), var(--font-site-ui), system-ui, sans-serif;
+}
+
+/* Каркас: шапка, содержимое, подвал. Ширина под большой экран, поля 16px. */
 .site {
   min-height: 100svh;
-  padding: 24px 16px 56px;
+  display: flex;
+  flex-direction: column;
+}
+
+.site-main {
+  flex: 1;
+  padding: 32px 16px 56px;
+}
+
+.site-wrap {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.site-header {
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.site-header__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xl);
+  min-height: 64px;
+  flex-wrap: wrap;
+}
+
+.site-logo {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.site-logo--sm {
+  font-size: 18px;
+}
+
+.site-nav {
+  display: flex;
+  gap: var(--sp-lg);
+  flex: 1;
+}
+
+.site-nav a,
+.site-footer a {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.site-nav a:hover,
+.site-footer a:hover {
+  color: var(--text-primary);
+}
+
+.site-header__bot {
+  padding: 9px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-on-brand);
+  background: var(--brand-primary);
+  border-radius: var(--r-md);
+  text-decoration: none;
+}
+
+.site-footer {
+  padding: 24px 16px 32px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 14px;
+}
+
+.site-footer__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-md) var(--sp-xl);
+  flex-wrap: wrap;
+}
+
+.site-footer__docs {
+  display: flex;
+  gap: var(--sp-sm) var(--sp-lg);
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.site-footer__org {
+  color: var(--text-muted);
+}
+
+.site a:focus-visible {
+  outline: 2px solid var(--brand-highlight);
+  outline-offset: 2px;
+}
+
+/* ВРЕМЕННАЯ главная — до макета: только содержимое, без оформления. */
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.home__title {
+  margin: 0 0 var(--sp-md);
+  font-family: var(--font-display);
+  font-size: clamp(28px, 5vw, 48px);
+  line-height: 1.1;
+  text-wrap: balance;
+}
+
+.home__lead {
+  margin: 0;
+  max-width: 60ch;
+  font-size: 18px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.home__calendar h2 {
+  margin: 0 0 var(--sp-lg);
+  font-family: var(--font-display);
+  font-size: 22px;
+}
+
+.race-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.race-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-lg);
+  flex-wrap: wrap;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.race-row__main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.race-row__when {
+  font-size: 14px;
+  color: var(--brand-highlight);
+}
+
+.race-row__title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+
+.race-row__meta {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* Кнопка регистрации (src/components/site/RegistrationCta.tsx). */
+.cta {
+  display: inline-block;
+  padding: 11px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-on-brand);
+  background: var(--brand-primary);
+  border-radius: var(--r-md);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.cta--off {
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+}
+
+.cta-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.cta-link {
+  font-size: 14px;
+  color: var(--brand-highlight);
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 599px) {
+  .cta-group {
+    align-items: flex-start;
+  }
 }
 
 /* Документы: одна колонка для чтения, без украшений. */
@@ -17,7 +225,7 @@
 .legal__top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: var(--sp-lg);
 }
 
@@ -184,10 +392,16 @@
     gap: 0;
   }
 
+  .site-header,
+  .site-footer,
   .legal__top,
   .legal__print,
   .legal__nav {
     display: none !important;
+  }
+
+  .site-main {
+    padding: 0;
   }
 
   .legal__body {

@@ -20,6 +20,12 @@ export type EventDto = {
    * Для <img src> прогонять через apiAsset — базового адреса в значении нет.
    */
   routeImageUrl: string | null;
+  /** Адрес страницы на сайте: /starty/<slug>. */
+  slug?: string | null;
+  /** Программа дня — по строке на пункт. */
+  program?: string | null;
+  /** Положение (PDF), путь относительно корня API — через apiAsset. */
+  regulationsUrl?: string | null;
   /**
    * Можно ли записаться. Сервер закрывает регистрацию, пока не включена оплата
    * (или вручную, REGISTRATION_OPEN=false). Нет поля — старый сервер, открыто.

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import './App.css';
 import AnalyticsScreen from './components/AnalyticsScreen';
 import HomeScreen from './components/HomeScreen';
@@ -24,7 +24,7 @@ import {
 import { toRaceResults } from './data/results';
 import { useTelegramAuth } from './hooks/useTelegramAuth';
 import { firstValidName, splitLegacyName } from './lib/personName';
-import { getUnsafeTelegramUser } from './lib/telegram';
+import { getUnsafeTelegramUser, requestedRaceSlug } from './lib/telegram';
 
 type Screen = 'analytics' | 'home' | 'profile' | 'registration' | 'payment' | 'success';
 
@@ -102,6 +102,19 @@ function App() {
     setRegEvent(event);
     setCurrentScreen('registration');
   };
+
+  // Ссылка на конкретный старт (с сайта или из сообщения бота) — открываем его
+  // сразу, один раз за запуск: дальше человек ходит по приложению сам.
+  const raceLinkHandled = useRef(false);
+  useEffect(() => {
+    if (raceLinkHandled.current || authState !== 'ready' || events.length === 0) return;
+    raceLinkHandled.current = true;
+    const slug = requestedRaceSlug();
+    const event = slug ? events.find((e) => e.slug === slug) : undefined;
+    // Переход на экран по внешней ссылке — синхронизация с внешним вводом.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (event) openRegistration(event);
+  }, [authState, events]);
 
   const handlePaymentStarted = (result: RegistrationOutcome, payment: PaymentDto) => {
     setParticipantOverride(result.user);
