@@ -130,7 +130,7 @@ export default async function RacePage({ params }: Props) {
         <Block title={r.route} wide>
           {event.routeImageUrl ? (
             // Карта — файл из админки (webp/png/jpg до 5 МБ); next/image не нужен.
-            <img className="race-map" src={apiAsset(event.routeImageUrl)} alt={r.routeAlt(event.title)} loading="lazy" />
+            <img className="race-map" src={apiAsset(event.routeImageUrl)} alt={r.routeAlt(event.title)} decoding="async" />
           ) : (
             <p className="race-tbd">{r.routeLater}</p>
           )}
