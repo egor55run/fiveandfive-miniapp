@@ -867,7 +867,7 @@ html.site-fonts body {
   }
 }
 
-/* ── Страница старта (предварительная, до этапа 3) ────────────────────── */
+/* ── Страница старта ──────────────────────────────────────────────────── */
 
 .race {
   display: flex;
@@ -875,15 +875,7 @@ html.site-fonts body {
   align-items: flex-start;
   gap: 24px;
   padding-top: 24px;
-  padding-bottom: 80px;
-}
-
-/* Длинные названия парков влезают в 360 px: размер от ширины экрана,
-   в крайнем случае — перенос по слогам. */
-.race__title {
-  font-size: clamp(26px, 7.5vw, 56px);
-  hyphens: auto;
-  overflow-wrap: break-word;
+  padding-bottom: 96px;
 }
 
 .site .race__back {
@@ -891,9 +883,30 @@ html.site-fonts body {
   text-decoration: none;
 }
 
+.race__head {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.race__label {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--orange-text);
+}
+
+/* Длинные названия парков влезают в 360 px: размер от ширины экрана,
+   в крайнем случае — перенос по слогам. */
+.race__title {
+  font-size: clamp(30px, 7.5vw, 64px);
+  hyphens: auto;
+  overflow-wrap: break-word;
+}
+
 .race__facts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
   gap: 12px;
   width: 100%;
   margin: 0;
@@ -919,20 +932,139 @@ html.site-fonts body {
   font-weight: 600;
 }
 
-.race__program h2 {
-  margin: 0 0 12px;
-  font-family: var(--font-display);
-  font-size: 22px;
+.race__facts dd::first-letter {
+  text-transform: uppercase;
 }
 
-.race__program ul {
+.race__blocks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  width: 100%;
+  margin-top: 24px;
+}
+
+.race-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 28px;
+  border-radius: 24px;
+  background: #fff;
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.race-block--wide {
+  grid-column: 1 / -1;
+}
+
+.race-block p {
+  margin: 0;
+}
+
+.race-block__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: clamp(20px, 4vw, 26px);
+  line-height: 1.15;
+}
+
+/* Чего ещё нет — серая пометка. */
+.race-tbd {
+  align-self: flex-start;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: #ece6dc;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.race-program {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.race-program li {
+  display: grid;
+  grid-template-columns: 9.5em 1fr;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.race-program li:first-child {
+  border-top: none;
+}
+
+.race-program__time {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.race-list {
   margin: 0;
   padding-left: 22px;
-  line-height: 1.6;
+}
+
+.race-list li + li {
+  margin-top: 6px;
+}
+
+.race-list li::marker {
+  color: var(--orange);
+}
+
+.race-map {
+  display: block;
+  width: 100%;
+  max-width: 900px;
+  height: auto;
+  border-radius: 16px;
 }
 
 .site .race__doc {
   font-weight: 600;
+}
+
+@media (max-width: 639px) {
+  .race__facts {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .race__facts div {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .race__facts dt {
+    font-size: 11px;
+  }
+
+  .race__facts dd {
+    font-size: 16px;
+  }
+
+  .race__blocks {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .race-block {
+    padding: 22px 18px;
+    border-radius: 20px;
+  }
+
+  .race-program li {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
 }
 
 /* Кнопка регистрации на сайте (RegistrationCta). */
