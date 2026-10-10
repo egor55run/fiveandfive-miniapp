@@ -2,10 +2,11 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import RegistrationCta from '../../../../components/site/RegistrationCta';
-import { apiAsset, type EventDto } from '../../../../lib/api';
+import { apiAsset, registrationState, type EventDto } from '../../../../lib/api';
 import { docPath, type Lang } from '../../../../lib/legal';
 import { fetchEventBySlug, fetchEvents } from '../../../../site/data';
 import { sitePath, siteText } from '../../../../site/i18n';
+import { jsonLdString, pageMeta, raceJsonLd, raceOg } from '../../../../site/seo';
 
 /**
  * Страница старта (этап 3). Дата, время, парк, цена, карта трассы и Положение —
@@ -23,14 +24,28 @@ type Props = { params: Promise<{ slug: string }> };
 /** Парк без города: «Триатлон Парк, Астана» → «Триатлон Парк». */
 const parkOf = (e: EventDto) => e.location.replace(/,\s*Астана\s*$/i, '');
 
+/** «23 мая 2027» — для заголовка и описания в поиске. */
+const dayLong = (e: EventDto) =>
+  new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: TZ })
+    .format(new Date(e.date))
+    .replace(/\s*г\.$/, '');
+
+/** Описание для поиска и превью — одно и то же в meta и в разметке события. */
+function raceDescription(e: EventDto): string {
+  const time = new Intl.DateTimeFormat('ru-RU', { hour: 'numeric', minute: '2-digit', timeZone: TZ }).format(new Date(e.date));
+  return `Забег на 5 км в Астане: ${dayLong(e)}, старт в ${time}, ${parkOf(e)}. Программа дня, трасса, награды и регистрация через Telegram.`;
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const event = await fetchEventBySlug((await params).slug);
-  if (!event) return {};
-  const when = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: TZ });
-  return {
-    title: event.title,
-    description: `Забег на 5 км: ${when.format(new Date(event.date))}, ${event.location}. Программа дня, трасса, награды и регистрация.`,
-  };
+  if (!event?.slug) return {};
+  return pageMeta({
+    title: `${event.title}: забег 5 км, ${dayLong(event)}`,
+    description: raceDescription(event),
+    path: `/starty/${event.slug}`,
+    image: raceOg(event.slug),
+    imageAlt: `${event.title}: ${dayLong(event)}, 5 км`,
+  });
 }
 
 function Block({ title, wide, children }: { title: string; wide?: boolean; children: ReactNode }) {
@@ -75,8 +90,11 @@ export default async function RacePage({ params }: Props) {
   const price = event.price > 0 ? r.price(new Intl.NumberFormat(t.locale).format(event.price)) : t.home.priceUnknown;
   const tbd = <p className="race-tbd">{r.tbd}</p>;
 
+  const jsonLd = raceJsonLd(event, raceDescription(event), `/starty/${event.slug}`, registrationState(event) === 'open');
+
   return (
     <main className="site-wrap race">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }} />
       <a className="race__back" href={`${sitePath('/', lang)}#starty`}>
         {r.back}
       </a>

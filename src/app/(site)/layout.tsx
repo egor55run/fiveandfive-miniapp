@@ -3,6 +3,7 @@ import { Montserrat, Unbounded } from 'next/font/google';
 import type { ReactNode } from 'react';
 import SiteFooter from '../../components/site/SiteFooter';
 import SiteHeader from '../../components/site/SiteHeader';
+import { SITE_INDEXABLE, SITE_NAME, SITE_URL } from '../../site/seo';
 import '../../index.css';
 import './site.css';
 
@@ -23,7 +24,12 @@ const display = Unbounded({
 });
 
 export const metadata: Metadata = {
-  title: { default: '5&5', template: '%s — 5&5' },
+  // Абсолютные адреса в og:image, canonical и т. п. — от адреса сайта.
+  metadataBase: new URL(SITE_URL),
+  title: { default: SITE_NAME, template: `%s — ${SITE_NAME}` },
+  applicationName: SITE_NAME,
+  // Staging и локальная сборка — вне поиска (на проде разрешено, см. seo.ts).
+  ...(SITE_INDEXABLE ? {} : { robots: { index: false, follow: false } }),
   // Вкладка — амперсанд-трасса из логотипа (целый «5&5» в 32 px не читается),
   // на телефоне (иконка «на экран Домой») — знак целиком.
   icons: {

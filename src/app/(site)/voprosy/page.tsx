@@ -4,14 +4,16 @@ import type { Lang } from '../../../lib/legal';
 import { faqItems, faqPlainText } from '../../../site/faq';
 import { botChatLink } from '../../../site/links';
 import { siteText } from '../../../site/i18n';
+import { jsonLdString, pageMeta } from '../../../site/seo';
 
 const lang: Lang = 'ru';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: 'Вопросы',
   description:
     'Частые вопросы о забегах 5&5: возраст, регистрация и оплата через Kaspi, возврат, передача слота, перенос из-за погоды, что взять с собой.',
-};
+  path: '/voprosy',
+});
 
 /** «текст [ссылка](/адрес) текст» → текст со ссылками. */
 function withLinks(text: string): ReactNode {
@@ -70,7 +72,7 @@ export default function FaqPage() {
       </div>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
+        dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }}
       />
     </main>
   );

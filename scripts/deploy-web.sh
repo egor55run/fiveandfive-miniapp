@@ -26,6 +26,8 @@ case "$TARGET" in
     # Казахские версии оферты/политики/бланка — пока только на staging:
     # их ещё проверяет юрист (решение пользователя 2026-10-08).
     LEGAL_KK=1
+    # Адрес для canonical/og:image/sitemap; staging — вне поиска.
+    SITE_URL="https://staging.fiveandfive.kz"; SITE_INDEX=0
     # Статистика посещений (Umami на /stats, ~/umami-staging): id сайта в Umami.
     # Не секрет — он виден в коде любой страницы со счётчиком.
     UMAMI_ID="6d7838b5-8e03-4866-8d7f-129cdb73351b"
@@ -36,6 +38,7 @@ case "$TARGET" in
     BOT="fiveandfive_run_bot"
     # На прод казахские версии — только по явной команде пользователя.
     LEGAL_KK=0
+    SITE_URL="https://fiveandfive.kz"; SITE_INDEX=1
     # Umami на проде ещё не стоит — счётчика нет (сначала staging и юрист).
     UMAMI_ID=""
     ;;
@@ -59,7 +62,8 @@ rev=$(git rev-parse --short HEAD)
 
 echo "==> next build ($TARGET: $branch @ $rev, бот @$BOT)"
 rm -rf .next
-NEXT_PUBLIC_BOT_USERNAME="$BOT" NEXT_PUBLIC_LEGAL_KK="$LEGAL_KK" NEXT_PUBLIC_UMAMI_WEBSITE_ID="$UMAMI_ID" npm run build
+NEXT_PUBLIC_BOT_USERNAME="$BOT" NEXT_PUBLIC_LEGAL_KK="$LEGAL_KK" NEXT_PUBLIC_UMAMI_WEBSITE_ID="$UMAMI_ID" \
+  NEXT_PUBLIC_SITE_URL="$SITE_URL" NEXT_PUBLIC_SITE_INDEX="$SITE_INDEX" npm run build
 
 # Проверки готовой сборки — до того, как она уедет на сервер.
 static=.next/static

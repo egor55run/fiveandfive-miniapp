@@ -8,6 +8,8 @@ import '../../App.css';
 
 export const metadata: Metadata = {
   title: 'fiveandfive',
+  // Mini App живёт в Telegram; в поиске — только сайт.
+  robots: { index: false, follow: false },
   icons: '/favicon.svg',
 };
 

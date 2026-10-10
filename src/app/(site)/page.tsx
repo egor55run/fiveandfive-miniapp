@@ -6,6 +6,7 @@ import type { EventDto } from '../../lib/api';
 import type { Lang } from '../../lib/legal';
 import { anyRegistrationOpen, botChatLink, fetchEvents, fetchSeasonPrice } from '../../site/data';
 import { sitePath, siteText } from '../../site/i18n';
+import { jsonLdString, pageMeta, siteJsonLd } from '../../site/seo';
 
 /**
  * Главная сайта — по утверждённому макету (glavnaya-maket-D, 2026-10-09).
@@ -15,11 +16,12 @@ import { sitePath, siteText } from '../../site/i18n';
 // Данные — с бэкенда на каждый запрос (см. src/site/data.ts).
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: { absolute: '5&5 — беговой сезон в Астане: пять парков по 5 км' },
+export const metadata: Metadata = pageMeta({
+  absoluteTitle: '5&5 — беговой сезон в Астане: пять забегов по 5 км в парках',
   description:
-    'Пять воскресений, пять парков Астаны, по 5 км. Медаль за каждый этап — и звезда за все пять.',
-};
+    'Серия любительских забегов на 5 км в парках Астаны с мая по сентябрь 2027: пять воскресений, медаль за каждый этап и звезда за все пять. Регистрация через Telegram, оплата Kaspi.',
+  path: '/',
+});
 
 const lang: Lang = 'ru';
 const TZ = 'Asia/Almaty';
@@ -81,6 +83,7 @@ export default async function HomePage() {
   return (
     <main className="home">
       <AnimPause />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(siteJsonLd()) }} />
 
       <section className="site-wrap h-hero" id="top">
         <div className="h-hero__row">
