@@ -12,7 +12,9 @@ html.site-fonts {
   --paper: #f2eee7;
   --orange: #ff6a13;
   --orange-soft: #ff8a3d;
-  --orange-text: #c4470a; /* оранжевый для текста на светлом — читается */
+  /* Оранжевый для текста и ссылок на светлом: контраст 5,1 к фону (норма —
+     4,5). Макетный #D9500A давал 3,6 — PageSpeed, 2026-10-10. */
+  --orange-text: #b03f08;
   --muted: #5e574d;
   --muted-on-ink: #b9b1a5;
 
@@ -23,7 +25,7 @@ html.site-fonts {
   --text-on-brand: var(--ink);
   --border-subtle: #d8d0c4;
   --brand-primary: var(--orange);
-  --brand-highlight: #d9500a;
+  --brand-highlight: var(--orange-text);
   color-scheme: light;
 }
 
@@ -67,7 +69,7 @@ html.site-fonts body {
 }
 
 .site a:hover {
-  color: #a83b05;
+  color: #8a3106;
 }
 
 .site a:focus-visible,

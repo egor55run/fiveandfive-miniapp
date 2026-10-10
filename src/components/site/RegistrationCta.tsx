@@ -26,7 +26,13 @@ export default function RegistrationCta({ event, lang }: { event: EventDto; lang
   }
   if (soldOut) return <span className="cta cta--off">{t.soldOut}</span>;
   return (
-    <a className="cta" href={event.slug ? botRaceLink(event.slug) : botChatLink()}>
+    // Подпись для чтецов экрана — со стартом: на странице есть и общая
+    // «Зарегистрироваться» в шапке, она ведёт в бота, а эта — сразу на старт.
+    <a
+      className="cta"
+      href={event.slug ? botRaceLink(event.slug) : botChatLink()}
+      aria-label={`${t.register}: ${event.title}`}
+    >
       {t.register}
     </a>
   );
