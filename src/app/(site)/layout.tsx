@@ -9,16 +9,19 @@ import './site.css';
 
 // Шрифты бренда — с нашего сервера: next/font скачивает их при сборке, и
 // браузер не ходит на Google Fonts (быстрее, и посетитель не уходит к Google).
-// cyrillic-ext — казахские буквы, на будущее (документы уже есть на казахском).
+// Наборы букв — латиница и кириллица: каждый набор браузер грузит заранее, а
+// казахских букв (cyrillic-ext) на русском сайте нет. Казахские документы
+// (пока только staging) берут эти буквы из системного шрифта; когда будет
+// казахский сайт — вернуть 'cyrillic-ext' в оба шрифта.
 // Без weight — вариативные шрифты: один файл на все начертания (макет главной
 // берёт Montserrat 400–700 и Unbounded до 900).
 const ui = Montserrat({
-  subsets: ['latin', 'cyrillic', 'cyrillic-ext'],
+  subsets: ['latin', 'cyrillic'],
   variable: '--font-site-ui',
   display: 'swap',
 });
 const display = Unbounded({
-  subsets: ['latin', 'cyrillic', 'cyrillic-ext'],
+  subsets: ['latin', 'cyrillic'],
   variable: '--font-site-display',
   display: 'swap',
 });
