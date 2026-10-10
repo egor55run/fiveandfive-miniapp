@@ -2,13 +2,16 @@ import type { Lang } from '../../lib/legal';
 import { docPath } from '../../lib/legal';
 import { botChatLink, SEASON_YEAR } from '../../site/links';
 import { sitePath, siteText } from '../../site/i18n';
+import SiteLogo from './SiteLogo';
 
 export default function SiteFooter({ lang }: { lang: Lang }) {
   const t = siteText(lang);
   return (
     <footer className="site-footer">
       <div className="site-wrap site-footer__row">
-        <span className="site-logo site-logo--sm">{t.brand}</span>
+        <span className="site-logo site-logo--sm">
+          <SiteLogo variant="light" />
+        </span>
         <nav className="site-footer__links" aria-label={t.footer.documents}>
           <a href={botChatLink()}>{t.footer.telegram}</a>
           <a href={sitePath('/voprosy', lang)}>{t.footer.faq}</a>

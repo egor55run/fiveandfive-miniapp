@@ -24,7 +24,15 @@ const display = Unbounded({
 
 export const metadata: Metadata = {
   title: { default: '5&5', template: '%s — 5&5' },
-  icons: '/favicon.svg',
+  // Вкладка — амперсанд-трасса из логотипа (целый «5&5» в 32 px не читается),
+  // на телефоне (иконка «на экран Домой») — знак целиком.
+  icons: {
+    icon: [
+      { url: '/brand/icon-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/brand/icon-48.png', sizes: '48x48', type: 'image/png' },
+    ],
+    apple: '/brand/apple-touch-icon.png',
+  },
 };
 
 export const viewport: Viewport = {

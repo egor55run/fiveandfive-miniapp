@@ -86,16 +86,19 @@ html.site-fonts body {
 }
 
 .site .site-logo {
-  font-family: var(--font-display);
-  font-weight: 900;
-  font-size: 26px;
-  line-height: 1;
-  color: var(--ink);
-  text-decoration: none;
+  display: block;
+  flex: none;
+  line-height: 0;
 }
 
-.site .site-logo--sm {
-  font-size: 20px;
+.site-logo img {
+  display: block;
+  width: auto;
+  height: 52px;
+}
+
+.site-logo--sm img {
+  height: 44px;
 }
 
 .site-nav {
@@ -151,10 +154,6 @@ html.site-fonts body {
   font-size: 14px;
 }
 
-.site .site-footer .site-logo {
-  color: var(--paper);
-}
-
 .site-footer__row {
   display: flex;
   flex-wrap: wrap;
@@ -194,6 +193,10 @@ html.site-fonts body {
 
   .site-header__cta {
     margin-left: auto;
+  }
+
+  .site-logo img {
+    height: 44px;
   }
 
   .site .site-header__cta {

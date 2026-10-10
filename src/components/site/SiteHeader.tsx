@@ -1,6 +1,7 @@
 import type { Lang } from '../../lib/legal';
 import { sitePath, siteText } from '../../site/i18n';
 import HeaderCta from './HeaderCta';
+import SiteLogo from './SiteLogo';
 
 /** Шапка сайта (макет главной, 2026-10-09). */
 export default function SiteHeader({ lang }: { lang: Lang }) {
@@ -9,8 +10,8 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
   return (
     <header className="site-header">
       <div className="site-wrap site-header__row">
-        <a className="site-logo" href={home}>
-          {t.brand}
+        <a className="site-logo" href={home} aria-label={t.brand}>
+          <SiteLogo />
         </a>
         <nav className="site-nav" aria-label={t.nav.label}>
           <a href={`${home}#starty`}>{t.nav.races}</a>
