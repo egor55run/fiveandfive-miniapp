@@ -27,3 +27,12 @@ export function botChatLink(payload?: string): string {
 
 /** Сезон в подвале сайта. Сменить к следующему сезону. */
 export const SEASON_YEAR = '2027';
+
+/**
+ * Показывать ли цены на сайте. Пока цена не утверждена (решение пользователя
+ * 2026-10-10), вместо сумм — «Цена будет объявлена», а в разметке для
+ * поисковиков цены нет вовсе. Суммы в базе при этом остаются (на них завязана
+ * оплата в приложении). Включается сборкой: NEXT_PUBLIC_PRICES_PUBLIC=1 в
+ * scripts/deploy-web.sh.
+ */
+export const PRICES_PUBLIC = process.env.NEXT_PUBLIC_PRICES_PUBLIC === '1';

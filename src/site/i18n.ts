@@ -58,7 +58,7 @@ const ru = {
     priceOneNote: 'Любой этап на выбор',
     priceSeason: 'АБОНЕМЕНТ НА СЕЗОН',
     priceSeasonNote: 'Все 5 стартов — и звезда целиком',
-    priceUnknown: '[ЦЕНА]',
+    priceUnknown: 'Цена будет объявлена',
     priceFrom: (amount: string) => `от ${amount}`,
   },
   race: {

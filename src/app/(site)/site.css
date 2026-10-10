@@ -712,6 +712,12 @@ html.site-fonts body {
   line-height: 1.1;
 }
 
+/* «Цена будет объявлена» — текст вместо суммы: мельче, чтобы влез. */
+.h-price__sum--tbd {
+  font-size: clamp(26px, 6vw, 34px);
+  line-height: 1.15;
+}
+
 .h-price__note {
   font-size: 16px;
   color: var(--muted);

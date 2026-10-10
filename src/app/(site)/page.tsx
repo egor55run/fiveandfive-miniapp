@@ -5,6 +5,7 @@ import StagesStar, { type Stage } from '../../components/site/home/StagesStar';
 import type { EventDto } from '../../lib/api';
 import type { Lang } from '../../lib/legal';
 import { anyRegistrationOpen, botChatLink, fetchEvents, fetchSeasonPrice } from '../../site/data';
+import { PRICES_PUBLIC } from '../../site/links';
 import { sitePath, siteText } from '../../site/i18n';
 import { jsonLdString, pageMeta, siteJsonLd } from '../../site/seo';
 
@@ -29,12 +30,20 @@ const TZ = 'Asia/Almaty';
 /** Место без города: «Триатлон Парк, Астана» → «Триатлон Парк». */
 const placeOf = (e: EventDto) => e.location.replace(/,\s*Астана\s*$/i, '');
 
-/** Цена одного старта: одна на все — она; разные — «от»; нет — заглушка. */
+/** Цена одного старта: одна на все — она; разные — «от»; нет — null. */
 function singlePrice(events: EventDto[], fmt: (n: number) => string, t: ReturnType<typeof siteText>) {
   const prices = events.map((e) => e.price).filter((p) => p > 0);
-  if (prices.length === 0) return t.home.priceUnknown;
+  if (prices.length === 0) return null;
   const min = Math.min(...prices);
   return prices.every((p) => p === min) ? fmt(min) : t.home.priceFrom(fmt(min));
+}
+
+/** Сумма с «₸» или, пока цены не объявлены, — «Цена будет объявлена». */
+function PriceSum({ amount, unknown }: { amount: string | null; unknown: string }) {
+  if (!PRICES_PUBLIC || amount === null) {
+    return <span className="h-price__sum h-price__sum--tbd">{unknown}</span>;
+  }
+  return <span className="h-price__sum">{amount} ₸</span>;
 }
 
 /** Номер ближайшего ещё не начавшегося старта (-1 — сезон прошёл). */
@@ -154,12 +163,12 @@ export default async function HomePage() {
         </div>
         <div className="h-price__card h-lift">
           <span className="h-price__kind">{t.home.priceOne}</span>
-          <span className="h-price__sum">{singlePrice(list, fmt, t)} ₸</span>
+          <PriceSum amount={singlePrice(list, fmt, t)} unknown={t.home.priceUnknown} />
           <span className="h-price__note">{t.home.priceOneNote}</span>
         </div>
         <div className="h-price__card h-price__card--brand h-lift">
           <span className="h-price__kind">{t.home.priceSeason}</span>
-          <span className="h-price__sum">{seasonPrice ? fmt(seasonPrice) : t.home.priceUnknown} ₸</span>
+          <PriceSum amount={seasonPrice ? fmt(seasonPrice) : null} unknown={t.home.priceUnknown} />
           <span className="h-price__note">{t.home.priceSeasonNote}</span>
         </div>
       </section>

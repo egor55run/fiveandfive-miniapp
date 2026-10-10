@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { EventDto } from '../lib/api';
 import { docPath, LEGAL_DOCS, type Lang, type LegalDocKey } from '../lib/legal';
+import { PRICES_PUBLIC } from './links';
 
 /**
  * Поиск и превью: адрес сайта, метаданные страниц, разметка schema.org.
@@ -92,12 +93,13 @@ export function siteJsonLd() {
 /**
  * Забег для поисковиков (SportsEvent): дата и место, цена, есть ли места.
  * Пока регистрация не открыта, «наличие» не указываем — ни «в продаже»,
- * ни «распродано» не было бы правдой.
+ * ни «распродано» не было бы правдой. Пока цены не объявлены (PRICES_PUBLIC),
+ * предложения с ценой нет вовсе.
  */
 export function raceJsonLd(event: EventDto, description: string, path: string, open: boolean) {
   const url = `${SITE_URL}${path}`;
   const offers =
-    event.price > 0
+    PRICES_PUBLIC && event.price > 0
       ? {
           '@type': 'Offer',
           price: event.price,

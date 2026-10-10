@@ -5,6 +5,7 @@ import RegistrationCta from '../../../../components/site/RegistrationCta';
 import { apiAsset, registrationState, type EventDto } from '../../../../lib/api';
 import { docPath, type Lang } from '../../../../lib/legal';
 import { fetchEventBySlug, fetchEvents } from '../../../../site/data';
+import { PRICES_PUBLIC } from '../../../../site/links';
 import { sitePath, siteText } from '../../../../site/i18n';
 import { jsonLdString, pageMeta, raceJsonLd, raceOg } from '../../../../site/seo';
 
@@ -87,7 +88,8 @@ export default async function RacePage({ params }: Props) {
           text: s.text,
         }));
 
-  const price = event.price > 0 ? r.price(new Intl.NumberFormat(t.locale).format(event.price)) : t.home.priceUnknown;
+  const price =
+    PRICES_PUBLIC && event.price > 0 ? r.price(new Intl.NumberFormat(t.locale).format(event.price)) : t.home.priceUnknown;
   const tbd = <p className="race-tbd">{r.tbd}</p>;
 
   const jsonLd = raceJsonLd(event, raceDescription(event), `/starty/${event.slug}`, registrationState(event) === 'open');
