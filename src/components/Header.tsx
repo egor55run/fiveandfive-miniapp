@@ -1,40 +1,45 @@
-import { motion, useReducedMotion } from 'framer-motion';
-import { ChevronLeft, MoreHorizontal } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { showTelegramBackButton } from '../lib/telegram';
 
 type Props = {
-  // Показывать кнопку «Назад». В Telegram-мини-аппе верхнюю панель позже
-  // заменят нативные контролы; на web это визуальный аналог макета.
+  /** Есть ли на экране «Назад». Без него — ничего не рисуем. */
   onBack?: () => void;
 };
 
+/**
+ * «Назад» для экранов Mini App. Своего заголовка нет: название и меню уже в
+ * шапке Telegram (решение пользователя 2026-10-14). Внутри Telegram — его
+ * нативная кнопка «Назад» в шапке; вне Telegram (браузер разработчика) —
+ * своя кнопка.
+ */
 function Header({ onBack }: Props) {
-  const reduceMotion = useReducedMotion();
+  const [native, setNative] = useState(false);
+  // Обработчик меняется на каждой перерисовке экрана (например, при вводе в
+  // форму); кнопку Telegram вешаем один раз, а вызываем всегда свежий.
+  const latest = useRef(onBack);
+  useEffect(() => {
+    latest.current = onBack;
+  });
+  const hasBack = Boolean(onBack);
 
+  useEffect(() => {
+    if (!hasBack) return;
+    const hide = showTelegramBackButton(() => latest.current?.());
+    // Нативная кнопка показана — свою не рисуем (синхронизация с Telegram).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNative(Boolean(hide));
+    return () => hide?.();
+  }, [hasBack]);
+
+  if (!onBack || native) return null;
   return (
-    <motion.header
-      className="topbar"
-      initial={reduceMotion ? false : { opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-    >
-      {onBack ? (
-        <button type="button" className="topbar__back" onClick={onBack}>
-          <ChevronLeft size={22} strokeWidth={2.4} />
-          Назад
-        </button>
-      ) : (
-        <span />
-      )}
-
-      <span className="topbar__title">
-        <b>5&5</b>
-        <span>приложение</span>
-      </span>
-
-      <button type="button" className="topbar__menu" aria-label="Меню">
-        <MoreHorizontal size={18} strokeWidth={2.2} />
+    <div className="topbar">
+      <button type="button" className="topbar__back" onClick={onBack}>
+        <ChevronLeft size={22} strokeWidth={2.4} />
+        Назад
       </button>
-    </motion.header>
+    </div>
   );
 }
 

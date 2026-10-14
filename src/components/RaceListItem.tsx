@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from 'framer-motion';
+import { priceShort } from '../lib/prices';
 import type { EventDto } from '../lib/api';
 import FitTitle from './FitTitle';
 
@@ -10,7 +11,6 @@ type Props = {
 const TZ = 'Asia/Almaty';
 const dateShort = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', timeZone: TZ });
 const timeFmt = new Intl.DateTimeFormat('ru-RU', { hour: 'numeric', minute: '2-digit', timeZone: TZ });
-const priceFmt = new Intl.NumberFormat('ru-RU');
 
 function RaceListItem({ event, onSelect }: Props) {
   const reduceMotion = useReducedMotion();
@@ -32,8 +32,12 @@ function RaceListItem({ event, onSelect }: Props) {
         <span>{event.distance}</span>
         <span className="dot">•</span>
         <span>{timeFmt.format(date)}</span>
-        <span className="dot">•</span>
-        <span>{priceFmt.format(event.price)}₸</span>
+        {priceShort(event.price) && (
+          <>
+            <span className="dot">•</span>
+            <span>{priceShort(event.price)}</span>
+          </>
+        )}
       </div>
     </motion.button>
   );

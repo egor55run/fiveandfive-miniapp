@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { PRICES_PUBLIC, priceLabel } from '../lib/prices';
 import { motion, useReducedMotion } from 'framer-motion';
 import { AlertCircle, Check, ChevronDown } from 'lucide-react';
 import Header from './Header';
@@ -333,7 +334,7 @@ function RegistrationScreen({
           <span className="dot">•</span>
           <span>{event.distance}</span>
           <span className="dot">•</span>
-          <span>{priceFmt.format(event.price)} ₸</span>
+          <span>{priceLabel(event.price)}</span>
         </div>
         {state !== 'ended' && event.registrationClosesAt && (
           <span className="reg-hero__deadline">
@@ -522,11 +523,11 @@ function RegistrationScreen({
               </span>
               <span className="upsell__body">
                 <span className="upsell__title u-display">
-                  Взять весь сезон 5&5 за {priceFmt.format(season.price)} ₸
+                  Взять весь сезон 5&5{PRICES_PUBLIC ? ` за ${priceFmt.format(season.price)} ₸` : ''}
                 </span>
                 <span className="upsell__desc">
                   Оплати все {season.events.length} стартов сезона одним платежом
-                  {season.savings > 0 ? ` и сэкономь ${priceFmt.format(season.savings)} ₸.` : '.'}
+                  {PRICES_PUBLIC && season.savings > 0 ? ` и сэкономь ${priceFmt.format(season.savings)} ₸.` : '.'}
                 </span>
               </span>
             </button>

@@ -46,17 +46,15 @@
 }
 
 /* ===================================================================
-   Верхняя панель (iOS-хром: Back / 5&5 / ···)
+   «Назад» вне Telegram (в Telegram — его нативная кнопка в шапке)
    =================================================================== */
 .topbar {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
   align-items: center;
   padding: 4px 0 2px;
 }
 
 .topbar__back {
-  justify-self: start;
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -70,43 +68,7 @@
   cursor: pointer;
 }
 
-.topbar__title {
-  justify-self: center;
-  text-align: center;
-  line-height: 1.05;
-}
-
-.topbar__title b {
-  display: block;
-  font-family: var(--font-ui);
-  font-size: 17px;
-  font-weight: 600;
-  letter-spacing: -0.2px;
-  color: var(--text-primary);
-}
-
-.topbar__title span {
-  display: block;
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--text-muted);
-}
-
-.topbar__menu {
-  justify-self: end;
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  color: var(--system-blue);
-  background: none;
-  border: 1.5px solid var(--system-blue);
-  border-radius: var(--r-full);
-  cursor: pointer;
-}
-
-.topbar__back:focus-visible,
-.topbar__menu:focus-visible {
+.topbar__back:focus-visible {
   outline: 2px solid var(--system-blue);
   outline-offset: 2px;
 }

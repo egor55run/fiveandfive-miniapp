@@ -30,6 +30,13 @@ type TelegramWebApp = {
   /** Попросить у пользователя разрешение боту писать ему (Bot API 6.9+). */
   requestWriteAccess?: (callback?: (granted: boolean) => void) => void;
   expand: () => void;
+  /** Нативная кнопка «Назад» в шапке Telegram (Bot API 6.1+). */
+  BackButton?: {
+    show: () => void;
+    hide: () => void;
+    onClick: (cb: () => void) => void;
+    offClick: (cb: () => void) => void;
+  };
   colorScheme?: 'light' | 'dark';
   platform?: string;
   version?: string;
@@ -118,4 +125,20 @@ export function askWriteAccess(): Promise<boolean> {
       resolve(true);
     }
   });
+}
+
+/**
+ * Показать нативную кнопку «Назад» в шапке Telegram. Возвращает функцию,
+ * которая её убирает, — или null, если кнопки нет (не Telegram, старый клиент):
+ * тогда экран рисует свою.
+ */
+export function showTelegramBackButton(onBack: () => void): (() => void) | null {
+  const button = webApp()?.BackButton;
+  if (!button || !isInsideTelegram()) return null;
+  button.onClick(onBack);
+  button.show();
+  return () => {
+    button.offClick(onBack);
+    button.hide();
+  };
 }

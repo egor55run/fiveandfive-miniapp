@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { priceShort } from '../lib/prices';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Map } from 'lucide-react';
 import {
@@ -46,7 +47,6 @@ function useCountdown(target: Date): Countdown {
 const TZ = 'Asia/Almaty';
 const dateShort = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', timeZone: TZ });
 const timeFmt = new Intl.DateTimeFormat('ru-RU', { hour: 'numeric', minute: '2-digit', timeZone: TZ });
-const priceFmt = new Intl.NumberFormat('ru-RU');
 
 function NextRaceCard({ event, onRegister, registrationOpenForMe }: Props) {
   const target = useMemo(() => new Date(event.date), [event.date]);
@@ -79,8 +79,12 @@ function NextRaceCard({ event, onRegister, registrationOpenForMe }: Props) {
         <span>{event.distance}</span>
         <span className="dot">•</span>
         <span>{timeFmt.format(target)}</span>
-        <span className="dot">•</span>
-        <span>{priceFmt.format(event.price)}₸</span>
+        {priceShort(event.price) && (
+          <>
+            <span className="dot">•</span>
+            <span>{priceShort(event.price)}</span>
+          </>
+        )}
       </div>
 
       {!started ? (
