@@ -5,11 +5,14 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 export class AdminApiError extends Error {
   status: number;
   reason?: string;
-  constructor(status: number, message: string, reason?: string) {
+  /** Ошибки по полям формы (ответ 400 с reason=validation). */
+  fields?: Record<string, string>;
+  constructor(status: number, message: string, reason?: string, fields?: Record<string, string>) {
     super(message);
     this.name = 'AdminApiError';
     this.status = status;
     this.reason = reason;
+    this.fields = fields;
   }
 }
 
@@ -39,11 +42,12 @@ async function request<T>(
 
   const data: unknown = await res.json().catch(() => null);
   if (!res.ok) {
-    const obj = (data ?? {}) as { error?: string; reason?: string };
+    const obj = (data ?? {}) as { error?: string; reason?: string; fields?: Record<string, string> };
     throw new AdminApiError(
       res.status,
       obj.error ?? `Ошибка ${res.status}`,
       obj.reason,
+      obj.fields,
     );
   }
   return data as T;
@@ -132,7 +136,8 @@ export type AdminEvent = {
   registrationClosesAtCustom: string | null;
   createdAt: string;
   season: { id: number; title: string; year: number } | null;
-  registrations: { total: number; pending: number; paid: number; cancelled: number };
+  /** manual — добавленные вручную без оплаты, в paid не входят. */
+  registrations: { total: number; pending: number; paid: number; manual: number; cancelled: number };
   resultsCount: number;
 };
 
@@ -308,6 +313,9 @@ export type Participant = {
   telegramId: string | null;
   username: string | null;
   paymentStatus: PaymentStatus;
+  /** Добавлен администратором без оплаты (партнёр, волонтёр). */
+  manual: boolean;
+  manualNote: string | null;
   distanceId: number | null;
   /** Название дистанции участника («5 км»). */
   distance: string | null;
@@ -333,6 +341,37 @@ export const setPaymentStatus = (registrationId: number, paymentStatus: PaymentS
     slotsChanged: number;
     event: { id: number; slotsTaken: number; slotsTotal: number; slotsLeft: number } | null;
   }>(`/admin/registrations/${registrationId}`, { method: 'PATCH', body: { paymentStatus } });
+
+/** Данные участника для правки и добавления вручную. */
+export type ParticipantInput = {
+  lastName: string;
+  firstName: string;
+  birthDate: string; // yyyy-mm-dd
+  gender: 'MALE' | 'FEMALE';
+  phone: string;
+  email: string;
+  distanceId: number;
+  /** Только при добавлении: «партнёр», «волонтёр»… */
+  note?: string;
+};
+
+export const updateParticipant = (registrationId: number, input: ParticipantInput) =>
+  request<{ changed: boolean }>(`/admin/registrations/${registrationId}/participant`, { method: 'PATCH', body: input });
+
+export const addParticipant = (eventId: number, input: ParticipantInput) =>
+  request<{ registrationId: number }>(`/admin/events/${eventId}/participants`, { method: 'POST', body: input });
+
+export type AuditEntry = {
+  id: number;
+  at: string;
+  admin: string;
+  action: 'participant.update' | 'participant.create' | 'registration.status';
+  registrationId: number | null;
+  subject: string;
+  changes: Record<string, [string | null, string | null]>;
+};
+
+export const getAudit = (eventId: number) => request<AuditEntry[]>(`/admin/events/${eventId}/audit`);
 
 // ---------- Результаты ----------
 

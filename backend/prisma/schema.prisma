@@ -119,6 +119,11 @@ model Registration {
   /// Выбранная дистанция. null — только у старых отменённых записей, чья
   /// дистанция удалена из старта; у живых регистраций всегда есть.
   distanceId    Int?          @map("distance_id")
+  /// Добавлен администратором без оплаты (партнёр, волонтёр): занимает место,
+  /// считается подтверждённым (PAID), но платежа нет — в деньгах не считается.
+  manual        Boolean       @default(false)
+  /// Кто это, со слов администратора: «партнёр», «волонтёр»…
+  manualNote    String?       @map("manual_note")
   paymentStatus PaymentStatus @default(PENDING) @map("payment_status")
   qrCode        String?       @map("qr_code")
   registeredAt  DateTime      @default(now()) @map("registered_at")
@@ -443,4 +448,25 @@ model RaceAnnouncement {
 
   @@unique([eventId, telegramId])
   @@map("race_announcements")
+}
+
+/// Журнал изменений из админки: кто (telegram_id администратора), когда и что
+/// было → что стало. Ссылки — простыми числами, без внешних ключей: запись
+/// журнала должна пережить удаление участника или старта.
+model AdminAuditLog {
+  id              Int      @id @default(autoincrement())
+  adminTelegramId BigInt   @map("admin_telegram_id")
+  /// participant.update / participant.create / registration.status
+  action          String
+  eventId         Int?     @map("event_id")
+  registrationId  Int?     @map("registration_id")
+  userId          Int?     @map("user_id")
+  /// Кого касается — «Иванов Иван», чтобы журнал читался без джойнов.
+  subject         String
+  /// { поле: [было, стало] }
+  changes         Json
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([eventId, createdAt])
+  @@map("admin_audit_log")
 }

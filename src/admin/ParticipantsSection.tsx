@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react';
 import {
   getEvents,
+  addParticipant,
   getParticipants,
   setPaymentStatus,
+  updateParticipant,
   type AdminDistance,
   type AdminEvent,
   type Participant,
   type PaymentStatus,
 } from './api';
 import { downloadParticipantsCsv } from './exportCsv';
+import AuditLog from './AuditLog';
+import ParticipantForm, { type ParticipantFormValues } from './ParticipantForm';
 import { formatDate, formatDateTime, formatSeconds, fullName, PAYMENT_LABEL } from './helpers';
 
 const STATUSES: PaymentStatus[] = ['PENDING', 'PAID', 'CANCELLED'];
@@ -20,6 +24,11 @@ export default function ParticipantsSection() {
   const [distances, setDistances] = useState<AdminDistance[]>([]);
   // Фильтр по дистанции: null — все.
   const [distanceFilter, setDistanceFilter] = useState<number | null>(null);
+  // Форма участника: правка (registrationId) или добавление вручную ('new').
+  const [editing, setEditing] = useState<Participant | 'new' | null>(null);
+  const [showAudit, setShowAudit] = useState(false);
+  // Счётчик для перезагрузки журнала после правок.
+  const [auditKey, setAuditKey] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -104,6 +113,26 @@ export default function ParticipantsSection() {
   const shown =
     distanceFilter === null ? participants : participants.filter((p) => p.distanceId === distanceFilter);
 
+  const formValues = (p: Participant | null): ParticipantFormValues => ({
+    lastName: p?.lastName ?? '',
+    firstName: p?.firstName ?? '',
+    birthDate: p?.birthDate ?? '',
+    gender: p?.gender ?? '',
+    phone: p?.phone ?? '',
+    email: p?.email ?? '',
+    distanceId: p?.distanceId ?? (distances.length === 1 ? distances[0].id : null),
+    note: '',
+  });
+
+  const afterSave = async (message: string) => {
+    setEditing(null);
+    setNotice(message);
+    setAuditKey((k) => k + 1);
+    if (eventId !== null) await loadParticipants(eventId);
+    // Счётчики мест в шапке — из списка стартов.
+    setEvents(await getEvents());
+  };
+
   const exportCsv = () => {
     if (!selected) return;
     const dist = distances.find((d) => d.id === distanceFilter);
@@ -150,6 +179,12 @@ export default function ParticipantsSection() {
           <button type="button" className="ad-btn" disabled={shown.length === 0} onClick={exportCsv}>
             Выгрузить в Excel (CSV)
           </button>
+          <button type="button" className="ad-btn" disabled={eventId === null} onClick={() => setEditing('new')}>
+            + Добавить участника
+          </button>
+          <button type="button" className="ad-btn" disabled={eventId === null} onClick={() => setShowAudit((v) => !v)}>
+            {showAudit ? 'Скрыть журнал' : 'Журнал изменений'}
+          </button>
         </div>
       </header>
 
@@ -164,6 +199,49 @@ export default function ParticipantsSection() {
 
       {error && <p className="ad-msg ad-msg--error">{error}</p>}
       {notice && <p className="ad-msg ad-msg--ok">{notice}</p>}
+
+      {editing === 'new' && eventId !== null && (
+        <ParticipantForm
+          key="new"
+          title="Добавить участника вручную"
+          hint="Без оплаты — например, партнёр или волонтёр. Займёт место на дистанции, в списке будет с пометкой «вручную» и в деньги не попадёт."
+          initial={formValues(null)}
+          distances={distances}
+          withNote
+          submitLabel="Добавить"
+          onCancel={() => setEditing(null)}
+          onSubmit={async (input) => {
+            await addParticipant(eventId, input);
+            await afterSave(`${input.lastName} ${input.firstName} добавлен(а) вручную.`);
+          }}
+        />
+      )}
+      {editing && editing !== 'new' && (
+        <ParticipantForm
+          key={editing.registrationId}
+          title={`Правка участника: ${fullName(editing.lastName, editing.firstName)}`}
+          hint={
+            editing.telegramId
+              ? 'Данные человека общие для всех его стартов. Смена дистанции переносит его место.'
+              : 'Смена дистанции переносит его место.'
+          }
+          initial={formValues(editing)}
+          distances={distances}
+          submitLabel="Сохранить"
+          onCancel={() => setEditing(null)}
+          onSubmit={async (input) => {
+            const res = await updateParticipant(editing.registrationId, input);
+            await afterSave(res.changed ? 'Изменения сохранены и записаны в журнал.' : 'Ничего не изменилось.');
+          }}
+        />
+      )}
+
+      {showAudit && eventId !== null && (
+        <div className="ad-card">
+          <h3>Журнал изменений</h3>
+          <AuditLog eventId={eventId} refreshKey={auditKey} />
+        </div>
+      )}
 
       {loading ? (
         <p className="ad-msg">Загружаем…</p>
@@ -185,6 +263,7 @@ export default function ParticipantsSection() {
                 <th>Записался</th>
                 <th>Результат</th>
                 <th>Оплата</th>
+                <th aria-label="Действия" />
               </tr>
             </thead>
             <tbody>
@@ -206,6 +285,11 @@ export default function ParticipantsSection() {
                     {p.seasonPassId !== null && (
                       <span className="ad-tag" title={`Абонемент #${p.seasonPassId}`}>
                         абонемент
+                      </span>
+                    )}
+                    {p.manual && (
+                      <span className="ad-tag ad-tag--manual" title="Добавлен администратором без оплаты">
+                        вручную{p.manualNote ? ` · ${p.manualNote}` : ''}
                       </span>
                     )}
                   </td>
@@ -234,6 +318,11 @@ export default function ParticipantsSection() {
                         </option>
                       ))}
                     </select>
+                  </td>
+                  <td>
+                    <button type="button" className="ad-btn ad-btn--sm" onClick={() => setEditing(p)}>
+                      Правка
+                    </button>
                   </td>
                 </tr>
               ))}

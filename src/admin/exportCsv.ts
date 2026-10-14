@@ -18,6 +18,7 @@ const COLUMNS: [string, (p: Participant) => string | number | null][] = [
   ['Записался', (p) => formatDateTime(p.registeredAt)],
   ['Оплата', (p) => PAYMENT_LABEL[p.paymentStatus]],
   ['Абонемент', (p) => (p.seasonPassId !== null ? `#${p.seasonPassId}` : null)],
+  ['Добавлен вручную', (p) => (p.manual ? p.manualNote || 'да' : null)],
   ['Время', (p) => (p.result ? formatSeconds(p.result.finishTime) : null)],
   ['Место', (p) => p.result?.place ?? null],
 ];

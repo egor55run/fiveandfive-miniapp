@@ -630,6 +630,12 @@ export default function EventsSection() {
                     <span title="Ожидает">{e.registrations.pending}</span>
                     {' / '}
                     <span title="Отменено">{e.registrations.cancelled}</span>
+                    {e.registrations.manual > 0 && (
+                      <span className="ad-hint ad-hint--dim" title="Добавлены вручную, без оплаты — в «оплачено» не входят">
+                        {' '}
+                        + {e.registrations.manual} вручную
+                      </span>
+                    )}
                   </td>
                   <td>{e.season ? `${e.season.title}` : '—'}</td>
                   <td>

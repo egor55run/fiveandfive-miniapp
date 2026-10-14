@@ -2,11 +2,22 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
 import { requireAdmin } from '../../plugins/adminAuth';
-import { ageOnStartDay } from '../../lib/eligibility';
+import { ageOnStartDay, checkAge } from '../../lib/eligibility';
+import { ageFromBirthDate, formatBirthDate, parseBirthDate } from '../../lib/birthDate';
+import { diffFields, personLabel, writeAudit } from '../../lib/audit';
+import {
+  birthDateField,
+  emailField,
+  genderField,
+  personNameField,
+  phoneField,
+  sendValidationError,
+} from '../../lib/validation';
 import {
   claimDistanceSlot,
   DISTANCE_ORDER,
   distanceIdOf,
+  pickDistance,
   releaseDistanceSlot,
   serializeDistance,
 } from '../../lib/distances';
@@ -71,6 +82,9 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
             telegramId: r.user.telegramId?.toString() ?? null,
             username: r.user.username,
             paymentStatus: r.paymentStatus,
+            // Добавлен администратором без оплаты (партнёр, волонтёр).
+            manual: r.manual,
+            manualNote: r.manualNote,
             distanceId: r.distanceId,
             distance: r.distance?.label ?? null,
             qrCode: r.qrCode,
@@ -109,7 +123,7 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
 
       const registration = await prisma.registration.findUnique({
         where: { id },
-        include: { event: true },
+        include: { event: true, user: true },
       });
       if (!registration) {
         return reply.code(404).send({ error: 'Регистрация не найдена' });
@@ -138,6 +152,15 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
           } else if (delta < 0 && distanceId) {
             await releaseDistanceSlot(tx, distanceId);
           }
+          await writeAudit(tx, {
+            adminTelegramId: req.admin!.telegramId,
+            action: 'registration.status',
+            eventId: registration.eventId,
+            registrationId: id,
+            userId: registration.userId,
+            subject: personLabel(registration.user),
+            changes: { paymentStatus: [prev, next] },
+          });
           return tx.registration.update({
             where: { id },
             data: { paymentStatus: next, ...(distanceId ? { distanceId } : {}) },
@@ -172,4 +195,220 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
       };
     },
   );
+
+  /**
+   * PATCH /admin/registrations/:id/participant — правка данных участника и его
+   * дистанции. Проверки — те же, что в форме приложения (кириллица, телефон,
+   * email, возраст на день старта). Данные человека общие для всех его стартов.
+   */
+  app.patch<{ Params: { id: string } }>('/admin/registrations/:id/participant', async (req, reply) => {
+    const id = parseId(req.params.id);
+    if (id === null) return reply.code(400).send({ error: 'Некорректный id' });
+    const parsed = participantSchema.safeParse(req.body);
+    if (!parsed.success) return sendValidationError(reply, parsed.error);
+    const data = parsed.data;
+
+    const reg = await prisma.registration.findUnique({
+      where: { id },
+      include: { user: true, event: true, distance: true },
+    });
+    if (!reg) return reply.code(404).send({ error: 'Регистрация не найдена' });
+
+    const birthDate = parseBirthDate(data.birthDate)!;
+    // Возраст — то же правило 16+, что в приложении; согласие родителя для
+    // 16–17 администратор проверяет на выдаче пакета (метка «16–17» в списке).
+    const age = checkAge(birthDate, reg.event.date, true);
+    if (!age.ok) return reply.code(400).send(age.body);
+
+    const distance = await pickDistance(prisma, reg.eventId, data.distanceId);
+    if (!distance) return reply.code(400).send({ error: 'Такой дистанции у старта нет', reason: 'bad_distance' });
+
+    const before = personFields(reg.user, reg.distance?.label ?? null);
+    const after = {
+      lastName: data.lastName,
+      firstName: data.firstName,
+      birthDate: formatBirthDate(birthDate),
+      gender: data.gender,
+      phone: data.phone,
+      email: data.email,
+      distance: distance.label,
+    };
+    const changes = diffFields(before, after);
+    if (Object.keys(changes).length === 0) return { changed: false };
+
+    try {
+      await prisma.$transaction(async (tx) => {
+        // Сменилась дистанция у живой записи — место переезжает вместе с ней.
+        if (reg.distanceId !== distance.id && reg.paymentStatus !== 'CANCELLED') {
+          if (!(await claimDistanceSlot(tx, distance.id))) throw new Error('no_slots');
+          if (reg.distanceId) await releaseDistanceSlot(tx, reg.distanceId);
+        }
+        await tx.registration.update({ where: { id }, data: { distanceId: distance.id } });
+        await tx.user.update({
+          where: { id: reg.userId },
+          data: {
+            lastName: data.lastName,
+            firstName: data.firstName,
+            birthDate,
+            age: ageFromBirthDate(birthDate),
+            gender: data.gender,
+            phone: data.phone,
+            email: data.email,
+          },
+        });
+        await writeAudit(tx, {
+          adminTelegramId: req.admin!.telegramId,
+          action: 'participant.update',
+          eventId: reg.eventId,
+          registrationId: id,
+          userId: reg.userId,
+          subject: personLabel({ lastName: data.lastName, firstName: data.firstName }),
+          changes,
+        });
+      });
+    } catch (err) {
+      if ((err as Error).message === 'no_slots') {
+        return reply.code(409).send({ error: `На «${distance.label}» мест нет`, reason: 'no_slots' });
+      }
+      throw err;
+    }
+    req.log.info({ registrationId: id, fields: Object.keys(changes) }, 'Данные участника изменены из админки');
+    return { changed: true, changes };
+  });
+
+  /**
+   * POST /admin/events/:id/participants — добавить участника вручную, без
+   * оплаты (партнёр, волонтёр). Занимает место на дистанции, считается
+   * подтверждённым; помечен «вручную» и в деньгах не считается (платежа нет).
+   */
+  app.post<{ Params: { id: string } }>('/admin/events/:id/participants', async (req, reply) => {
+    const eventId = parseId(req.params.id);
+    if (eventId === null) return reply.code(400).send({ error: 'Некорректный id' });
+    const parsed = createParticipantSchema.safeParse(req.body);
+    if (!parsed.success) return sendValidationError(reply, parsed.error);
+    const data = parsed.data;
+
+    const event = await prisma.event.findUnique({ where: { id: eventId } });
+    if (!event) return reply.code(404).send({ error: 'Старт не найден' });
+    const birthDate = parseBirthDate(data.birthDate)!;
+    const age = checkAge(birthDate, event.date, true);
+    if (!age.ok) return reply.code(400).send(age.body);
+    const distance = await pickDistance(prisma, eventId, data.distanceId);
+    if (!distance) return reply.code(400).send({ error: 'Такой дистанции у старта нет', reason: 'bad_distance' });
+
+    let registrationId: number;
+    try {
+      registrationId = await prisma.$transaction(async (tx) => {
+        if (!(await claimDistanceSlot(tx, distance.id))) throw new Error('no_slots');
+        // Без Telegram: такой участник не входит в приложение, данные — со слов
+        // администратора.
+        const user = await tx.user.create({
+          data: {
+            firstName: data.firstName,
+            lastName: data.lastName,
+            birthDate,
+            age: ageFromBirthDate(birthDate),
+            gender: data.gender,
+            phone: data.phone,
+            email: data.email,
+          },
+        });
+        const reg = await tx.registration.create({
+          data: {
+            userId: user.id,
+            eventId,
+            distanceId: distance.id,
+            paymentStatus: 'PAID',
+            manual: true,
+            manualNote: data.note || null,
+          },
+        });
+        await tx.registration.update({ where: { id: reg.id }, data: { qrCode: `fiveandfive://ticket/${reg.id}` } });
+        await writeAudit(tx, {
+          adminTelegramId: req.admin!.telegramId,
+          action: 'participant.create',
+          eventId,
+          registrationId: reg.id,
+          userId: user.id,
+          subject: personLabel(user),
+          changes: diffFields({}, { ...personFields(user, distance.label), note: data.note || null }),
+        });
+        return reg.id;
+      });
+    } catch (err) {
+      if ((err as Error).message === 'no_slots') {
+        return reply.code(409).send({ error: `На «${distance.label}» мест нет`, reason: 'no_slots' });
+      }
+      throw err;
+    }
+    req.log.info({ eventId, registrationId }, 'Участник добавлен вручную из админки');
+    return reply.code(201).send({ registrationId });
+  });
+
+  /** GET /admin/events/:id/audit — журнал изменений по старту, свежие сверху. */
+  app.get<{ Params: { id: string } }>('/admin/events/:id/audit', async (req, reply) => {
+    const eventId = parseId(req.params.id);
+    if (eventId === null) return reply.code(400).send({ error: 'Некорректный id' });
+    const rows = await prisma.adminAuditLog.findMany({
+      where: { eventId },
+      orderBy: { createdAt: 'desc' },
+      take: 300,
+    });
+    // Имена администраторов — из их профилей участника, если они есть.
+    const admins = await prisma.user.findMany({
+      where: { telegramId: { in: [...new Set(rows.map((r) => r.adminTelegramId))] } },
+      select: { telegramId: true, firstName: true, lastName: true, username: true },
+    });
+    const nameOf = (id: bigint) => {
+      const u = admins.find((a) => a.telegramId === id);
+      if (!u) return `id ${id}`;
+      return u.username ? `@${u.username}` : personLabel(u);
+    };
+    return rows.map((r) => ({
+      id: r.id,
+      at: r.createdAt,
+      admin: nameOf(r.adminTelegramId),
+      action: r.action,
+      registrationId: r.registrationId,
+      subject: r.subject,
+      changes: r.changes,
+    }));
+  });
 }
+
+/** Поля участника для сравнения и журнала: строками, как их видит человек. */
+function personFields(
+  u: {
+    lastName: string | null;
+    firstName: string;
+    birthDate: Date | null;
+    gender: string | null;
+    phone: string | null;
+    email: string | null;
+  },
+  distance: string | null,
+): Record<string, string | null> {
+  return {
+    lastName: u.lastName,
+    firstName: u.firstName,
+    birthDate: formatBirthDate(u.birthDate),
+    gender: u.gender,
+    phone: u.phone,
+    email: u.email,
+    distance,
+  };
+}
+
+const participantSchema = z.object({
+  lastName: personNameField('lastName'),
+  firstName: personNameField('firstName'),
+  birthDate: birthDateField,
+  gender: genderField,
+  phone: phoneField,
+  email: emailField,
+  distanceId: z.number().int().positive(),
+});
+
+const createParticipantSchema = participantSchema.extend({
+  note: z.string().trim().max(100).optional(),
+});

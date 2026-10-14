@@ -163,14 +163,16 @@ export async function adminEventsRoutes(app: FastifyInstance) {
     });
 
     // Разбивка по статусам одним запросом, чтобы не дёргать БД на каждый старт.
+    // Добавленные вручную (без оплаты) — отдельной строкой, не в «оплачено».
     const grouped = await prisma.registration.groupBy({
-      by: ['eventId', 'paymentStatus'],
+      by: ['eventId', 'paymentStatus', 'manual'],
       _count: { _all: true },
     });
     const byEvent = new Map<number, Record<string, number>>();
     for (const row of grouped) {
       const bucket = byEvent.get(row.eventId) ?? {};
-      bucket[row.paymentStatus] = row._count._all;
+      const key = row.manual && row.paymentStatus !== 'CANCELLED' ? 'MANUAL' : row.paymentStatus;
+      bucket[key] = (bucket[key] ?? 0) + row._count._all;
       byEvent.set(row.eventId, bucket);
     }
 
@@ -191,9 +193,10 @@ export async function adminEventsRoutes(app: FastifyInstance) {
         registrationClosesAtCustom: e.registrationClosesAt,
         season: e.season,
         registrations: {
-          total: (counts.PENDING ?? 0) + (counts.PAID ?? 0) + (counts.CANCELLED ?? 0),
+          total: (counts.PENDING ?? 0) + (counts.PAID ?? 0) + (counts.MANUAL ?? 0) + (counts.CANCELLED ?? 0),
           pending: counts.PENDING ?? 0,
           paid: counts.PAID ?? 0,
+          manual: counts.MANUAL ?? 0,
           cancelled: counts.CANCELLED ?? 0,
         },
         resultsCount: resultsByEvent.get(e.id) ?? 0,
