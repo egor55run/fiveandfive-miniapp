@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import RouteCarousel from '../../../../components/RouteCarousel';
+import { routeMapsOf } from '../../../../lib/routeMaps';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import RegistrationCta from '../../../../components/site/RegistrationCta';
@@ -159,10 +161,9 @@ export default async function RacePage({ params }: Props) {
         </Block>
 
         <Block title={r.route} wide>
-          {event.routeImageUrl ? (
-            // Карта — файл из админки (webp/png/jpg до 5 МБ); next/image не нужен.
-            // Она внизу страницы: грузится, когда до неё долистают.
-            <img className="race-map" src={apiAsset(event.routeImageUrl)} alt={r.routeAlt(event.title)} loading="lazy" decoding="async" />
+          {routeMapsOf(event).length > 0 ? (
+            // Карты — файлы из админки; несколько («5 км», «3 км») листаются свайпом.
+            <RouteCarousel maps={routeMapsOf(event)} title={event.title} />
           ) : (
             <p className="race-tbd">{r.routeLater}</p>
           )}

@@ -96,6 +96,7 @@ model Event {
 
   season        Season?         @relation(fields: [seasonId], references: [id], onDelete: SetNull)
   distances     EventDistance[]
+  routeMaps     RouteMap[]
   registrations Registration[]
   results       Result[]
   notifications Notification[]
@@ -155,6 +156,24 @@ model EventDistance {
   @@unique([eventId, label])
   @@index([eventId])
   @@map("event_distances")
+}
+
+/// Карта трассы старта. Их может быть несколько («5 км», «3 км»): листаются
+/// свайпом. Event.routeImageUrl — первая по порядку (для превью и старых
+/// клиентов), её поддерживает lib/routeMaps.
+model RouteMap {
+  id        Int      @id @default(autoincrement())
+  eventId   Int      @map("event_id")
+  /// Путь относительно корня API: «/uploads/routes/<файл>» (lib/routeImages).
+  url       String
+  caption   String   @default("")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@map("event_route_maps")
 }
 
 model SeasonPass {

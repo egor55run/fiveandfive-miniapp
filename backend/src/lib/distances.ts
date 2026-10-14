@@ -20,9 +20,6 @@ export const DISTANCE_ORDER: Prisma.EventDistanceOrderByWithRelationInput[] = [
   { id: 'asc' },
 ];
 
-/** include для старта вместе с дистанциями — для serializeEvent. */
-export const WITH_DISTANCES = { distances: { orderBy: DISTANCE_ORDER } } as const;
-
 export function serializeDistance(d: EventDistance) {
   return {
     id: d.id,

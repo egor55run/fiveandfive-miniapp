@@ -117,8 +117,10 @@ export type AdminEvent = {
   price: number;
   /** Дистанции; distance / slots* / price выше — сводка по ним. */
   distances: AdminDistance[];
-  /** Путь к загруженной карте трассы относительно корня API, или null. */
+  /** Первая карта трассы (путь относительно корня API) или null. */
   routeImageUrl: string | null;
+  /** Все карты трасс по порядку. */
+  routeMaps: AdminRouteMap[];
   /** Адрес страницы на сайте: /starty/<slug>. */
   slug: string | null;
   program: string | null;
@@ -175,31 +177,27 @@ export const ROUTE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 /** Абсолютная ссылка на загруженный файл: в БД лежит путь без домена. */
 export const assetUrl = (path: string) => `${API_URL}${path}`;
 
-/**
- * Ответ роутов карты — сериализованный старт, но без счётчиков и сезона,
- * которыми список обрастает в GET /admin/events. Берём из него только то, что
- * там точно есть: свежий список UI всё равно перезагружает.
- */
-export type RouteImageResult = { id: number; routeImageUrl: string | null };
+/** Карта трассы старта: путь к файлу относительно корня API и подпись. */
+export type AdminRouteMap = { id: number; url: string; caption: string };
+
+/** Ответ правок карт — старт (как в GET /events), из него нужны только карты. */
+export type RouteMapsResult = { id: number; routeImageUrl: string | null; routeMaps: AdminRouteMap[] };
 
 /**
- * Загрузка карты трассы. Идёт не через request(): тело здесь multipart, а не
- * JSON, и Content-Type должен поставить сам браузер — вместе с boundary.
+ * Добавить карту трассы в конец списка. Идёт не через request(): тело здесь
+ * multipart, а не JSON, и Content-Type должен поставить сам браузер — вместе с
+ * boundary. Подпись — в адресе (?caption=).
  */
-export async function uploadRouteImage(
-  eventId: number,
-  file: File,
-): Promise<RouteImageResult> {
+export async function addRouteMap(eventId: number, file: File, caption: string): Promise<RouteMapsResult> {
   const body = new FormData();
   body.append('file', file);
 
   let res: Response;
   try {
-    res = await fetch(`${API_URL}/admin/events/${eventId}/route-image`, {
-      method: 'POST',
-      credentials: 'same-origin',
-      body,
-    });
+    res = await fetch(
+      `${API_URL}/admin/events/${eventId}/route-maps?caption=${encodeURIComponent(caption)}`,
+      { method: 'POST', credentials: 'same-origin', body },
+    );
   } catch {
     throw new AdminApiError(0, 'Не удалось связаться с сервером');
   }
@@ -208,8 +206,7 @@ export async function uploadRouteImage(
   if (!res.ok) {
     const obj = (data ?? {}) as { error?: string; reason?: string };
     // 413 без JSON — это nginx, а не наш обработчик: у него свой лимит на тело
-    // запроса (client_max_body_size, по умолчанию 1 МБ), и до бэкенда файл не
-    // дошёл. Иначе администратор увидел бы бессмысленную «Ошибка 413».
+    // запроса (client_max_body_size), и до бэкенда файл не дошёл.
     if (res.status === 413 && !obj.error) {
       throw new AdminApiError(
         413,
@@ -219,12 +216,16 @@ export async function uploadRouteImage(
     }
     throw new AdminApiError(res.status, obj.error ?? `Ошибка ${res.status}`, obj.reason);
   }
-  return data as AdminEvent;
+  return data as RouteMapsResult;
 }
 
-/** Убрать карту: в приложении у старта снова будет плейсхолдер. */
-export const deleteRouteImage = (eventId: number) =>
-  request<RouteImageResult>(`/admin/events/${eventId}/route-image`, { method: 'DELETE' });
+/** Порядок и подписи карт: все карты старта в нужном порядке. */
+export const updateRouteMaps = (eventId: number, maps: { id: number; caption: string }[]) =>
+  request<RouteMapsResult>(`/admin/events/${eventId}/route-maps`, { method: 'PUT', body: { maps } });
+
+/** Убрать карту. */
+export const deleteRouteMap = (eventId: number, mapId: number) =>
+  request<RouteMapsResult>(`/admin/events/${eventId}/route-maps/${mapId}`, { method: 'DELETE' });
 
 /** Положение — PDF до 7 МБ (backend/src/lib/regulations.ts). */
 export const REGULATIONS_MAX_BYTES = 7 * 1024 * 1024;

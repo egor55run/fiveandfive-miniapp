@@ -1,16 +1,18 @@
 import type { FastifyInstance } from 'fastify';
-import type { Event, EventDistance } from '@prisma/client';
+import { serializeRouteMap } from '../lib/routeMaps';
+import { EVENT_DETAILS } from '../lib/eventDetails';
+import type { Event, EventDistance, RouteMap } from '@prisma/client';
 import { prisma } from '../prisma';
 import { registrationOpen } from '../lib/registrationWindow';
 import { registrationClosesAt, registrationDeadlinePassed } from '../lib/eligibility';
-import { serializeDistance, WITH_DISTANCES } from '../lib/distances';
+import { serializeDistance } from '../lib/distances';
 
 /**
  * Старт для клиентов. distance / slots* / price — сводка по дистанциям (для
  * старых клиентов и коротких строк), distances — сами дистанции: при записи
  * участник выбирает одну из них.
  */
-export function serializeEvent(e: Event & { distances?: EventDistance[] }) {
+export function serializeEvent(e: Event & { distances?: EventDistance[]; routeMaps?: RouteMap[] }) {
   return {
     id: e.id,
     title: e.title,
@@ -25,6 +27,8 @@ export function serializeEvent(e: Event & { distances?: EventDistance[] }) {
     // Путь относительно корня API («/uploads/routes/…») или null, если карты у
     // старта нет. Базовый адрес приклеивает клиент — см. apiAsset в src/lib/api.ts.
     routeImageUrl: e.routeImageUrl,
+    // Все карты трасс по порядку (первая = routeImageUrl), с подписями.
+    routeMaps: (e.routeMaps ?? []).map(serializeRouteMap),
     // Пока общий для всех стартов (см. lib/registrationWindow). Полем у старта,
     // а не отдельным ответом: старый фронт ждёт от /events массив и лишнее
     // поле просто не заметит.
@@ -44,7 +48,7 @@ export function serializeEvent(e: Event & { distances?: EventDistance[] }) {
 export async function eventsRoutes(app: FastifyInstance) {
   // GET /events — list of races, soonest first
   app.get('/events', async () => {
-    const events = await prisma.event.findMany({ orderBy: { date: 'asc' }, include: WITH_DISTANCES });
+    const events = await prisma.event.findMany({ orderBy: { date: 'asc' }, include: EVENT_DETAILS });
     return events.map(serializeEvent);
   });
 
@@ -52,7 +56,7 @@ export async function eventsRoutes(app: FastifyInstance) {
   app.get<{ Params: { slug: string } }>('/events/by-slug/:slug', async (req, reply) => {
     const event = await prisma.event.findUnique({
       where: { slug: req.params.slug },
-      include: WITH_DISTANCES,
+      include: EVENT_DETAILS,
     });
     if (!event) return reply.code(404).send({ error: 'Старт не найден' });
     return serializeEvent(event);
@@ -65,7 +69,7 @@ export async function eventsRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'Invalid event id' });
     }
 
-    const event = await prisma.event.findUnique({ where: { id }, include: WITH_DISTANCES });
+    const event = await prisma.event.findUnique({ where: { id }, include: EVENT_DETAILS });
     if (!event) {
       return reply.code(404).send({ error: 'Event not found' });
     }

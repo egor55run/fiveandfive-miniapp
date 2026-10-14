@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
+import RouteCarousel from './RouteCarousel';
+import { routeMapsOf } from '../lib/routeMaps';
 import { priceShort } from '../lib/prices';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Map } from 'lucide-react';
 import {
-  apiAsset,
   type EventDto,
   REGISTRATION_CLOSED_TEXT,
   REGISTRATION_ENDED_TEXT,
@@ -59,7 +60,7 @@ function NextRaceCard({ event, onRegister, registrationOpenForMe }: Props) {
   const closed = state !== 'open';
   // Карту загружает организатор в админке; у стартов без неё показываем
   // плейсхолдер, а не чужой маршрут.
-  const routeSrc = event.routeImageUrl ? apiAsset(event.routeImageUrl) : null;
+  const maps = routeMapsOf(event);
 
   return (
     <motion.section
@@ -109,16 +110,9 @@ function NextRaceCard({ event, onRegister, registrationOpenForMe }: Props) {
           animate={{ opacity: 1, height: 'auto' }}
           transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
         >
-          {routeSrc ? (
-            <img
-              className="hero__map-img"
-              src={routeSrc}
-              alt={`Схема трассы: ${event.distance} — ${event.title}`}
-              // Карта раскрывается по тапу, так что к моменту показа её ещё нет в кэше —
-              // грузим сразу, а не лениво, иначе видно пустой блок.
-              decoding="async"
-              draggable={false}
-            />
+          {maps.length > 0 ? (
+            // Несколько карт («5 км», «3 км») листаются свайпом, точки снизу.
+            <RouteCarousel maps={maps} title={event.title} />
           ) : (
             <div className="hero__map-stub">
               <Map size={26} strokeWidth={1.8} />

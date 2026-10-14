@@ -37,6 +37,8 @@ export type EventDto = {
    * Для <img src> прогонять через apiAsset — базового адреса в значении нет.
    */
   routeImageUrl: string | null;
+  /** Все карты трасс по порядку (первая = routeImageUrl). Нет поля — старый сервер. */
+  routeMaps?: { id: number; url: string; caption: string }[];
   /** Адрес страницы на сайте: /starty/<slug>. */
   slug?: string | null;
   /** Программа дня — по строке на пункт. */

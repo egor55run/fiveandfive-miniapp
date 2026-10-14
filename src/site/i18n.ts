@@ -96,7 +96,6 @@ const ru = {
     storage: 'Камера хранения и раздевалка',
     storageText: 'Будут на месте старта.',
     route: 'Карта трассы',
-    routeAlt: (title: string) => `Карта трассы: ${title}`,
     routeLater: 'Трасса будет опубликована позже',
     awards: 'Награды',
     awardsList: [

@@ -1,16 +1,13 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { EVENT_DETAILS } from '../../lib/eventDetails';
 import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
 import { requireAdmin } from '../../plugins/adminAuth';
-import {
-  MAX_ROUTE_IMAGE_BYTES,
-  RouteImageError,
-  deleteRouteImage,
-  saveRouteImage,
-} from '../../lib/routeImages';
+import { MAX_ROUTE_IMAGE_BYTES, RouteImageError, saveRouteImage } from '../../lib/routeImages';
+import { deleteRouteFileIfUnused, MAX_ROUTE_MAPS, syncFirstRouteMap } from '../../lib/routeMaps';
 import { serializeEvent } from '../events';
-import { syncEventTotals, WITH_DISTANCES } from '../../lib/distances';
+import { syncEventTotals } from '../../lib/distances';
 import { eventSlug, SLUG_RE, uniqueEventSlug } from '../../lib/slug';
 import {
   deleteRegulations,
@@ -162,7 +159,7 @@ export async function adminEventsRoutes(app: FastifyInstance) {
   app.get('/admin/events', async () => {
     const events = await prisma.event.findMany({
       orderBy: { date: 'asc' },
-      include: { season: { select: { id: true, title: true, year: true } }, ...WITH_DISTANCES },
+      include: { season: { select: { id: true, title: true, year: true } }, ...EVENT_DETAILS },
     });
 
     // Разбивка по статусам одним запросом, чтобы не дёргать БД на каждый старт.
@@ -243,7 +240,7 @@ export async function adminEventsRoutes(app: FastifyInstance) {
         },
       });
       await saveDistances(tx, created.id, distances);
-      return tx.event.findUniqueOrThrow({ where: { id: created.id }, include: WITH_DISTANCES });
+      return tx.event.findUniqueOrThrow({ where: { id: created.id }, include: EVENT_DETAILS });
     });
     return reply.code(201).send(serializeEvent(event));
   });
@@ -300,7 +297,7 @@ export async function adminEventsRoutes(app: FastifyInstance) {
         // Лимит дистанции нельзя опустить ниже занятых мест — иначе «мест
         // нет» вместе с бронью; проверка внутри saveDistances.
         if (distances) await saveDistances(tx, id, distances);
-        return tx.event.findUniqueOrThrow({ where: { id }, include: WITH_DISTANCES });
+        return tx.event.findUniqueOrThrow({ where: { id }, include: EVENT_DETAILS });
       });
     } catch (err) {
       if (err instanceof DistanceConflict) return reply.code(409).send(err.body);
@@ -310,104 +307,140 @@ export async function adminEventsRoutes(app: FastifyInstance) {
   });
 
   /**
-   * POST /admin/events/:id/route-image — загрузить карту трассы.
-   *
-   * Тело — multipart/form-data с единственным файлом в поле `file`. Файл
-   * целиком поднимаем в память (не более MAX_ROUTE_IMAGE_BYTES, лимит стоит на
-   * самом плагине multipart): так формат проверяется по содержимому ДО того,
-   * как что-то попадёт на диск, и не остаётся недописанных файлов.
+   * Прочитать картинку из multipart (поле `file`) целиком в память — так формат
+   * проверяется по содержимому ДО записи на диск. null — ответ с ошибкой уже
+   * отправлен.
    */
-  app.post<{ Params: { id: string } }>('/admin/events/:id/route-image', async (req, reply) => {
-    const id = parseId(req.params.id);
-    if (id === null) return reply.code(400).send({ error: 'Некорректный id' });
-
-    const event = await prisma.event.findUnique({ where: { id } });
-    if (!event) return reply.code(404).send({ error: 'Старт не найден' });
-
+  async function readImage(
+    req: FastifyRequest,
+    reply: FastifyReply,
+    eventId: number,
+  ): Promise<{ buffer: Buffer; caption: string } | null> {
     let data: Awaited<ReturnType<typeof req.file>>;
     try {
       data = await req.file();
     } catch (err) {
-      req.log.warn({ err, eventId: id }, 'Не удалось разобрать multipart с картой трассы');
-      return reply.code(400).send({
-        error: 'Ожидается файл в multipart/form-data',
-        reason: 'bad_multipart',
-      });
+      req.log.warn({ err, eventId }, 'Не удалось разобрать multipart с картой трассы');
+      reply.code(400).send({ error: 'Ожидается файл в multipart/form-data', reason: 'bad_multipart' });
+      return null;
     }
     if (!data) {
-      return reply.code(400).send({ error: 'Файл не приложен', reason: 'no_file' });
+      reply.code(400).send({ error: 'Файл не приложен', reason: 'no_file' });
+      return null;
     }
-
     const tooLarge = {
       error: `Файл больше ${Math.round(MAX_ROUTE_IMAGE_BYTES / 1024 / 1024)} МБ`,
       reason: 'file_too_large',
     };
-
     let buffer: Buffer;
     try {
       buffer = await data.toBuffer();
     } catch (err) {
-      // Превышение лимита — единственная ожидаемая ошибка чтения, и для неё
-      // правильный код 413, а не 500.
+      // Превышение лимита — единственная ожидаемая ошибка чтения: 413, не 500.
       if ((err as { code?: string }).code === 'FST_REQ_FILE_TOO_LARGE') {
-        return reply.code(413).send(tooLarge);
+        reply.code(413).send(tooLarge);
+        return null;
       }
       throw err;
     }
-
-    // Лимит плагина не всегда становится исключением: файл может просто
-    // приехать обрезанным по лимиту. Молча сохранять такое нельзя — у
-    // усечённого PNG заголовок остаётся правильным, проверка формата его
+    // Лимит плагина не всегда становится исключением: файл может приехать
+    // обрезанным. У усечённого PNG заголовок правильный — проверка формата его
     // пропустит, и в приложение уйдёт битая картинка.
     if (data.file.truncated) {
-      return reply.code(413).send(tooLarge);
+      reply.code(413).send(tooLarge);
+      return null;
+    }
+    // Подпись — query ?caption= (поля формы до файла multipart может и не дать).
+    const caption = String((req.query as { caption?: string }).caption ?? '').trim().slice(0, 50);
+    return { buffer, caption };
+  }
+
+  const eventWithDetails = (id: number) =>
+    prisma.event.findUniqueOrThrow({ where: { id }, include: EVENT_DETAILS });
+
+  /**
+   * POST /admin/events/:id/route-maps?caption=5%20км — добавить карту трассы
+   * в конец списка. Файл — multipart, поле `file` (JPG/PNG/WebP до 5 МБ).
+   */
+  app.post<{ Params: { id: string } }>('/admin/events/:id/route-maps', async (req, reply) => {
+    const id = parseId(req.params.id);
+    if (id === null) return reply.code(400).send({ error: 'Некорректный id' });
+    const event = await prisma.event.findUnique({ where: { id } });
+    if (!event) return reply.code(404).send({ error: 'Старт не найден' });
+    const count = await prisma.routeMap.count({ where: { eventId: id } });
+    if (count >= MAX_ROUTE_MAPS) {
+      return reply.code(409).send({ error: `Не больше ${MAX_ROUTE_MAPS} карт у старта`, reason: 'too_many_maps' });
     }
 
+    const upload = await readImage(req, reply, id);
+    if (!upload) return reply;
     let saved;
     try {
-      saved = await saveRouteImage(id, buffer);
+      saved = await saveRouteImage(id, upload.buffer);
     } catch (err) {
       if (err instanceof RouteImageError) {
         return reply.code(400).send({ error: err.message, reason: err.reason });
       }
       throw err;
     }
-
-    // Порядок: сначала новый файл на диске, потом ссылка в БД, и только затем
-    // удаление прежнего файла. Обрыв на любом шаге оставляет рабочую картинку —
-    // либо старую, либо новую, но не ссылку в пустоту.
-    const updated = await prisma.event.update({
-      where: { id },
-      data: { routeImageUrl: saved.url },
-      include: WITH_DISTANCES,
+    const last = await prisma.routeMap.findFirst({ where: { eventId: id }, orderBy: { sortOrder: 'desc' } });
+    await prisma.$transaction(async (tx) => {
+      await tx.routeMap.create({
+        data: { eventId: id, url: saved.url, caption: upload.caption, sortOrder: (last?.sortOrder ?? -1) + 1 },
+      });
+      await syncFirstRouteMap(tx, id);
     });
-    await deleteRouteImage(event.routeImageUrl);
-
-    req.log.info(
-      { eventId: id, url: saved.url, bytes: saved.bytes, kind: saved.kind },
-      'Карта трассы загружена',
-    );
-    return serializeEvent(updated);
+    req.log.info({ eventId: id, url: saved.url, bytes: saved.bytes, kind: saved.kind }, 'Карта трассы добавлена');
+    return serializeEvent(await eventWithDetails(id));
   });
 
-  /** DELETE /admin/events/:id/route-image — убрать карту (в приложении вернётся плейсхолдер). */
-  app.delete<{ Params: { id: string } }>('/admin/events/:id/route-image', async (req, reply) => {
+  /**
+   * PUT /admin/events/:id/route-maps — порядок и подписи: { maps: [{ id, caption }] }
+   * в нужном порядке, ровно те же карты, что у старта.
+   */
+  const mapsOrderSchema = z.object({
+    maps: z
+      .array(z.object({ id: z.number().int().positive(), caption: z.string().trim().max(50) }))
+      .max(MAX_ROUTE_MAPS),
+  });
+  app.put<{ Params: { id: string } }>('/admin/events/:id/route-maps', async (req, reply) => {
     const id = parseId(req.params.id);
     if (id === null) return reply.code(400).send({ error: 'Некорректный id' });
-
-    const event = await prisma.event.findUnique({ where: { id } });
-    if (!event) return reply.code(404).send({ error: 'Старт не найден' });
-
-    const updated = await prisma.event.update({
-      where: { id },
-      data: { routeImageUrl: null },
-      include: WITH_DISTANCES,
+    const parsed = mapsOrderSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Проверьте карты', details: parsed.error.flatten() });
+    const current = await prisma.routeMap.findMany({ where: { eventId: id } });
+    const ids = parsed.data.maps.map((m) => m.id);
+    if (ids.length !== current.length || current.some((c) => !ids.includes(c.id))) {
+      return reply.code(409).send({ error: 'Список карт устарел — обновите страницу', reason: 'maps_changed' });
+    }
+    await prisma.$transaction(async (tx) => {
+      for (const [i, m] of parsed.data.maps.entries()) {
+        await tx.routeMap.update({ where: { id: m.id }, data: { caption: m.caption, sortOrder: i } });
+      }
+      await syncFirstRouteMap(tx, id);
     });
-    await deleteRouteImage(event.routeImageUrl);
-
-    req.log.info({ eventId: id }, 'Карта трассы убрана');
-    return serializeEvent(updated);
+    return serializeEvent(await eventWithDetails(id));
   });
+
+  /** DELETE /admin/events/:id/route-maps/:mapId — убрать карту. */
+  app.delete<{ Params: { id: string; mapId: string } }>(
+    '/admin/events/:id/route-maps/:mapId',
+    async (req, reply) => {
+      const id = parseId(req.params.id);
+      const mapId = parseId(req.params.mapId);
+      if (id === null || mapId === null) return reply.code(400).send({ error: 'Некорректный id' });
+      const map = await prisma.routeMap.findFirst({ where: { id: mapId, eventId: id } });
+      if (!map) return reply.code(404).send({ error: 'Карта не найдена' });
+      await prisma.$transaction(async (tx) => {
+        await tx.routeMap.delete({ where: { id: mapId } });
+        await syncFirstRouteMap(tx, id);
+      });
+      // Файл — только если он больше нигде не нужен (одна трасса у двух стартов).
+      await deleteRouteFileIfUnused(map.url);
+      req.log.info({ eventId: id, mapId }, 'Карта трассы убрана');
+      return serializeEvent(await eventWithDetails(id));
+    },
+  );
 
   /**
    * POST /admin/events/:id/regulations — загрузить Положение (PDF, до 7 МБ).
@@ -456,7 +489,7 @@ export async function adminEventsRoutes(app: FastifyInstance) {
     const updated = await prisma.event.update({
       where: { id },
       data: { regulationsUrl: url },
-      include: WITH_DISTANCES,
+      include: EVENT_DETAILS,
     });
     await deleteRegulations(event.regulationsUrl);
     req.log.info({ eventId: id, url, bytes: buffer.length }, 'Положение загружено');
@@ -472,7 +505,7 @@ export async function adminEventsRoutes(app: FastifyInstance) {
     const updated = await prisma.event.update({
       where: { id },
       data: { regulationsUrl: null },
-      include: WITH_DISTANCES,
+      include: EVENT_DETAILS,
     });
     await deleteRegulations(event.regulationsUrl);
     req.log.info({ eventId: id }, 'Положение убрано');
@@ -494,7 +527,10 @@ export async function adminEventsRoutes(app: FastifyInstance) {
 
       const event = await prisma.event.findUnique({
         where: { id },
-        include: { _count: { select: { registrations: true, results: true } } },
+        include: {
+          _count: { select: { registrations: true, results: true } },
+          routeMaps: { select: { url: true } },
+        },
       });
       if (!event) return reply.code(404).send({ error: 'Старт не найден' });
 
@@ -514,8 +550,11 @@ export async function adminEventsRoutes(app: FastifyInstance) {
       }
 
       await prisma.event.delete({ where: { id } });
-      // Строки в БД больше нет — файл карты иначе остался бы на диске навсегда.
-      await deleteRouteImage(event.routeImageUrl);
+      // Строк в БД больше нет — файлы карт иначе остались бы на диске навсегда
+      // (если файл не нужен другому старту).
+      for (const url of new Set([event.routeImageUrl, ...event.routeMaps.map((m) => m.url)])) {
+        if (url) await deleteRouteFileIfUnused(url);
+      }
       req.log.warn(
         { eventId: id, title: event.title, registrations: regs, results },
         'Старт удалён из админки',

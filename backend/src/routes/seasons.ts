@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { EVENT_DETAILS } from '../lib/eventDetails';
 import type { Event, SeasonPass, User } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../prisma';
@@ -29,7 +30,7 @@ import {
   personNameField,
 } from '../lib/validation';
 import { serializeEvent } from './events';
-import { claimDistanceSlot, seasonDistanceOf, WITH_DISTANCES } from '../lib/distances';
+import { claimDistanceSlot, seasonDistanceOf } from '../lib/distances';
 import { requireTelegramAuth, tgUserOf } from '../plugins/telegramAuth';
 import { serializeUser } from './auth';
 
@@ -79,7 +80,7 @@ export async function seasonsRoutes(app: FastifyInstance) {
   app.get('/seasons/current', async (_req, reply) => {
     const season = await prisma.season.findFirst({
       where: { isActive: true },
-      include: { events: { orderBy: { date: 'asc' }, include: WITH_DISTANCES } },
+      include: { events: { orderBy: { date: 'asc' }, include: EVENT_DETAILS } },
       orderBy: { year: 'desc' },
     });
     if (!season) {

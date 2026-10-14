@@ -143,19 +143,6 @@
   overflow: hidden;
 }
 
-/* Карта трассы. Картинку теперь загружает организатор в админке, и её пропорции
-   заранее неизвестны — поэтому бокс фиксированный (тот же, что был в макете), а
-   object-fit: contain вписывает в него любой файл, не сплющивая маршрут. Так же
-   решается прыжок вёрстки: блок раскрывается по тапу с анимацией высоты, и без
-   заранее заданных пропорций до загрузки картинки он остался бы нулевым.
-   Скругление углов запечено в webp, CSS-радиус — страховка для неокруглённых. */
-.hero__map-img {
-  display: block;
-  width: 100%;
-  aspect-ratio: 328 / 227;
-  object-fit: contain;
-  border-radius: var(--r-md);
-}
 
 /* Плейсхолдер для стартов, у которых карты пока нет. */
 .hero__map-stub {
@@ -1759,4 +1746,101 @@ select.rfield__input {
 .dist-chip:focus-visible {
   outline: 2px solid var(--brand-highlight);
   outline-offset: 2px;
+}
+
+/* ===================================================================
+   Карты трасс: свайп + точки (components/RouteCarousel)
+   =================================================================== */
+.route-carousel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.route-carousel__track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  border-radius: var(--r-md);
+}
+
+.route-carousel__track::-webkit-scrollbar {
+  display: none;
+}
+
+.route-carousel__track:focus-visible {
+  outline: 2px solid var(--brand-highlight);
+  outline-offset: 2px;
+}
+
+.route-carousel__slide {
+  flex: 0 0 100%;
+  margin: 0;
+  scroll-snap-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Пропорции заранее неизвестны: фиксированный бокс + contain вписывает любую
+   картинку и не даёт вёрстке прыгать до загрузки. */
+.route-carousel__slide img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 328 / 227;
+  object-fit: contain;
+  border-radius: var(--r-md);
+}
+
+.route-carousel__slide figcaption {
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  opacity: 0.8;
+}
+
+.route-carousel__dots {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+/* Точка — 8 px, но нажимать удобно: зона касания 28 px. */
+.route-carousel__dot {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  position: relative;
+}
+
+.route-carousel__dot::after {
+  content: '';
+  position: absolute;
+  inset: 10px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.35;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.route-carousel__dot.is-active::after {
+  opacity: 1;
+  transform: scale(1.25);
+}
+
+.route-carousel__dot:focus-visible {
+  outline: 2px solid var(--brand-highlight);
+  outline-offset: -4px;
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-carousel__dot::after {
+    transition: none;
+  }
 }
