@@ -4,6 +4,18 @@ import { getInitData } from './telegram';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 
+/** Дистанция старта: свой лимит мест и цена. */
+export type DistanceDto = {
+  id: number;
+  label: string;
+  slotsTotal: number;
+  slotsTaken: number;
+  slotsLeft: number;
+  price: number;
+  /** На эту дистанцию записывает абонемент сезона. */
+  seasonPass: boolean;
+};
+
 export type EventDto = {
   id: number;
   title: string;
@@ -14,6 +26,11 @@ export type EventDto = {
   slotsTaken: number;
   slotsLeft: number;
   price: number;
+  /**
+   * Дистанции старта. distance / slots* / price выше — сводка по ним. Нет поля —
+   * старый сервер: одна дистанция, описанная сводкой.
+   */
+  distances?: DistanceDto[];
   /**
    * Карта трассы: путь относительно корня API («/uploads/routes/…»), который
    * админка получила при загрузке файла, или null, если карты у старта нет.
@@ -131,6 +148,8 @@ export type RegistrationResult = {
 
 export type RegistrationPayload = {
   eventId: number;
+  /** Выбранная дистанция; без неё сервер возьмёт первую. */
+  distanceId?: number;
   firstName: string;
   lastName: string;
   email: string;

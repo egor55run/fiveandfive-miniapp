@@ -3,10 +3,12 @@ import {
   getEvents,
   getParticipants,
   setPaymentStatus,
+  type AdminDistance,
   type AdminEvent,
   type Participant,
   type PaymentStatus,
 } from './api';
+import { downloadParticipantsCsv } from './exportCsv';
 import { formatDate, formatDateTime, formatSeconds, fullName, PAYMENT_LABEL } from './helpers';
 
 const STATUSES: PaymentStatus[] = ['PENDING', 'PAID', 'CANCELLED'];
@@ -15,6 +17,9 @@ export default function ParticipantsSection() {
   const [events, setEvents] = useState<AdminEvent[]>([]);
   const [eventId, setEventId] = useState<number | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [distances, setDistances] = useState<AdminDistance[]>([]);
+  // Фильтр по дистанции: null — все.
+  const [distanceFilter, setDistanceFilter] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -37,6 +42,8 @@ export default function ParticipantsSection() {
     try {
       const res = await getParticipants(id);
       setParticipants(res.participants);
+      setDistances(res.distances);
+      setDistanceFilter(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось загрузить участников');
       setParticipants([]);
@@ -84,7 +91,7 @@ export default function ParticipantsSection() {
             : '';
       setNotice(
         `${fullName(p.lastName, p.firstName)}: ${PAYMENT_LABEL[next]}.${slotNote}` +
-          (res.event ? ` Занято ${res.event.slotsTaken} из ${res.event.slotsTotal}.` : ''),
+          (res.event ? ` На старте занято ${res.event.slotsTaken} из ${res.event.slotsTotal}.` : ''),
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось изменить статус');
@@ -94,6 +101,15 @@ export default function ParticipantsSection() {
   };
 
   const selected = events.find((e) => e.id === eventId) ?? null;
+  const shown =
+    distanceFilter === null ? participants : participants.filter((p) => p.distanceId === distanceFilter);
+
+  const exportCsv = () => {
+    if (!selected) return;
+    const dist = distances.find((d) => d.id === distanceFilter);
+    const name = `uchastniki-${selected.slug ?? selected.id}${dist ? `-${dist.label.replace(/\s+/g, '')}` : ''}.csv`;
+    downloadParticipantsCsv(shown, name);
+  };
 
   return (
     <section className="ad-section">
@@ -110,6 +126,20 @@ export default function ParticipantsSection() {
               </option>
             ))}
           </select>
+          {distances.length > 1 && (
+            <select
+              value={distanceFilter ?? ''}
+              onChange={(e) => setDistanceFilter(e.target.value === '' ? null : Number(e.target.value))}
+              aria-label="Дистанция"
+            >
+              <option value="">Все дистанции</option>
+              {distances.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
+          )}
           <button
             type="button"
             className="ad-btn"
@@ -117,13 +147,18 @@ export default function ParticipantsSection() {
           >
             Обновить
           </button>
+          <button type="button" className="ad-btn" disabled={shown.length === 0} onClick={exportCsv}>
+            Выгрузить в Excel (CSV)
+          </button>
         </div>
       </header>
 
       {selected && (
         <p className="ad-hint">
-          Занято {selected.slotsTaken} из {selected.slotsTotal} · записалось{' '}
-          {selected.registrations.total}
+          {distances.length > 1
+            ? distances.map((d) => `${d.label}: занято ${d.slotsTaken} из ${d.slotsTotal}`).join(' · ')
+            : `Занято ${selected.slotsTaken} из ${selected.slotsTotal}`}{' '}
+          · записалось {selected.registrations.total}
         </p>
       )}
 
@@ -132,14 +167,17 @@ export default function ParticipantsSection() {
 
       {loading ? (
         <p className="ad-msg">Загружаем…</p>
-      ) : participants.length === 0 ? (
-        <p className="ad-msg">На этот старт пока никто не записан</p>
+      ) : shown.length === 0 ? (
+        <p className="ad-msg">
+          {participants.length === 0 ? 'На этот старт пока никто не записан' : 'На эту дистанцию пока никто не записан'}
+        </p>
       ) : (
         <div className="ad-table-wrap">
           <table className="ad-table">
             <thead>
               <tr>
                 <th>ФИО</th>
+                <th>Дистанция</th>
                 <th>Телефон</th>
                 <th>Email</th>
                 <th className="num" title="Полных лет на день старта">Возр.</th>
@@ -150,7 +188,7 @@ export default function ParticipantsSection() {
               </tr>
             </thead>
             <tbody>
-              {participants.map((p) => (
+              {shown.map((p) => (
                 <tr
                   key={p.registrationId}
                   className={p.paymentStatus === 'CANCELLED' ? 'ad-row--muted' : undefined}
@@ -171,6 +209,7 @@ export default function ParticipantsSection() {
                       </span>
                     )}
                   </td>
+                  <td className="ad-nowrap">{p.distance ?? '—'}</td>
                   <td className="ad-nowrap">{p.phone ?? '—'}</td>
                   <td>{p.email ?? '—'}</td>
                   <td className="num">{p.ageOnStart ?? p.age ?? '—'}</td>

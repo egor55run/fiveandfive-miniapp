@@ -10,13 +10,14 @@ export type Stage = {
   month: string;
   place: string;
   time: string;
+  /** Дистанции старта: «5 км» или «5 км / 3 км». */
+  distance: string;
   /** Подпись ссылки для экранных чтецов: «Триатлон Парк, 23 мая — подробнее…». */
   linkLabel: string;
 };
 
 type Texts = {
   hint: string;
-  distance: string;
   rayGot: string;
   rayAdd: string;
   starTitle: string;
@@ -66,7 +67,7 @@ export default function StagesStar({ stages, t }: { stages: Stage[]; t: Texts })
                     {s.place}
                   </a>
                   <span className="h-stage__time">
-                    {s.time} · {t.distance}
+                    {s.time} · {s.distance}
                   </span>
                 </span>
                 {i < RAYS.length && (

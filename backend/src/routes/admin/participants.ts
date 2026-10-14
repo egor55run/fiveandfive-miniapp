@@ -3,6 +3,13 @@ import { z } from 'zod';
 import { prisma } from '../../prisma';
 import { requireAdmin } from '../../plugins/adminAuth';
 import { ageOnStartDay } from '../../lib/eligibility';
+import {
+  claimDistanceSlot,
+  DISTANCE_ORDER,
+  distanceIdOf,
+  releaseDistanceSlot,
+  serializeDistance,
+} from '../../lib/distances';
 
 const statusSchema = z.object({
   paymentStatus: z.enum(['PENDING', 'PAID', 'CANCELLED']),
@@ -32,7 +39,7 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
       const registrations = await prisma.registration.findMany({
         where: { eventId },
         orderBy: { registeredAt: 'asc' },
-        include: { user: true },
+        include: { user: true, distance: true },
       });
 
       // Результаты подтягиваем одним запросом — чтобы в списке было видно,
@@ -42,6 +49,9 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
 
       return {
         event: { id: event.id, title: event.title, date: event.date },
+        distances: (
+          await prisma.eventDistance.findMany({ where: { eventId }, orderBy: DISTANCE_ORDER })
+        ).map(serializeDistance),
         participants: registrations.map((r) => {
           const result = resultByUser.get(r.userId);
           return {
@@ -53,12 +63,16 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
             phone: r.user.phone,
             email: r.user.email,
             age: r.user.age,
+            gender: r.user.gender,
+            birthDate: r.user.birthDate ? r.user.birthDate.toISOString().slice(0, 10) : null,
             // Возраст на день этого старта: 16–17 — нужна письменная справка
             // от родителя при выдаче стартового пакета (lib/eligibility).
             ageOnStart: r.user.birthDate ? ageOnStartDay(r.user.birthDate, event.date) : null,
             telegramId: r.user.telegramId?.toString() ?? null,
             username: r.user.username,
             paymentStatus: r.paymentStatus,
+            distanceId: r.distanceId,
+            distance: r.distance?.label ?? null,
             qrCode: r.qrCode,
             // Абонемент: регистрация создана оптом, отменять её по одной нельзя
             // без последствий для остальных — помечаем, чтобы UI предупредил.
@@ -110,27 +124,29 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
       const willHold = HOLDS_SLOT(next);
       const delta = Number(willHold) - Number(wasHolding); // -1, 0 или +1
 
-      // Возвращаем место занятым — проверяем, что оно есть.
-      if (delta > 0 && registration.event.slotsTaken >= registration.event.slotsTotal) {
-        return reply.code(409).send({
-          error: 'Свободных мест на старте нет — вернуть регистрацию нельзя',
-          reason: 'no_slots',
-        });
-      }
-
-      const updated = await prisma.$transaction(async (tx) => {
-        const reg = await tx.registration.update({
-          where: { id },
-          data: { paymentStatus: next },
-        });
-        if (delta !== 0) {
-          await tx.event.update({
-            where: { id: registration.eventId },
-            data: { slotsTaken: { increment: delta } },
+      const NO_SLOTS = {
+        error: 'Свободных мест на этой дистанции нет — вернуть регистрацию нельзя',
+        reason: 'no_slots',
+      };
+      let updated;
+      try {
+        updated = await prisma.$transaction(async (tx) => {
+          const distanceId = await distanceIdOf(tx, registration);
+          if (delta > 0) {
+            // Возвращаем место занятым — может упереться в лимит дистанции.
+            if (!distanceId || !(await claimDistanceSlot(tx, distanceId))) throw new Error('no_slots');
+          } else if (delta < 0 && distanceId) {
+            await releaseDistanceSlot(tx, distanceId);
+          }
+          return tx.registration.update({
+            where: { id },
+            data: { paymentStatus: next, ...(distanceId ? { distanceId } : {}) },
           });
-        }
-        return reg;
-      });
+        });
+      } catch (err) {
+        if ((err as Error).message === 'no_slots') return reply.code(409).send(NO_SLOTS);
+        throw err;
+      }
 
       req.log.info(
         { registrationId: id, from: prev, to: next, slotDelta: delta },

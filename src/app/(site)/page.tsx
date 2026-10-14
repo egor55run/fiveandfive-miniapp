@@ -77,6 +77,7 @@ export default async function HomePage() {
       month,
       place: placeOf(e),
       time: timeFmt.format(new Date(e.date)),
+      distance: e.distance,
       linkLabel: t.home.stageLink(placeOf(e), `${day} ${month}`),
     };
   });
@@ -143,7 +144,6 @@ export default async function HomePage() {
           stages={stages}
           t={{
             hint: t.home.stagesHint,
-            distance: t.home.distance,
             rayGot: t.home.rayGot,
             rayAdd: t.home.rayAdd,
             starTitle: t.home.starTitle,

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { PRICES_PUBLIC, priceLabel } from '../lib/prices';
+import { PRICES_PUBLIC, priceLabel, priceShort } from '../lib/prices';
 import { motion, useReducedMotion } from 'framer-motion';
 import { AlertCircle, Check, ChevronDown } from 'lucide-react';
 import Header from './Header';
@@ -151,6 +151,12 @@ function RegistrationScreen({
   const [values, setValues] = useState<FormValues>(() => withPrefill(prefill));
   const [season, setSeason] = useState<SeasonDto | null>(null);
   const [seasonChecked, setSeasonChecked] = useState(false);
+  // Дистанция: по умолчанию первая, где есть места.
+  const distances = event.distances ?? [];
+  const [distanceId, setDistanceId] = useState<number | null>(
+    () => (distances.find((d) => d.slotsLeft > 0) ?? distances[0])?.id ?? null,
+  );
+  const chosen = distances.find((d) => d.id === distanceId) ?? null;
   const [consentRules, setConsentRules] = useState(false);
   const [consentData, setConsentData] = useState(false);
   const toggleRules = () => {
@@ -188,12 +194,15 @@ function RegistrationScreen({
 
   // Абонемент предлагаем, только если старт входит в активный сезон и
   // регистрация открыта на все его старты (абонемент — всё или ничего).
+  // Абонемент записывает только на свою дистанцию (пока 5 км) — на другой
+  // дистанции его не предлагаем.
   const seasonAvailable = Boolean(
     season?.events.some((e) => e.id === event.id) &&
-      season.events.every((e) => !e.registrationDeadlinePassed),
+      season.events.every((e) => !e.registrationDeadlinePassed) &&
+      (chosen === null || chosen.seasonPass),
   );
   const useSeason = seasonAvailable && seasonChecked;
-  const total = useSeason && season ? season.price : event.price;
+  const total = useSeason && season ? season.price : (chosen?.price ?? event.price);
   const date = new Date(event.date);
   const state = registrationState(event, registrationOpenForMe);
 
@@ -287,7 +296,11 @@ function RegistrationScreen({
               outcome: { events: season.events, seasonPass: true },
             }
           : {
-              result: await createRegistration({ eventId: event.id, ...participant }),
+              result: await createRegistration({
+                eventId: event.id,
+                ...(chosen ? { distanceId: chosen.id } : {}),
+                ...participant,
+              }),
               outcome: { events: [event], seasonPass: false },
             };
       const full: RegistrationOutcome = { user: result.user, ...outcome };
@@ -334,7 +347,7 @@ function RegistrationScreen({
           <span className="dot">•</span>
           <span>{event.distance}</span>
           <span className="dot">•</span>
-          <span>{priceLabel(event.price)}</span>
+          <span>{priceLabel(chosen?.price ?? event.price)}</span>
         </div>
         {state !== 'ended' && event.registrationClosesAt && (
           <span className="reg-hero__deadline">
@@ -477,6 +490,38 @@ function RegistrationScreen({
           </label>
 
           <p className="reg-group-label">Детали забега:</p>
+
+          {distances.length > 1 && (
+            <div className="dist-picker" role="radiogroup" aria-label="Дистанция">
+              <span className="rfield__label">Дистанция</span>
+              <div className="dist-picker__list">
+                {distances.map((d) => {
+                  const full = d.slotsLeft <= 0;
+                  const on = d.id === distanceId;
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      className={`dist-chip${on ? ' dist-chip--on' : ''}`}
+                      disabled={submitting || full}
+                      onClick={() => {
+                        setDistanceId(d.id);
+                        if (!d.seasonPass) setSeasonChecked(false);
+                        if (serverError) setServerError(null);
+                      }}
+                    >
+                      <span className="dist-chip__label">{d.label}</span>
+                      <span className="dist-chip__note">
+                        {full ? 'мест нет' : (priceShort(d.price) ?? `осталось ${d.slotsLeft}`)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="rfield rfield--select">
             <span className="rfield__label">Ожидаемое время финиша</span>

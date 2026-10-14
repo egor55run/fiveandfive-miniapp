@@ -57,7 +57,7 @@ export async function sendRaceReminders(
       registrations: {
         // Отменённые регистрации не в счёт: человек на старт не идёт.
         where: { paymentStatus: { not: 'CANCELLED' } },
-        include: { user: true },
+        include: { user: true, distance: true },
       },
     },
     orderBy: { date: 'asc' },
@@ -95,7 +95,13 @@ export async function sendRaceReminders(
     });
     const done = new Set(already.map((n) => n.userId));
 
-    const text = reminderText(event, now);
+    // Текст зависит от дистанции участника — собираем по одному на дистанцию.
+    const textByDistance = new Map<string, string>();
+    const textFor = (label?: string) => {
+      const key = label ?? '';
+      if (!textByDistance.has(key)) textByDistance.set(key, reminderText(event, now, label));
+      return textByDistance.get(key)!;
+    };
 
     for (const registration of event.registrations) {
       if (done.has(registration.userId)) {
@@ -108,7 +114,7 @@ export async function sendRaceReminders(
         telegramId: registration.user.telegramId,
         eventId: event.id,
         kind: 'RACE_REMINDER',
-        text,
+        text: textFor(registration.distance?.label),
         log,
       });
 

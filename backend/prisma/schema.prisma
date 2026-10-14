@@ -94,7 +94,8 @@ model Event {
   regulationsUrl       String?   @map("regulations_url")
   createdAt            DateTime  @default(now()) @map("created_at")
 
-  season        Season?        @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+  season        Season?         @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+  distances     EventDistance[]
   registrations Registration[]
   results       Result[]
   notifications Notification[]
@@ -113,19 +114,47 @@ model Registration {
   userId        Int           @map("user_id")
   eventId       Int           @map("event_id")
   seasonPassId  Int?          @map("season_pass_id")
+  /// Выбранная дистанция. null — только у старых отменённых записей, чья
+  /// дистанция удалена из старта; у живых регистраций всегда есть.
+  distanceId    Int?          @map("distance_id")
   paymentStatus PaymentStatus @default(PENDING) @map("payment_status")
   qrCode        String?       @map("qr_code")
   registeredAt  DateTime      @default(now()) @map("registered_at")
 
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  event      Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  seasonPass SeasonPass? @relation(fields: [seasonPassId], references: [id], onDelete: SetNull)
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event      Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  seasonPass SeasonPass?    @relation(fields: [seasonPassId], references: [id], onDelete: SetNull)
+  distance   EventDistance? @relation(fields: [distanceId], references: [id], onDelete: SetNull)
   payments   Payment[]
   consents   Consent[]
 
   // Один пользователь — одна регистрация на конкретный старт
   @@unique([userId, eventId])
   @@map("registrations")
+}
+
+/// Дистанция старта (5 км, 3 км…): свой лимит мест, счётчик занятых и цена.
+/// Места занимаются и освобождаются только здесь (lib/distances.ts), а поля
+/// старта distance / slotsTotal / slotsTaken / price — сводка по дистанциям,
+/// которую lib/distances пересчитывает после каждого изменения.
+model EventDistance {
+  id         Int      @id @default(autoincrement())
+  eventId    Int      @map("event_id")
+  label      String // «5 км»
+  slotsTotal Int      @map("slots_total")
+  slotsTaken Int      @default(0) @map("slots_taken")
+  price      Decimal  @default(0) @db.Decimal(10, 2)
+  sortOrder  Int      @default(0) @map("sort_order")
+  /// На эту дистанцию записывает абонемент сезона (одна на старт; пока 5 км).
+  seasonPass Boolean  @default(false) @map("season_pass")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  event         Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  registrations Registration[]
+
+  @@unique([eventId, label])
+  @@index([eventId])
+  @@map("event_distances")
 }
 
 model SeasonPass {

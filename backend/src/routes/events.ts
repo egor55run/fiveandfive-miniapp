@@ -1,10 +1,16 @@
 import type { FastifyInstance } from 'fastify';
-import type { Event } from '@prisma/client';
+import type { Event, EventDistance } from '@prisma/client';
 import { prisma } from '../prisma';
 import { registrationOpen } from '../lib/registrationWindow';
 import { registrationClosesAt, registrationDeadlinePassed } from '../lib/eligibility';
+import { serializeDistance, WITH_DISTANCES } from '../lib/distances';
 
-export function serializeEvent(e: Event) {
+/**
+ * Старт для клиентов. distance / slots* / price — сводка по дистанциям (для
+ * старых клиентов и коротких строк), distances — сами дистанции: при записи
+ * участник выбирает одну из них.
+ */
+export function serializeEvent(e: Event & { distances?: EventDistance[] }) {
   return {
     id: e.id,
     title: e.title,
@@ -15,6 +21,7 @@ export function serializeEvent(e: Event) {
     slotsTaken: e.slotsTaken,
     slotsLeft: e.slotsTotal - e.slotsTaken,
     price: Number(e.price),
+    distances: (e.distances ?? []).map(serializeDistance),
     // Путь относительно корня API («/uploads/routes/…») или null, если карты у
     // старта нет. Базовый адрес приклеивает клиент — см. apiAsset в src/lib/api.ts.
     routeImageUrl: e.routeImageUrl,
@@ -37,13 +44,16 @@ export function serializeEvent(e: Event) {
 export async function eventsRoutes(app: FastifyInstance) {
   // GET /events — list of races, soonest first
   app.get('/events', async () => {
-    const events = await prisma.event.findMany({ orderBy: { date: 'asc' } });
+    const events = await prisma.event.findMany({ orderBy: { date: 'asc' }, include: WITH_DISTANCES });
     return events.map(serializeEvent);
   });
 
   // GET /events/by-slug/:slug — старт по адресу страницы на сайте (/starty/<slug>).
   app.get<{ Params: { slug: string } }>('/events/by-slug/:slug', async (req, reply) => {
-    const event = await prisma.event.findUnique({ where: { slug: req.params.slug } });
+    const event = await prisma.event.findUnique({
+      where: { slug: req.params.slug },
+      include: WITH_DISTANCES,
+    });
     if (!event) return reply.code(404).send({ error: 'Старт не найден' });
     return serializeEvent(event);
   });
@@ -55,7 +65,7 @@ export async function eventsRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'Invalid event id' });
     }
 
-    const event = await prisma.event.findUnique({ where: { id } });
+    const event = await prisma.event.findUnique({ where: { id }, include: WITH_DISTANCES });
     if (!event) {
       return reply.code(404).send({ error: 'Event not found' });
     }

@@ -71,6 +71,7 @@ const ru = {
       start: 'Старт',
       park: 'Парк',
       distance: 'Дистанция',
+      distances: 'Дистанции',
       cutoff: 'Контрольное время',
       cutoffValue: '1 час',
       cost: 'Стоимость',

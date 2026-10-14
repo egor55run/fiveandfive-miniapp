@@ -98,20 +98,26 @@ export function siteJsonLd() {
  */
 export function raceJsonLd(event: EventDto, description: string, path: string, open: boolean) {
   const url = `${SITE_URL}${path}`;
-  const offers =
-    PRICES_PUBLIC && event.price > 0
-      ? {
+  const distances = event.distances?.length
+    ? event.distances
+    : [{ label: event.distance, price: event.price, slotsLeft: event.slotsLeft }];
+  const offerList = PRICES_PUBLIC
+    ? distances
+        .filter((d) => d.price > 0)
+        .map((d) => ({
           '@type': 'Offer',
-          price: event.price,
+          name: d.label,
+          price: d.price,
           priceCurrency: 'KZT',
           url,
-          ...(event.slotsLeft <= 0
+          ...(d.slotsLeft <= 0
             ? { availability: 'https://schema.org/SoldOut' }
             : open
               ? { availability: 'https://schema.org/InStock' }
               : {}),
-        }
-      : undefined;
+        }))
+    : [];
+  const offers = offerList.length === 0 ? undefined : offerList.length === 1 ? offerList[0] : offerList;
   return {
     '@context': 'https://schema.org',
     '@type': 'SportsEvent',

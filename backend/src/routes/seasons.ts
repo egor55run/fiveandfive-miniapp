@@ -29,6 +29,7 @@ import {
   personNameField,
 } from '../lib/validation';
 import { serializeEvent } from './events';
+import { claimDistanceSlot, seasonDistanceOf, WITH_DISTANCES } from '../lib/distances';
 import { requireTelegramAuth, tgUserOf } from '../plugins/telegramAuth';
 import { serializeUser } from './auth';
 
@@ -61,7 +62,12 @@ const bodySchema = z.object({
 // Причина, по которой абонемент нельзя оформить (all-or-nothing).
 class SeasonPassBlocked extends Error {
   constructor(
-    public reason: 'no_slots' | 'already_registered' | 'already_has_pass' | 'empty_season',
+    public reason:
+      | 'no_slots'
+      | 'already_registered'
+      | 'already_has_pass'
+      | 'empty_season'
+      | 'no_season_distance',
     public eventTitle?: string,
   ) {
     super(reason);
@@ -73,7 +79,7 @@ export async function seasonsRoutes(app: FastifyInstance) {
   app.get('/seasons/current', async (_req, reply) => {
     const season = await prisma.season.findFirst({
       where: { isActive: true },
-      include: { events: { orderBy: { date: 'asc' } } },
+      include: { events: { orderBy: { date: 'asc' }, include: WITH_DISTANCES } },
       orderBy: { year: 'desc' },
     });
     if (!season) {
@@ -81,7 +87,12 @@ export async function seasonsRoutes(app: FastifyInstance) {
     }
 
     const price = Number(season.price);
-    const eventsTotal = season.events.reduce((sum, e) => sum + Number(e.price), 0);
+    // Абонемент — на дистанцию «для абонемента» каждого старта (пока 5 км):
+    // экономию считаем против её цены, а не самой дешёвой дистанции.
+    const eventsTotal = season.events.reduce((sum, e) => {
+      const d = e.distances.find((x) => x.seasonPass) ?? e.distances[0];
+      return sum + Number(d?.price ?? e.price);
+    }, 0);
 
     return {
       id: season.id,
@@ -230,17 +241,18 @@ export async function seasonsRoutes(app: FastifyInstance) {
             throw new SeasonPassBlocked('already_registered', e.title);
           }
 
-          const taken = await tx.event.updateMany({
-            where: { id: e.id, slotsTaken: { lt: e.slotsTotal } },
-            data: { slotsTaken: { increment: 1 } },
-          });
-          if (taken.count === 0) throw new SeasonPassBlocked('no_slots', e.title);
+          // Абонемент записывает на дистанцию «для абонемента» (пока 5 км).
+          const distance = await seasonDistanceOf(tx, e.id);
+          if (!distance) throw new SeasonPassBlocked('no_season_distance', e.title);
+          if (!(await claimDistanceSlot(tx, distance.id))) {
+            throw new SeasonPassBlocked('no_slots', `${e.title}, ${distance.label}`);
+          }
 
           if (reg) {
             registrations.push(
               await tx.registration.update({
                 where: { id: reg.id },
-                data: { paymentStatus: 'PENDING', seasonPassId: pass.id },
+                data: { paymentStatus: 'PENDING', seasonPassId: pass.id, distanceId: distance.id },
               }),
             );
             continue;
@@ -249,6 +261,7 @@ export async function seasonsRoutes(app: FastifyInstance) {
             data: {
               userId: user.id,
               eventId: e.id,
+              distanceId: distance.id,
               seasonPassId: pass.id,
               paymentStatus: 'PENDING',
             },
@@ -339,6 +352,7 @@ export async function seasonsRoutes(app: FastifyInstance) {
           no_slots: `Нет мест на старт «${err.eventTitle}». Абонемент оформляется только на все старты сразу`,
           already_registered: `Вы уже зарегистрированы на старт «${err.eventTitle}». Абонемент оформляется только на все старты сразу`,
           empty_season: 'В сезоне пока нет стартов',
+          no_season_distance: `На старт «${err.eventTitle}» абонемент пока не действует. Запишитесь на него отдельно`,
         };
         return reply.code(409).send({ error: messages[err.reason], reason: err.reason });
       }

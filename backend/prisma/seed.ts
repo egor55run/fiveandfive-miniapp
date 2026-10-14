@@ -2,6 +2,10 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// Одна дистанция на старт; сводные поля старта (distance, slotsTotal, price)
+// совпадают с ней — так же их поддерживает lib/distances.
+const FIVE_KM = { label: '5 км', slotsTotal: 2000, price: 5000, sortOrder: 0, seasonPass: true };
+
 async function main() {
   const existing = await prisma.event.count();
   if (existing > 0) {
@@ -26,6 +30,7 @@ async function main() {
             distance: '5 км',
             slotsTotal: 2000,
             price: 5000,
+            distances: { create: [FIVE_KM] },
           },
           {
             title: 'Президентский парк',
@@ -34,6 +39,7 @@ async function main() {
             distance: '5 км',
             slotsTotal: 2000,
             price: 5000,
+            distances: { create: [FIVE_KM] },
           },
           {
             title: 'Ботанический сад',
@@ -42,6 +48,7 @@ async function main() {
             distance: '5 км',
             slotsTotal: 2000,
             price: 5000,
+            distances: { create: [FIVE_KM] },
           },
           {
             title: 'Центральный парк',
@@ -50,6 +57,7 @@ async function main() {
             distance: '5 км',
             slotsTotal: 2000,
             price: 5000,
+            distances: { create: [FIVE_KM] },
           },
           {
             title: 'Триатлон Парк — финал сезона',
@@ -58,6 +66,7 @@ async function main() {
             distance: '5 км',
             slotsTotal: 2000,
             price: 5000,
+            distances: { create: [FIVE_KM] },
           },
         ],
       },

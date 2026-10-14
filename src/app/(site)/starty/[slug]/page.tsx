@@ -88,8 +88,19 @@ export default async function RacePage({ params }: Props) {
           text: s.text,
         }));
 
+  // Несколько дистанций — цена по каждой («5 км — 5 000 ₸ · 3 км — 4 000 ₸»).
+  const money = new Intl.NumberFormat(t.locale);
+  const distances = event.distances?.length
+    ? event.distances
+    : [{ id: 0, label: event.distance, price: event.price, slotsLeft: event.slotsLeft }];
+  const priceOf = (amount: number) => (PRICES_PUBLIC && amount > 0 ? r.price(money.format(amount)) : null);
   const price =
-    PRICES_PUBLIC && event.price > 0 ? r.price(new Intl.NumberFormat(t.locale).format(event.price)) : t.home.priceUnknown;
+    distances.length > 1 && distances.some((d) => priceOf(d.price))
+      ? distances.map((d) => `${d.label} — ${priceOf(d.price) ?? t.home.priceUnknown}`).join(' · ')
+      : (priceOf(distances[0].price) ?? t.home.priceUnknown);
+  const distanceText = distances
+    .map((d) => (d.slotsLeft <= 0 ? `${d.label} (мест нет)` : d.label))
+    .join(' · ');
   const tbd = <p className="race-tbd">{r.tbd}</p>;
 
   const jsonLd = raceJsonLd(event, raceDescription(event), `/starty/${event.slug}`, registrationState(event) === 'open');
@@ -120,8 +131,8 @@ export default async function RacePage({ params }: Props) {
           <dd>{parkOf(event)}</dd>
         </div>
         <div>
-          <dt>{r.facts.distance}</dt>
-          <dd>{event.distance}</dd>
+          <dt>{distances.length > 1 ? r.facts.distances : r.facts.distance}</dt>
+          <dd>{distanceText}</dd>
         </div>
         <div>
           <dt>{r.facts.cutoff}</dt>

@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { WITH_DISTANCES } from '../lib/distances';
 import type { Prisma, User } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../prisma';
@@ -101,7 +102,7 @@ export async function authRoutes(app: FastifyInstance) {
       where: { telegramId: BigInt(tg.id) },
       include: {
         registrations: {
-          include: { event: true },
+          include: { event: { include: WITH_DISTANCES }, distance: true },
           orderBy: { registeredAt: 'desc' },
         },
         // От старых к новым: на этом порядке держатся динамика времени и
@@ -144,6 +145,9 @@ export async function authRoutes(app: FastifyInstance) {
         paymentStatus: r.paymentStatus,
         qrCode: r.qrCode,
         registeredAt: r.registeredAt,
+        // Дистанция участника — для билета и профиля.
+        distanceId: r.distanceId,
+        distance: r.distance?.label ?? null,
         event: serializeEvent(r.event),
       })),
       results: user.results.map((r) => ({

@@ -28,7 +28,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
     kicker,
     title: event.title,
     lines: [`${date} · ${time}`, event.location],
-    band: `5 КМ · КОНТРОЛЬНОЕ ВРЕМЯ 1 ЧАС · ${year}`,
+    band: `${event.distance.toUpperCase()} · КОНТРОЛЬНОЕ ВРЕМЯ 1 ЧАС · ${year}`,
     maxAge: 3600,
   });
 }

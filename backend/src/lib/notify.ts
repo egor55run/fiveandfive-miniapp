@@ -125,24 +125,27 @@ function packetLine(event: Event, now: Date): string {
     : `🎒 Стартовый пакет — ${pickupDaysText(event.date)}. Возьмите документ, удостоверяющий личность.`;
 }
 
-/** Дата, время, место и дистанция — общий блок для регистрации и напоминания. */
-function whenWhereLines(event: Event): string {
+/**
+ * Дата, время, место и дистанция — общий блок для регистрации и напоминания.
+ * distance — дистанция участника; без неё — все дистанции старта.
+ */
+function whenWhereLines(event: Event, distance?: string): string {
   return [
     `📅 ${dayMonth(event.date)}, ${timeOfDay(event.date)} по Астане`,
     `📍 ${escapeHtml(event.location)}`,
-    `📏 ${escapeHtml(event.distance)}`,
+    `📏 ${escapeHtml(distance ?? event.distance)}`,
   ].join('\n');
 }
 
 // ---------- Тексты ----------
 
-export function registrationText(event: Event, now: Date = new Date()): string {
+export function registrationText(event: Event, now: Date = new Date(), distance?: string): string {
   return [
     '🏃 <b>Вы в деле!</b>',
     '',
     `Регистрация на «${escapeHtml(event.title)}» принята.`,
     '',
-    whenWhereLines(event),
+    whenWhereLines(event, distance),
     '',
     packetLine(event, now),
     '',
@@ -189,13 +192,13 @@ export function resultText(
   ].join('\n');
 }
 
-export function reminderText(event: Event, now: Date = new Date()): string {
+export function reminderText(event: Event, now: Date = new Date(), distance?: string): string {
   return [
     '⏰ <b>Старт через 3 дня</b>',
     '',
     `«${escapeHtml(event.title)}»`,
     '',
-    whenWhereLines(event),
+    whenWhereLines(event, distance),
     '',
     packetLine(event, now),
     '',

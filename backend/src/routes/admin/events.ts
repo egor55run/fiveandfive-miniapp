@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
 import { requireAdmin } from '../../plugins/adminAuth';
@@ -9,6 +10,7 @@ import {
   saveRouteImage,
 } from '../../lib/routeImages';
 import { serializeEvent } from '../events';
+import { syncEventTotals, WITH_DISTANCES } from '../../lib/distances';
 import { eventSlug, SLUG_RE, uniqueEventSlug } from '../../lib/slug';
 import {
   deleteRegulations,
@@ -20,9 +22,6 @@ const eventFields = {
   title: z.string().trim().min(1).max(200),
   date: z.coerce.date(),
   location: z.string().trim().min(1).max(200),
-  distance: z.string().trim().min(1).max(50),
-  price: z.number().min(0).max(10_000_000),
-  slotsTotal: z.number().int().min(1).max(1_000_000),
   seasonId: z.number().int().positive().nullable(),
   // null — по умолчанию за 7 дней до старта (lib/eligibility).
   registrationClosesAt: z.coerce.date().nullable(),
@@ -40,13 +39,90 @@ const eventFields = {
   program: z.string().trim().max(5000).nullable().optional(),
 };
 
+/**
+ * Дистанции старта — список целиком, в нужном порядке. Есть id — правка
+ * существующей, нет — новая; не пришедшие в списке удаляются (если на них
+ * никто не записан). seasonPass — на какую дистанцию записывает абонемент.
+ */
+const distancesField = z
+  .array(
+    z.object({
+      id: z.number().int().positive().optional(),
+      label: z.string().trim().min(1).max(50),
+      slotsTotal: z.number().int().min(1).max(1_000_000),
+      price: z.number().min(0).max(10_000_000),
+      seasonPass: z.boolean().default(false),
+    }),
+  )
+  .min(1, 'Нужна хотя бы одна дистанция')
+  .max(10)
+  .refine((list) => new Set(list.map((d) => d.label.toLowerCase())).size === list.length, {
+    message: 'Названия дистанций не должны повторяться',
+  })
+  .refine((list) => list.filter((d) => d.seasonPass).length <= 1, {
+    message: 'Абонемент может записывать только на одну дистанцию',
+  });
+
+type DistanceInput = z.infer<typeof distancesField>[number];
+
+class DistanceConflict extends Error {
+  constructor(public body: { error: string; reason: string }) {
+    super(body.reason);
+  }
+}
+
+/**
+ * Привести дистанции старта к присланному списку — в транзакции. Лимит не
+ * ниже занятых мест; удалить можно только дистанцию без живых записей.
+ */
+async function saveDistances(tx: Prisma.TransactionClient, eventId: number, list: DistanceInput[]) {
+  const current = await tx.eventDistance.findMany({ where: { eventId } });
+  const keepIds = new Set(list.filter((d) => d.id).map((d) => d.id!));
+
+  for (const d of list) {
+    if (d.id && !current.some((c) => c.id === d.id)) {
+      throw new DistanceConflict({ error: 'Дистанция не из этого старта', reason: 'bad_distance' });
+    }
+  }
+  for (const c of current.filter((c) => !keepIds.has(c.id))) {
+    const live = await tx.registration.count({
+      where: { distanceId: c.id, paymentStatus: { not: 'CANCELLED' } },
+    });
+    if (live > 0) {
+      throw new DistanceConflict({
+        error: `На дистанцию «${c.label}» записано ${live} — удалить её нельзя`,
+        reason: 'distance_in_use',
+      });
+    }
+    await tx.eventDistance.delete({ where: { id: c.id } });
+  }
+  // Сначала временные названия: иначе перестановка «5 км» ↔ «3 км» упрётся
+  // в уникальность (старт, название).
+  for (const c of current.filter((c) => keepIds.has(c.id))) {
+    await tx.eventDistance.update({ where: { id: c.id }, data: { label: `__tmp_${c.id}` } });
+  }
+  for (const [i, d] of list.entries()) {
+    const old = current.find((c) => c.id === d.id);
+    if (old && d.slotsTotal < old.slotsTaken) {
+      throw new DistanceConflict({
+        error: `На «${d.label}» занято уже ${old.slotsTaken} мест — лимит не может быть меньше`,
+        reason: 'slots_below_taken',
+      });
+    }
+    const data = { label: d.label, slotsTotal: d.slotsTotal, price: d.price, seasonPass: d.seasonPass, sortOrder: i };
+    if (old) await tx.eventDistance.update({ where: { id: old.id }, data });
+    else await tx.eventDistance.create({ data: { ...data, eventId } });
+  }
+  await syncEventTotals(tx, eventId);
+}
+
 // routeImageUrl в eventFields сознательно нет: карту ставит только загрузка
 // файла (POST /admin/events/:id/route-image), которая сама придумывает имя и
 // проверяет содержимое. Иначе в колонку можно было бы вписать любую строку —
 // и ссылку на чужой сайт, и путь мимо каталога загрузок.
-const createSchema = z.object(eventFields);
+const createSchema = z.object({ ...eventFields, distances: distancesField });
 // Правка частичная: форма присылает только изменённые поля.
-const updateSchema = z.object(eventFields).partial().refine(
+const updateSchema = z.object({ ...eventFields, distances: distancesField }).partial().refine(
   (v) => Object.keys(v).length > 0,
   { message: 'Нужно передать хотя бы одно поле' },
 );
@@ -86,7 +162,7 @@ export async function adminEventsRoutes(app: FastifyInstance) {
   app.get('/admin/events', async () => {
     const events = await prisma.event.findMany({
       orderBy: { date: 'asc' },
-      include: { season: { select: { id: true, title: true, year: true } } },
+      include: { season: { select: { id: true, title: true, year: true } }, ...WITH_DISTANCES },
     });
 
     // Разбивка по статусам одним запросом, чтобы не дёргать БД на каждый старт.
@@ -152,8 +228,22 @@ export async function adminEventsRoutes(app: FastifyInstance) {
     if (data.slug && (await slugTaken(data.slug))) return reply.code(409).send(SLUG_TAKEN);
     const slug = data.slug || (await uniqueEventSlug(eventSlug(data.title, data.date)));
 
-    const event = await prisma.event.create({
-      data: { ...data, slug, program: data.program || null },
+    const { distances, ...fields } = data;
+    const first = distances[0];
+    const event = await prisma.$transaction(async (tx) => {
+      // Сводные поля старта заполнит syncEventTotals; здесь — заглушки под NOT NULL.
+      const created = await tx.event.create({
+        data: {
+          ...fields,
+          slug,
+          program: fields.program || null,
+          distance: first.label,
+          slotsTotal: first.slotsTotal,
+          price: first.price,
+        },
+      });
+      await saveDistances(tx, created.id, distances);
+      return tx.event.findUniqueOrThrow({ where: { id: created.id }, include: WITH_DISTANCES });
     });
     return reply.code(201).send(serializeEvent(event));
   });
@@ -173,16 +263,6 @@ export async function adminEventsRoutes(app: FastifyInstance) {
 
     const event = await prisma.event.findUnique({ where: { id } });
     if (!event) return reply.code(404).send({ error: 'Старт не найден' });
-
-    // Лимит нельзя опустить ниже уже занятых мест: иначе slotsLeft в приложении
-    // станет отрицательным и участники увидят «мест нет» вместе с бронью.
-    if (data.slotsTotal !== undefined && data.slotsTotal < event.slotsTaken) {
-      return reply.code(409).send({
-        error: `Занято уже ${event.slotsTaken} мест — лимит не может быть меньше`,
-        reason: 'slots_below_taken',
-        slotsTaken: event.slotsTaken,
-      });
-    }
 
     if (data.seasonId !== undefined && data.seasonId !== null) {
       const season = await prisma.season.findUnique({ where: { id: data.seasonId } });
@@ -205,14 +285,27 @@ export async function adminEventsRoutes(app: FastifyInstance) {
       return reply.code(409).send(SLUG_TAKEN);
     }
 
-    const updated = await prisma.event.update({
-      where: { id },
-      data: {
-        ...data,
-        ...(slug !== undefined ? { slug } : {}),
-        ...(data.program !== undefined ? { program: data.program || null } : {}),
-      },
-    });
+    const { distances, ...fields } = data;
+    let updated;
+    try {
+      updated = await prisma.$transaction(async (tx) => {
+        await tx.event.update({
+          where: { id },
+          data: {
+            ...fields,
+            ...(slug !== undefined ? { slug } : {}),
+            ...(fields.program !== undefined ? { program: fields.program || null } : {}),
+          },
+        });
+        // Лимит дистанции нельзя опустить ниже занятых мест — иначе «мест
+        // нет» вместе с бронью; проверка внутри saveDistances.
+        if (distances) await saveDistances(tx, id, distances);
+        return tx.event.findUniqueOrThrow({ where: { id }, include: WITH_DISTANCES });
+      });
+    } catch (err) {
+      if (err instanceof DistanceConflict) return reply.code(409).send(err.body);
+      throw err;
+    }
     return serializeEvent(updated);
   });
 
@@ -286,6 +379,7 @@ export async function adminEventsRoutes(app: FastifyInstance) {
     const updated = await prisma.event.update({
       where: { id },
       data: { routeImageUrl: saved.url },
+      include: WITH_DISTANCES,
     });
     await deleteRouteImage(event.routeImageUrl);
 
@@ -307,6 +401,7 @@ export async function adminEventsRoutes(app: FastifyInstance) {
     const updated = await prisma.event.update({
       where: { id },
       data: { routeImageUrl: null },
+      include: WITH_DISTANCES,
     });
     await deleteRouteImage(event.routeImageUrl);
 
@@ -358,7 +453,11 @@ export async function adminEventsRoutes(app: FastifyInstance) {
       }
       throw err;
     }
-    const updated = await prisma.event.update({ where: { id }, data: { regulationsUrl: url } });
+    const updated = await prisma.event.update({
+      where: { id },
+      data: { regulationsUrl: url },
+      include: WITH_DISTANCES,
+    });
     await deleteRegulations(event.regulationsUrl);
     req.log.info({ eventId: id, url, bytes: buffer.length }, 'Положение загружено');
     return serializeEvent(updated);
@@ -370,7 +469,11 @@ export async function adminEventsRoutes(app: FastifyInstance) {
     if (id === null) return reply.code(400).send({ error: 'Некорректный id' });
     const event = await prisma.event.findUnique({ where: { id } });
     if (!event) return reply.code(404).send({ error: 'Старт не найден' });
-    const updated = await prisma.event.update({ where: { id }, data: { regulationsUrl: null } });
+    const updated = await prisma.event.update({
+      where: { id },
+      data: { regulationsUrl: null },
+      include: WITH_DISTANCES,
+    });
     await deleteRegulations(event.regulationsUrl);
     req.log.info({ eventId: id }, 'Положение убрано');
     return serializeEvent(updated);

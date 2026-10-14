@@ -95,6 +95,16 @@ export type SeasonOption = {
   isActive: boolean;
 };
 
+export type AdminDistance = {
+  id: number;
+  label: string;
+  slotsTotal: number;
+  slotsTaken: number;
+  slotsLeft: number;
+  price: number;
+  seasonPass: boolean;
+};
+
 export type AdminEvent = {
   id: number;
   title: string;
@@ -105,6 +115,8 @@ export type AdminEvent = {
   slotsTaken: number;
   slotsLeft: number;
   price: number;
+  /** Дистанции; distance / slots* / price выше — сводка по ним. */
+  distances: AdminDistance[];
   /** Путь к загруженной карте трассы относительно корня API, или null. */
   routeImageUrl: string | null;
   /** Адрес страницы на сайте: /starty/<slug>. */
@@ -126,9 +138,14 @@ export type EventInput = {
   title: string;
   date: string; // ISO
   location: string;
-  distance: string;
-  price: number;
-  slotsTotal: number;
+  /** Дистанции целиком, в нужном порядке: с id — правка, без — новая. */
+  distances: {
+    id?: number;
+    label: string;
+    slotsTotal: number;
+    price: number;
+    seasonPass: boolean;
+  }[];
   seasonId: number | null;
   /** ISO или null — по умолчанию за 7 дней до старта. */
   registrationClosesAt: string | null;
@@ -253,11 +270,17 @@ export type Participant = {
   phone: string | null;
   email: string | null;
   age: number | null;
+  gender: 'MALE' | 'FEMALE' | null;
+  /** yyyy-mm-dd или null. */
+  birthDate: string | null;
   /** Полных лет на день этого старта; null — дата рождения неизвестна. */
   ageOnStart: number | null;
   telegramId: string | null;
   username: string | null;
   paymentStatus: PaymentStatus;
+  distanceId: number | null;
+  /** Название дистанции участника («5 км»). */
+  distance: string | null;
   qrCode: string | null;
   seasonPassId: number | null;
   registeredAt: string;
@@ -266,6 +289,7 @@ export type Participant = {
 
 export type ParticipantsResponse = {
   event: { id: number; title: string; date: string };
+  distances: AdminDistance[];
   participants: Participant[];
 };
 

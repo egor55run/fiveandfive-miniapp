@@ -16,6 +16,7 @@ import {
 } from '../lib/eligibility';
 import { ageProfileFields, parseBirthDate } from '../lib/birthDate';
 import { deliver, registrationText } from '../lib/notify';
+import { claimDistanceSlot, pickDistance, releaseDistanceSlot } from '../lib/distances';
 import {
   apiPayConfigured,
   findActivePayment,
@@ -40,6 +41,8 @@ import { serializeUser } from './auth';
 // Остальные поля Telegram не выдаёт, поэтому их по-прежнему спрашиваем формой.
 const bodySchema = z.object({
   eventId: z.number().int().positive(),
+  // Дистанция старта. Нет — первая по порядку (старое приложение до дистанций).
+  distanceId: z.number().int().positive().optional(),
   firstName: personNameField('firstName'),
   lastName: personNameField('lastName'),
   email: emailField,
@@ -61,7 +64,7 @@ class RegistrationBlocked extends Error {
 }
 
 const BLOCKED_MESSAGES: Record<RegistrationBlocked['reason'], string> = {
-  no_slots: 'Мест на этот старт больше нет',
+  no_slots: 'Мест на эту дистанцию больше нет',
   already_registered: 'Вы уже зарегистрированы на этот старт',
   in_season_pass:
     'Этот старт входит в ваш неоплаченный абонемент — оплатите абонемент или дождитесь, пока счёт истечёт',
@@ -101,7 +104,13 @@ export async function registrationsRoutes(app: FastifyInstance) {
         return reply.code(404).send({ error: 'Event not found' });
       }
 
-      const price = Math.round(Number(event.price));
+      const distance = await pickDistance(prisma, event.id, data.distanceId);
+      if (!distance) {
+        return reply.code(400).send({ error: 'Выберите дистанцию', reason: 'no_distance' });
+      }
+
+      // Цена — у дистанции: 5 км и 3 км могут стоить по-разному.
+      const price = Math.round(Number(distance.price));
       const paid = price > 0 && apiPayConfigured();
       const kaspiPhone = normalizeKzPhone(data.phone);
       if (paid && !kaspiPhone) {
@@ -163,24 +172,28 @@ export async function registrationsRoutes(app: FastifyInstance) {
           if (existing.seasonPassId !== null) throw new RegistrationBlocked('in_season_pass');
           // Без оплаты PENDING — это и есть «зарегистрирован».
           if (!paid) throw new RegistrationBlocked('already_registered');
-          return existing; // место уже за участником
+          if (existing.distanceId === distance.id) return existing; // место уже за участником
+          // Пока не оплатил, передумал с дистанцией: занимаем новое место,
+          // старое отпускаем. Счёт ниже выставится заново — сумма другая.
+          if (!(await claimDistanceSlot(tx, distance.id))) throw new RegistrationBlocked('no_slots');
+          if (existing.distanceId) await releaseDistanceSlot(tx, existing.distanceId);
+          return tx.registration.update({
+            where: { id: existing.id },
+            data: { distanceId: distance.id },
+          });
         }
 
         // Новое место: условный инкремент, чтобы двое не заняли последнее.
-        const taken = await tx.event.updateMany({
-          where: { id: event.id, slotsTaken: { lt: event.slotsTotal } },
-          data: { slotsTaken: { increment: 1 } },
-        });
-        if (taken.count === 0) throw new RegistrationBlocked('no_slots');
+        if (!(await claimDistanceSlot(tx, distance.id))) throw new RegistrationBlocked('no_slots');
 
         if (existing) {
           return tx.registration.update({
             where: { id: existing.id },
-            data: { paymentStatus: 'PENDING', seasonPassId: null },
+            data: { paymentStatus: 'PENDING', seasonPassId: null, distanceId: distance.id },
           });
         }
         const created = await tx.registration.create({
-          data: { userId: user.id, eventId: event.id, paymentStatus: 'PENDING' },
+          data: { userId: user.id, eventId: event.id, distanceId: distance.id, paymentStatus: 'PENDING' },
         });
         // Stub QR — later this becomes a real ticket/QR URL.
         return tx.registration.update({
@@ -224,7 +237,7 @@ export async function registrationsRoutes(app: FastifyInstance) {
           telegramId: user.telegramId,
           eventId: event.id,
           kind: 'REGISTERED',
-          text: registrationText(event),
+          text: registrationText(event, new Date(), distance.label),
           log: req.log,
         });
         return reply.code(201).send({
@@ -245,7 +258,7 @@ export async function registrationsRoutes(app: FastifyInstance) {
               target,
               amount: price,
               phone: kaspiPhone!,
-              description: invoiceDescription(event.title),
+              description: invoiceDescription(`${event.title}, ${distance.label}`),
               clientName: `${data.lastName} ${data.firstName}`,
               log: req.log,
             });

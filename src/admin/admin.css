@@ -501,3 +501,49 @@ select:focus {
   padding: 8px 10px;
   resize: vertical;
 }
+
+/* Редактор дистанций в форме старта. */
+.ad-dist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+}
+
+.ad-dist legend {
+  padding: 0 4px;
+  font-weight: 600;
+}
+
+.ad-dist__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ad-dist__table th {
+  text-align: left;
+  font-weight: 500;
+  font-size: 13px;
+  opacity: 0.75;
+  padding: 0 6px 4px 0;
+}
+
+.ad-dist__table td {
+  padding: 3px 6px 3px 0;
+  vertical-align: top;
+}
+
+.ad-dist__table input[type='number'] {
+  width: 110px;
+}
+
+.ad-dist__center {
+  text-align: center;
+}
+
+.ad-dist__actions {
+  white-space: nowrap;
+}

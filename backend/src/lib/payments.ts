@@ -1,4 +1,5 @@
 import type { Payment, PaymentState, Prisma } from '@prisma/client';
+import { claimDistanceSlot, distanceIdOf, releaseDistanceSlot } from './distances';
 import { prisma } from '../prisma';
 import {
   ApiPayError,
@@ -370,11 +371,8 @@ async function confirmRegistration(tx: Prisma.TransactionClient, registrationId:
   if (reg.paymentStatus === 'PAID') return true;
 
   if (reg.paymentStatus === 'CANCELLED') {
-    const taken = await tx.event.updateMany({
-      where: { id: reg.eventId, slotsTaken: { lt: reg.event.slotsTotal } },
-      data: { slotsTaken: { increment: 1 } },
-    });
-    if (taken.count === 0) return false;
+    const distanceId = await distanceIdOf(tx, reg);
+    if (!distanceId || !(await claimDistanceSlot(tx, distanceId))) return false;
   }
 
   await tx.registration.update({
@@ -391,7 +389,7 @@ async function notifyPaid(payment: Payment, log: Logger): Promise<void> {
   if (payment.purpose === 'REGISTRATION') {
     const reg = await prisma.registration.findUnique({
       where: { id: payment.registrationId! },
-      include: { event: true },
+      include: { event: true, distance: true },
     });
     if (!reg || reg.paymentStatus !== 'PAID') return;
     await deliver({
@@ -399,7 +397,7 @@ async function notifyPaid(payment: Payment, log: Logger): Promise<void> {
       telegramId: user.telegramId,
       eventId: reg.eventId,
       kind: 'REGISTERED',
-      text: registrationText(reg.event),
+      text: registrationText(reg.event, new Date(), reg.distance?.label),
       log,
     });
     return;
@@ -471,10 +469,8 @@ async function releaseTarget(tx: Prisma.TransactionClient, target: PaymentTarget
       data: { paymentStatus: 'CANCELLED' },
     });
     if (cancelled.count === 1) {
-      await tx.event.update({
-        where: { id: r.eventId },
-        data: { slotsTaken: { decrement: 1 } },
-      });
+      const distanceId = await distanceIdOf(tx, r);
+      if (distanceId) await releaseDistanceSlot(tx, distanceId);
       released += 1;
     }
   }

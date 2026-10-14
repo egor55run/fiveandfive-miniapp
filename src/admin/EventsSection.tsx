@@ -20,13 +20,24 @@ import {
 } from './api';
 import { formatDate, formatDateTime, priceFmt, toDateTimeLocal } from './helpers';
 
+/** Строка редактора дистанций: числа — строками, как в полях ввода. */
+type DistanceRow = {
+  id?: number;
+  label: string;
+  slotsTotal: string;
+  price: string;
+  seasonPass: boolean;
+  /** Сколько уже занято — лимит не ниже, удалить нельзя, если > 0. */
+  slotsTaken: number;
+};
+
+const NEW_DISTANCE: DistanceRow = { label: '', slotsTotal: '1000', price: '5000', seasonPass: false, slotsTaken: 0 };
+
 type FormState = {
   title: string;
   date: string; // datetime-local
   location: string;
-  distance: string;
-  price: string;
-  slotsTotal: string;
+  distances: DistanceRow[];
   seasonId: string; // '' = без сезона
   closesAt: string; // datetime-local; '' = за 7 дней до старта
   slug: string; // '' = составит сервер
@@ -37,9 +48,7 @@ const EMPTY_FORM: FormState = {
   title: '',
   date: '',
   location: '',
-  distance: '5 км',
-  price: '5000',
-  slotsTotal: '2000',
+  distances: [{ label: '5 км', slotsTotal: '2000', price: '5000', seasonPass: true, slotsTaken: 0 }],
   seasonId: '',
   closesAt: '',
   slug: '',
@@ -50,13 +59,21 @@ function toInput(form: FormState): EventInput | string {
   if (!form.title.trim()) return 'Укажите название';
   if (!form.date) return 'Укажите дату и время';
   if (!form.location.trim()) return 'Укажите локацию';
-  if (!form.distance.trim()) return 'Укажите дистанцию';
-
-  const price = Number(form.price);
-  if (!Number.isFinite(price) || price < 0) return 'Некорректная цена';
-
-  const slotsTotal = Number(form.slotsTotal);
-  if (!Number.isInteger(slotsTotal) || slotsTotal < 1) return 'Некорректный лимит слотов';
+  if (form.distances.length === 0) return 'Нужна хотя бы одна дистанция';
+  const distances = [];
+  for (const d of form.distances) {
+    const label = d.label.trim();
+    if (!label) return 'Укажите название каждой дистанции';
+    const price = Number(d.price);
+    if (!Number.isFinite(price) || price < 0) return `Некорректная цена у «${label}»`;
+    const slotsTotal = Number(d.slotsTotal);
+    if (!Number.isInteger(slotsTotal) || slotsTotal < 1) return `Некорректный лимит у «${label}»`;
+    if (slotsTotal < d.slotsTaken) return `На «${label}» занято ${d.slotsTaken} — лимит не может быть меньше`;
+    distances.push({ ...(d.id ? { id: d.id } : {}), label, slotsTotal, price, seasonPass: d.seasonPass });
+  }
+  if (new Set(distances.map((d) => d.label.toLowerCase())).size !== distances.length) {
+    return 'Названия дистанций не должны повторяться';
+  }
   if (form.closesAt && new Date(form.closesAt) > new Date(form.date)) {
     return 'Регистрация должна закрываться не позже старта';
   }
@@ -71,9 +88,7 @@ function toInput(form: FormState): EventInput | string {
     // toISOString переводит в UTC, бэкенд хранит в UTC.
     date: new Date(form.date).toISOString(),
     location: form.location.trim(),
-    distance: form.distance.trim(),
-    price,
-    slotsTotal,
+    distances,
     seasonId: form.seasonId === '' ? null : Number(form.seasonId),
     registrationClosesAt: form.closesAt ? new Date(form.closesAt).toISOString() : null,
     slug: form.slug.trim().toLowerCase() || null,
@@ -217,9 +232,14 @@ export default function EventsSection() {
       title: event.title,
       date: toDateTimeLocal(event.date),
       location: event.location,
-      distance: event.distance,
-      price: String(event.price),
-      slotsTotal: String(event.slotsTotal),
+      distances: event.distances.map((d) => ({
+        id: d.id,
+        label: d.label,
+        slotsTotal: String(d.slotsTotal),
+        price: String(d.price),
+        seasonPass: d.seasonPass,
+        slotsTaken: d.slotsTaken,
+      })),
       seasonId: event.season ? String(event.season.id) : '',
       closesAt: event.registrationClosesAtCustom
         ? toDateTimeLocal(event.registrationClosesAtCustom)
@@ -338,8 +358,31 @@ export default function EventsSection() {
     }
   };
 
-  const field = (key: keyof FormState, value: string) =>
+  const field = (key: Exclude<keyof FormState, 'distances'>, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  // Редактор дистанций: правка строки, перестановка, удаление, «для абонемента».
+  const setDistance = (i: number, patch: Partial<DistanceRow>) =>
+    setForm((prev) => ({
+      ...prev,
+      distances: prev.distances.map((d, j) => {
+        if (j === i) return { ...d, ...patch };
+        // Абонемент записывает только на одну дистанцию старта.
+        return patch.seasonPass ? { ...d, seasonPass: false } : d;
+      }),
+    }));
+  const moveDistance = (i: number, dir: -1 | 1) =>
+    setForm((prev) => {
+      const list = [...prev.distances];
+      const j = i + dir;
+      if (j < 0 || j >= list.length) return prev;
+      [list[i], list[j]] = [list[j], list[i]];
+      return { ...prev, distances: list };
+    });
+  const removeDistance = (i: number) =>
+    setForm((prev) => ({ ...prev, distances: prev.distances.filter((_, j) => j !== i) }));
+  const addDistance = () =>
+    setForm((prev) => ({ ...prev, distances: [...prev.distances, { ...NEW_DISTANCE }] }));
 
   // Что показать в превью: выбранный файл важнее сохранённой карты, а помеченная
   // на удаление карта не показывается вовсе — форма показывает будущее состояние.
@@ -415,32 +458,92 @@ export default function EventsSection() {
                 placeholder="Парк Астана, Астана"
               />
             </label>
-            <label>
-              <span>Дистанция</span>
-              <input
-                value={form.distance}
-                onChange={(e) => field('distance', e.target.value)}
-                placeholder="5 км"
-              />
-            </label>
-            <label>
-              <span>Цена, ₸</span>
-              <input
-                type="number"
-                min="0"
-                value={form.price}
-                onChange={(e) => field('price', e.target.value)}
-              />
-            </label>
-            <label>
-              <span>Лимит слотов</span>
-              <input
-                type="number"
-                min="1"
-                value={form.slotsTotal}
-                onChange={(e) => field('slotsTotal', e.target.value)}
-              />
-            </label>
+            <fieldset className="ad-form__wide ad-dist">
+              <legend>Дистанции</legend>
+              <table className="ad-dist__table">
+                <thead>
+                  <tr>
+                    <th>Название</th>
+                    <th>Лимит</th>
+                    <th>Цена, ₸</th>
+                    <th title="На эту дистанцию записывает абонемент сезона">Абонемент</th>
+                    <th aria-label="Действия" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {form.distances.map((d, i) => (
+                    <tr key={d.id ?? `new-${i}`}>
+                      <td>
+                        <input
+                          value={d.label}
+                          placeholder="5 км"
+                          aria-label="Название дистанции"
+                          onChange={(e) => setDistance(i, { label: e.target.value })}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          min={Math.max(1, d.slotsTaken)}
+                          value={d.slotsTotal}
+                          aria-label="Лимит слотов"
+                          onChange={(e) => setDistance(i, { slotsTotal: e.target.value })}
+                        />
+                        {d.slotsTaken > 0 && <span className="ad-hint ad-hint--dim">занято {d.slotsTaken}</span>}
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          min="0"
+                          value={d.price}
+                          aria-label="Цена"
+                          onChange={(e) => setDistance(i, { price: e.target.value })}
+                        />
+                      </td>
+                      <td className="ad-dist__center">
+                        <input
+                          type="radio"
+                          name="season-distance"
+                          checked={d.seasonPass}
+                          aria-label={`Абонемент записывает на ${d.label || 'эту дистанцию'}`}
+                          onChange={() => setDistance(i, { seasonPass: true })}
+                        />
+                      </td>
+                      <td className="ad-dist__actions">
+                        <button type="button" className="ad-btn ad-btn--sm" disabled={i === 0} onClick={() => moveDistance(i, -1)} aria-label="Выше">
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          className="ad-btn ad-btn--sm"
+                          disabled={i === form.distances.length - 1}
+                          onClick={() => moveDistance(i, 1)}
+                          aria-label="Ниже"
+                        >
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          className="ad-btn ad-btn--sm ad-btn--danger"
+                          disabled={form.distances.length === 1 || d.slotsTaken > 0}
+                          title={d.slotsTaken > 0 ? 'На дистанцию уже записаны' : undefined}
+                          onClick={() => removeDistance(i)}
+                        >
+                          Удалить
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <button type="button" className="ad-btn" onClick={addDistance} disabled={form.distances.length >= 10}>
+                + Дистанция
+              </button>
+              <span className="ad-hint ad-hint--dim">
+                Порядок — как участник увидит в приложении. Абонемент сезона записывает на отмеченную
+                дистанцию; без отметки абонемент на этот старт не оформить.
+              </span>
+            </fieldset>
             <label>
               <span>Сезон</span>
               <select
@@ -618,7 +721,10 @@ export default function EventsSection() {
                   </td>
                   <td>{e.location}</td>
                   <td>{e.distance}</td>
-                  <td className="num">{priceFmt.format(e.price)} ₸</td>
+                  <td className="num">
+                    {e.distances.length > 1 ? 'от ' : ''}
+                    {priceFmt.format(e.price)} ₸
+                  </td>
                   <td className="num">
                     {e.slotsTaken} / {e.slotsTotal}
                   </td>
