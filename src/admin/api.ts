@@ -259,6 +259,35 @@ export async function uploadRegulations(eventId: number, file: File): Promise<Ad
 export const deleteRegulations = (eventId: number) =>
   request<AdminEvent>(`/admin/events/${eventId}/regulations`, { method: 'DELETE' });
 
+// ---------- Сообщение о новом старте ----------
+
+export type AnnouncementRun = {
+  running: boolean;
+  total: number;
+  done: number;
+  sent: number;
+  blocked: number;
+  failed: number;
+  startedAt: string | null;
+  finishedAt: string | null;
+};
+
+export type AnnouncementInfo = {
+  /** Текст сообщения — HTML Telegram (собирает сервер). */
+  text: string;
+  button: { text: string };
+  stats: { audience: number; pending: number; sent: number; blocked: number; failed: number };
+  run: AnnouncementRun | null;
+  /** Старт уже прошёл — рассылка недоступна. */
+  started: boolean;
+};
+
+export const getAnnouncement = (eventId: number) =>
+  request<AnnouncementInfo>(`/admin/events/${eventId}/announcement`);
+
+export const startAnnouncement = (eventId: number) =>
+  request<{ run: AnnouncementRun }>(`/admin/events/${eventId}/announcement`, { method: 'POST', body: {} });
+
 // ---------- Участники ----------
 
 export type PaymentStatus = 'PENDING' | 'PAID' | 'CANCELLED';

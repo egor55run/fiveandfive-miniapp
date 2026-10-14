@@ -4,6 +4,7 @@ import { prisma } from '../prisma';
 import { appUrl, subscribe, unsubscribe } from '../lib/openingSubscribers';
 import { registrationOpen } from '../lib/registrationWindow';
 import { answerCallbackQuery, sendMessage, type InlineButton } from '../lib/telegramBot';
+import { stopBotContact, touchBotContact } from '../lib/raceAnnouncements';
 
 /**
  * Входящие сообщения боту (вебхук Telegram, этап 2 сайта).
@@ -38,7 +39,8 @@ const WELCOME_TEXT = [
 ].join('\n');
 
 const UNSUBSCRIBED_TEXT =
-  'Хорошо, больше не напишем об открытии регистрации. Передумаете — нажмите /start.';
+  'Хорошо, больше не будем присылать новости 5&amp;5 — ни об открытии регистрации, ни о новых стартах. ' +
+  'Сообщения о ваших регистрациях придут как обычно. Передумаете — нажмите /start.';
 
 const appButton = (slug?: string): InlineButton => ({
   text: 'Открыть приложение',
@@ -86,6 +88,8 @@ async function handleStart(chatId: number, from: TgUser, payload: string | undef
 async function handleUpdate(update: Update, log: FastifyBaseLogger) {
   const cb = update.callback_query;
   if (cb) {
+    // Нажал кнопку бота — значит, писать ему можно (аудитория «новый старт»).
+    await touchBotContact(cb.from, { start: cb.data === 'notify' });
     if (cb.data === 'notify') {
       if (registrationOpen()) {
         await answerCallbackQuery(cb.id, 'Регистрация уже открыта!');
@@ -107,6 +111,9 @@ async function handleUpdate(update: Update, log: FastifyBaseLogger) {
   if (!msg?.from || msg.chat.type !== 'private') return;
   const text = msg.text?.trim() ?? '';
   const [command, payload] = text.split(/\s+/, 2);
+  // Каждый, кто пишет боту, — в списке тех, кому можно писать первыми.
+  // /start возвращает в рассылки после /stop, остальное — только отмечает.
+  if (command !== '/stop') await touchBotContact(msg.from, { start: command === '/start' });
 
   if (command === '/start') {
     await handleStart(msg.chat.id, msg.from, payload);
@@ -117,6 +124,7 @@ async function handleUpdate(update: Update, log: FastifyBaseLogger) {
   }
   if (command === '/stop') {
     await unsubscribe(msg.from.id);
+    await stopBotContact(msg.from.id);
     await sendMessage(String(msg.chat.id), UNSUBSCRIBED_TEXT);
     return;
   }

@@ -16,6 +16,7 @@ import {
 } from './api';
 import { formatDate, formatDateTime, priceFmt, toDateTimeLocal } from './helpers';
 import RouteMapsEditor from './RouteMapsEditor';
+import AnnounceRace from './AnnounceRace';
 
 /** Строка редактора дистанций: числа — строками, как в полях ввода. */
 type DistanceRow = {
@@ -93,6 +94,11 @@ function toInput(form: FormState): EventInput | string {
   };
 }
 
+/** Старт ещё впереди — о нём можно сообщить в боте. */
+function isUpcoming(iso: string): boolean {
+  return Date.parse(iso) > Date.now();
+}
+
 export default function EventsSection() {
   const [events, setEvents] = useState<AdminEvent[]>([]);
   const [seasons, setSeasons] = useState<SeasonOption[]>([]);
@@ -104,6 +110,8 @@ export default function EventsSection() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [formOpen, setFormOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  // «Сообщить о новом старте» — панель над списком.
+  const [announcing, setAnnouncing] = useState<AdminEvent | null>(null);
 
   // Положение (PDF) — так же отдельным запросом и так же по «Сохранить».
   const [regFile, setRegFile] = useState<File | null>(null);
@@ -319,6 +327,8 @@ export default function EventsSection() {
 
       {error && <p className="ad-msg ad-msg--error">{error}</p>}
       {notice && <p className="ad-msg ad-msg--ok">{notice}</p>}
+
+      {announcing && <AnnounceRace key={announcing.id} event={announcing} onClose={() => setAnnouncing(null)} />}
 
       {formOpen && (
         <div className="ad-card">
@@ -636,6 +646,16 @@ export default function EventsSection() {
                     <button type="button" className="ad-btn ad-btn--sm" onClick={() => openEdit(e)}>
                       Правка
                     </button>
+                    {isUpcoming(e.date) && (
+                      <button
+                        type="button"
+                        className="ad-btn ad-btn--sm"
+                        title="Разослать в бот сообщение о старте"
+                        onClick={() => setAnnouncing(e)}
+                      >
+                        Сообщить
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="ad-btn ad-btn--sm ad-btn--danger"

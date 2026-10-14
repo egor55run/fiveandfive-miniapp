@@ -94,9 +94,10 @@ model Event {
   regulationsUrl       String?   @map("regulations_url")
   createdAt            DateTime  @default(now()) @map("created_at")
 
-  season        Season?         @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+  season        Season?            @relation(fields: [seasonId], references: [id], onDelete: SetNull)
   distances     EventDistance[]
   routeMaps     RouteMap[]
+  announcements RaceAnnouncement[]
   registrations Registration[]
   results       Result[]
   notifications Notification[]
@@ -409,4 +410,37 @@ model OpeningSubscriber {
   notifyError    String?   @map("notify_error")
 
   @@map("opening_subscribers")
+}
+
+/// Кто писал боту (/start, кнопка, любое сообщение) — им можно писать первыми.
+/// Аудитория рассылки «новый старт». /stop — отписка от всех рассылок бота,
+/// повторный /start возвращает. blockedAt — бот заблокирован (узнали при
+/// отправке): больше не пишем, пока человек сам не напишет боту.
+model BotContact {
+  id          Int       @id @default(autoincrement())
+  telegramId  BigInt    @unique @map("telegram_id")
+  firstName   String?   @map("first_name")
+  username    String?
+  firstSeenAt DateTime  @default(now()) @map("first_seen_at")
+  lastSeenAt  DateTime  @default(now()) @map("last_seen_at")
+  stoppedAt   DateTime? @map("stopped_at")
+  blockedAt   DateTime? @map("blocked_at")
+
+  @@map("bot_contacts")
+}
+
+/// Сообщение «новый старт» человеку — одно на старт: строка на пару
+/// (старт, получатель). FAILED повторяется при следующем запуске рассылки.
+model RaceAnnouncement {
+  id         Int      @id @default(autoincrement())
+  eventId    Int      @map("event_id")
+  telegramId BigInt   @map("telegram_id")
+  status     String // SENT / BLOCKED / FAILED
+  error      String?
+  sentAt     DateTime @default(now()) @map("sent_at")
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, telegramId])
+  @@map("race_announcements")
 }

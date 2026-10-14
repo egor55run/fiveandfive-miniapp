@@ -580,3 +580,43 @@ select:focus {
 .ad-maps__actions {
   white-space: nowrap;
 }
+
+/* «Сообщить о новом старте» (AnnounceRace). */
+.ad-announce__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ad-announce__head h3 {
+  margin: 0;
+}
+
+/* Сообщение — как пузырь в Telegram, с кнопкой под ним. */
+.ad-announce__preview {
+  max-width: 380px;
+  margin: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ad-announce__bubble {
+  padding: 10px 12px;
+  background: #2b5278;
+  color: #fff;
+  border-radius: 12px 12px 12px 4px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.ad-announce__button {
+  padding: 8px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(43, 82, 120, 0.7);
+  border-radius: 8px;
+}
