@@ -27,7 +27,6 @@ function Header({ onBack }: Props) {
     if (!hasBack) return;
     const hide = showTelegramBackButton(() => latest.current?.());
     // Нативная кнопка показана — свою не рисуем (синхронизация с Telegram).
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNative(Boolean(hide));
     return () => hide?.();
   }, [hasBack]);
