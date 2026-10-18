@@ -11,6 +11,7 @@ import {
 } from '../lib/registrationWindow';
 import { KASPI_PHONE_ERROR, normalizeKzPhone } from '../lib/apipay';
 import { recordConsents } from '../lib/legal';
+import { INVOICE_LIMIT_MESSAGE, hasActiveInvoice, invoiceLimitReached } from '../lib/invoiceLimit';
 import {
   checkAge,
   REGISTRATION_DEADLINE_MESSAGE,
@@ -24,6 +25,7 @@ import {
   findActivePayment,
   invoiceDescription,
   serializePayment,
+  isInvoiceLimitFailure,
   startPayment,
 } from '../lib/payments';
 import {
@@ -138,7 +140,7 @@ export async function registrationsRoutes(app: FastifyInstance) {
       const birthDate = data.birthDate ? parseBirthDate(data.birthDate) : null;
       const known = await prisma.user.findUnique({
         where: { telegramId },
-        select: { birthDate: true },
+        select: { id: true, birthDate: true },
       });
       const age = checkAge(
         birthDate ?? known?.birthDate ?? null,
@@ -146,6 +148,11 @@ export async function registrationsRoutes(app: FastifyInstance) {
         data.consents.parent === true,
       );
       if (!age.ok) return reply.code(400).send(age.body);
+      // Дневной лимит счетов Kaspi выбран — отказ до того, как занять место
+      // (lib/invoiceLimit). Если счёт у человека уже ждёт — пропускаем.
+      if (paid && (await invoiceLimitReached()) && !(known && (await hasActiveInvoice(known.id)))) {
+        return reply.code(503).send({ error: INVOICE_LIMIT_MESSAGE, reason: 'payment_busy' });
+      }
       const profile = {
         firstName: data.firstName,
         lastName: data.lastName,
@@ -275,9 +282,10 @@ export async function registrationsRoutes(app: FastifyInstance) {
             });
 
       if (!['PENDING', 'CREATED', 'PAID'].includes(payment.state)) {
-        return reply.code(502).send({
+        const limited = isInvoiceLimitFailure(payment);
+        return reply.code(limited ? 503 : 502).send({
           error: serializePayment(payment).message,
-          reason: 'payment_failed',
+          reason: limited ? 'payment_busy' : 'payment_failed',
           payment: serializePayment(payment),
         });
       }

@@ -13,6 +13,7 @@ import {
 import { ageProfileFields, parseBirthDate } from '../lib/birthDate';
 import { KASPI_PHONE_ERROR, normalizeKzPhone } from '../lib/apipay';
 import { recordConsents } from '../lib/legal';
+import { INVOICE_LIMIT_MESSAGE, hasActiveInvoice, invoiceLimitReached } from '../lib/invoiceLimit';
 import { checkAge, registrationDeadlinePassed } from '../lib/eligibility';
 import { deliver, seasonPassText } from '../lib/notify';
 import {
@@ -20,6 +21,7 @@ import {
   findActivePayment,
   invoiceDescription,
   serializePayment,
+  isInvoiceLimitFailure,
   startPayment,
 } from '../lib/payments';
 import {
@@ -204,6 +206,14 @@ export async function seasonsRoutes(app: FastifyInstance) {
       if (!age.ok) return reply.code(400).send(age.body);
       minor = age.minor;
     }
+    // Дневной лимит счетов Kaspi выбран — отказ до того, как занять места
+    // (lib/invoiceLimit). Если счёт у человека уже ждёт — пропускаем.
+    if (paid && (await invoiceLimitReached())) {
+      const me = await prisma.user.findUnique({ where: { telegramId }, select: { id: true } });
+      if (!(me && (await hasActiveInvoice(me.id)))) {
+        return reply.code(503).send({ error: INVOICE_LIMIT_MESSAGE, reason: 'payment_busy' });
+      }
+    }
 
     try {
       const result = await prisma.$transaction(async (tx) => {
@@ -373,9 +383,10 @@ export async function seasonsRoutes(app: FastifyInstance) {
             });
 
       if (!['PENDING', 'CREATED', 'PAID'].includes(payment.state)) {
-        return reply.code(502).send({
+        const limited = isInvoiceLimitFailure(payment);
+        return reply.code(limited ? 503 : 502).send({
           error: serializePayment(payment).message,
-          reason: 'payment_failed',
+          reason: limited ? 'payment_busy' : 'payment_failed',
           payment: serializePayment(payment),
         });
       }

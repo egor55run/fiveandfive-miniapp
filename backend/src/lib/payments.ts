@@ -12,6 +12,14 @@ import {
   type ApiPayInvoice,
 } from './apipay';
 import { deliver, registrationText, seasonPassText } from './notify';
+import {
+  INVOICE_LIMIT_ERROR,
+  INVOICE_LIMIT_MESSAGE,
+  checkInvoiceAlerts,
+  dailyInvoiceLimit,
+  invoicesToday,
+  isLimitError,
+} from './invoiceLimit';
 
 /**
  * Оплата регистраций через Kaspi (ApiPay).
@@ -93,6 +101,7 @@ export function serializePayment(p: Payment): PaymentDto {
 function userMessage(p: Payment): string | null {
   switch (p.state) {
     case 'FAILED':
+      if (isInvoiceLimitFailure(p)) return INVOICE_LIMIT_MESSAGE;
       return 'Не удалось выставить счёт в Kaspi. Проверьте, что номер привязан к Kaspi, и попробуйте ещё раз';
     case 'CANCELLED':
       return 'Счёт отменён. Чтобы занять место, зарегистрируйтесь ещё раз';
@@ -101,6 +110,11 @@ function userMessage(p: Payment): string | null {
     default:
       return null;
   }
+}
+
+/** Счёт не выставлен из-за дневного лимита — роут отвечает 503 «попробуйте позже». */
+export function isInvoiceLimitFailure(p: Payment): boolean {
+  return p.state === 'FAILED' && Boolean(p.error?.startsWith(INVOICE_LIMIT_ERROR));
 }
 
 // ---------- Выставление счёта ----------
@@ -169,6 +183,16 @@ export async function startPayment(input: StartPaymentInput): Promise<Payment> {
     },
   });
 
+  // Роут проверил лимит до того, как занять место; здесь — на случай
+  // одновременных запросов (этот платёж уже в счёте как CREATED).
+  if ((await invoicesToday()) > dailyInvoiceLimit()) {
+    log.warn({ paymentId: payment.id }, 'Дневной лимит счетов Kaspi выбран');
+    await prisma.payment.update({ where: { id: payment.id }, data: { error: INVOICE_LIMIT_ERROR } });
+    await finishUnpaid(payment.id, 'FAILED', log);
+    void checkInvoiceAlerts(log);
+    return (await prisma.payment.findUnique({ where: { id: payment.id } }))!;
+  }
+
   let invoice: ApiPayInvoice;
   try {
     invoice = await createInvoice({
@@ -184,11 +208,14 @@ export async function startPayment(input: StartPaymentInput): Promise<Payment> {
     // external_order_id (см. applyInvoice) и вернёт место.
     const message = err instanceof ApiPayError ? `${err.code ?? err.status}: ${err.message}` : String(err);
     log.error({ paymentId: payment.id, err: message }, 'Не удалось выставить счёт Kaspi');
+    // Лимит тарифа у ApiPay — человеку «попробуйте позже», владельцу — сообщение.
+    const limited = isLimitError(err);
     await prisma.payment.update({
       where: { id: payment.id },
-      data: { error: message.slice(0, 500) },
+      data: { error: (limited ? `${INVOICE_LIMIT_ERROR} ${message}` : message).slice(0, 500) },
     });
     await finishUnpaid(payment.id, 'FAILED', log);
+    if (limited) void checkInvoiceAlerts(log, { apiPayLimit: true });
     return (await prisma.payment.findUnique({ where: { id: payment.id } }))!;
   }
 
@@ -208,6 +235,7 @@ export async function startPayment(input: StartPaymentInput): Promise<Payment> {
     { paymentId: payment.id, invoiceId: invoice.id, status: invoice.status, sandbox: invoice.is_sandbox },
     'Счёт Kaspi выставлен',
   );
+  void checkInvoiceAlerts(log);
 
   if (state === 'PAID') return (await markPaid(updated.id, invoice, log)) ?? updated;
   if (state !== 'PENDING') {
