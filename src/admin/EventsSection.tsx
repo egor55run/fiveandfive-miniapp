@@ -41,6 +41,7 @@ type FormState = {
   closesAt: string; // datetime-local; '' = за 7 дней до старта
   slug: string; // '' = составит сервер
   program: string;
+  packetPickup: string; // '' = «[время и место уточняются]»
 };
 
 const EMPTY_FORM: FormState = {
@@ -52,6 +53,7 @@ const EMPTY_FORM: FormState = {
   closesAt: '',
   slug: '',
   program: '',
+  packetPickup: '',
 };
 
 function toInput(form: FormState): EventInput | string {
@@ -92,6 +94,7 @@ function toInput(form: FormState): EventInput | string {
     registrationClosesAt: form.closesAt ? new Date(form.closesAt).toISOString() : null,
     slug: form.slug.trim().toLowerCase() || null,
     program: form.program.trim() || null,
+    packetPickupInfo: form.packetPickup.trim() || null,
   };
 }
 
@@ -196,6 +199,7 @@ export default function EventsSection() {
         : '',
       slug: event.slug ?? '',
       program: event.program ?? '',
+      packetPickup: event.packetPickupInfo ?? '',
     });
     setFormOpen(true);
     setError(null);
@@ -494,12 +498,25 @@ export default function EventsSection() {
               </select>
             </label>
             <label className="ad-form__wide">
+              <span>Выдача стартовых пакетов: время и место</span>
+              <input
+                value={form.packetPickup}
+                onChange={(e) => field('packetPickup', e.target.value)}
+                placeholder="например: ТРЦ «Керуен», 2 этаж, 12:00–20:00"
+                maxLength={300}
+              />
+              <span className="ad-hint ad-hint--dim">
+                Основная выдача — за 2 и за 1 день до старта (даты подставятся сами). Пусто — «[время и место
+                уточняются]». В день старта — иногородним, за 2 часа до старта и до часа до старта.
+              </span>
+            </label>
+            <label className="ad-form__wide">
               <span>Программа дня</span>
               <textarea
                 rows={5}
                 value={form.program}
                 onChange={(e) => field('program', e.target.value)}
-                placeholder={'По строке на пункт:\n07:00 — выдача стартовых пакетов\n08:00 — старт'}
+                placeholder={'По строке на пункт:\n07:30 — камера хранения\n09:00 — старт'}
               />
               <span className="ad-hint ad-hint--dim">Показывается на странице старта на сайте</span>
             </label>

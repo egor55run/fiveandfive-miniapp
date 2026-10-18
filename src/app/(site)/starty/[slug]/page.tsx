@@ -70,6 +70,16 @@ export default async function RacePage({ params }: Props) {
   const dateFmt = new Intl.DateTimeFormat(t.locale, { weekday: 'long', day: 'numeric', month: 'long', timeZone: TZ });
   const timeFmt = new Intl.DateTimeFormat(t.locale, { hour: 'numeric', minute: '2-digit', timeZone: TZ });
   const at = (minutes: number) => timeFmt.format(new Date(start + minutes * 60_000));
+  // «11 и 12 июня» (на стыке месяцев — «31 июля и 1 августа»).
+  const dayOnly = new Intl.DateTimeFormat(t.locale, { day: 'numeric', timeZone: TZ });
+  const dayMonthFmt = new Intl.DateTimeFormat(t.locale, { day: 'numeric', month: 'long', timeZone: TZ });
+  const monthOnly = new Intl.DateTimeFormat(t.locale, { month: 'long', timeZone: TZ });
+  const d1 = new Date(start - 2 * 86_400_000);
+  const d2 = new Date(start - 86_400_000);
+  const pickupDays =
+    monthOnly.format(d1) === monthOnly.format(d2)
+      ? `${dayOnly.format(d1)} и ${dayMonthFmt.format(d2)}`
+      : `${dayMonthFmt.format(d1)} и ${dayMonthFmt.format(d2)}`;
 
   // «ЭТАП 2» / «ФИНАЛ» — по месту в календаре сезона.
   const list = events ?? [];
@@ -172,6 +182,10 @@ export default async function RacePage({ params }: Props) {
         <Block title={r.venue}>{tbd}</Block>
 
         <Block title={r.pack}>
+          {/* Основная выдача — за 2 и за 1 день; в день старта — иногородним. */}
+          <p>{r.packMain(pickupDays, event.packetPickupInfo?.trim() || r.pickupTbd)}</p>
+          <p>{r.packRaceDay(at(-120), at(-60))}</p>
+          <p>{r.packDocument}</p>
           <p className="race-tbd">{r.packText}</p>
         </Block>
 

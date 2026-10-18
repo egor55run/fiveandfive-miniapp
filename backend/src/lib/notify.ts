@@ -93,9 +93,26 @@ export function shiftDays(date: Date, days: number): Date {
 }
 
 /**
- * Дни выдачи стартового пакета: два календарных дня перед стартом.
- * Правило фиксированное (старт минус 2 и минус 1), поля в БД для него не нужно.
+ * Выдача стартовых пакетов (решение пользователя 2026-10-18):
+ *  - основная — за 2 и за 1 день до старта; время и место — поле старта
+ *    в админке (packetPickupInfo), пока не задано — «[время и место уточняются]»;
+ *  - в день старта — только для иногородних, за 2 часа до старта и до часа
+ *    до старта (при старте в 9:00 — 7:00–8:00). Никаких проверок в форме:
+ *    так просто пишем в текстах.
  */
+export const PICKUP_TBD = '[время и место уточняются]';
+
+/** Время и место основной выдачи — из админки или «уточняются». */
+export function pickupPlace(event: { packetPickupInfo?: string | null }): string {
+  return event.packetPickupInfo?.trim() || PICKUP_TBD;
+}
+
+/** «с 07:00 до 08:00» — выдача в день старта (для иногородних). */
+export function raceDayPickupText(eventDate: Date): string {
+  return `с ${timeOfDay(shiftDays(eventDate, -2 / 24))} до ${timeOfDay(shiftDays(eventDate, -1 / 24))}`;
+}
+
+/** Дни основной выдачи: старт минус 2 и минус 1 день. */
 export function packetPickupDays(eventDate: Date): { first: Date; second: Date } {
   return { first: shiftDays(eventDate, -2), second: shiftDays(eventDate, -1) };
 }
@@ -113,16 +130,15 @@ export function pickupDaysText(eventDate: Date): string {
 }
 
 /**
- * Строка про стартовый пакет. Выдача идёт два календарных дня перед стартом и
- * заканчивается в полночь дня старта — если этот момент уже прошёл, конкретные
- * даты называть нельзя (человек записался слишком поздно), и остаётся отправить
- * его к организатору.
+ * Строка про стартовый пакет. Основная выдача — за 2 и за 1 день до старта;
+ * когда она уже прошла (день старта), остаётся только выдача для иногородних.
  */
 function packetLine(event: Event, now: Date): string {
+  const raceDay = `Иногородним — в день старта ${raceDayPickupText(event.date)}.`;
   const pickupOver = now.getTime() >= startOfDayInTz(event.date).getTime();
   return pickupOver
-    ? '🎒 По выдаче стартового пакета свяжитесь с организатором.'
-    : `🎒 Стартовый пакет — ${pickupDaysText(event.date)}. Возьмите документ, удостоверяющий личность.`;
+    ? `🎒 Основная выдача стартовых пакетов уже прошла. ${raceDay}`
+    : `🎒 Стартовый пакет — ${pickupDaysText(event.date)}, ${escapeHtml(pickupPlace(event))}. ${raceDay} Возьмите документ, удостоверяющий личность.`;
 }
 
 /**
@@ -166,7 +182,7 @@ export function seasonPassText(events: Event[]): string {
     '',
     list,
     '',
-    'О каждом напомним за 3 дня и подскажем даты выдачи стартового пакета — её проводят за два дня до старта.',
+    'О каждом напомним заранее. Стартовые пакеты выдаём за 2 и за 1 день до старта, иногородним — ещё и в день старта, утром.',
   ].join('\n');
 }
 

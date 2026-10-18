@@ -45,6 +45,8 @@ export type EventDto = {
   program?: string | null;
   /** Положение (PDF), путь относительно корня API — через apiAsset. */
   regulationsUrl?: string | null;
+  /** Время и место основной выдачи стартовых пакетов; null — «уточняются». */
+  packetPickupInfo?: string | null;
   /**
    * Можно ли записаться. Сервер закрывает регистрацию, пока не включена оплата
    * (или вручную, REGISTRATION_OPEN=false). Нет поля — старый сервер, открыто.

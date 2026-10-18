@@ -34,8 +34,10 @@ const eventFields = {
     .refine((v) => v === '' || SLUG_RE.test(v), 'Только латиница, цифры и дефис')
     .nullable()
     .optional(),
-  // Программа дня — по строке на пункт («07:00 — выдача пакетов»).
+  // Программа дня — по строке на пункт («07:00 — старт»).
   program: z.string().trim().max(5000).nullable().optional(),
+  // Время и место основной выдачи стартовых пакетов (за 2 и за 1 день).
+  packetPickupInfo: z.string().trim().max(300).nullable().optional(),
 };
 
 /**
@@ -303,6 +305,7 @@ export async function adminEventsRoutes(app: FastifyInstance) {
           ...fields,
           slug,
           program: fields.program || null,
+          packetPickupInfo: fields.packetPickupInfo || null,
           distance: first.label,
           slotsTotal: first.slotsTotal,
           price: first.price,
@@ -361,6 +364,7 @@ export async function adminEventsRoutes(app: FastifyInstance) {
             ...fields,
             ...(slug !== undefined ? { slug } : {}),
             ...(fields.program !== undefined ? { program: fields.program || null } : {}),
+            ...(fields.packetPickupInfo !== undefined ? { packetPickupInfo: fields.packetPickupInfo || null } : {}),
           },
         });
         // Лимит дистанции нельзя опустить ниже занятых мест — иначе «мест

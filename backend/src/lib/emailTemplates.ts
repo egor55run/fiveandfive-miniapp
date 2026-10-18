@@ -1,6 +1,6 @@
 import type { Event } from '@prisma/client';
 import type { EmailMessage } from './email';
-import { dayMonth, timeOfDay } from './notify';
+import { dayMonth, pickupDaysText, pickupPlace, raceDayPickupText, timeOfDay } from './notify';
 
 /**
  * Письма участникам: регистрация (и оплата), абонемент, напоминание накануне.
@@ -110,6 +110,11 @@ function plain(lines: (string | null | false)[]): string {
 
 const hello = (firstName: string | null) => (firstName ? `Здравствуйте, ${firstName}!` : 'Здравствуйте!');
 
+/** «11 и 12 июня — <где/когда>. Иногородним — в день старта с 07:00 до 08:00. Возьмите документ…» */
+function pickupLine(e: Event): string {
+  return `${pickupDaysText(e.date)} — ${pickupPlace(e)}. Иногородним — в день старта ${raceDayPickupText(e.date)}. Возьмите документ, удостоверяющий личность.`;
+}
+
 /** Регистрация на старт принята (и, если был счёт, — оплата получена). */
 export function registrationEmail(p: {
   firstName: string | null;
@@ -129,9 +134,10 @@ export function registrationEmail(p: {
       blocks: [
         { kind: 'p', html: `Вы зарегистрированы на забег <b>«${esc(p.event.title)}»</b>.${paid ? ` ${esc(paid)}` : ''}` },
         { kind: 'facts', rows },
+        { kind: 'p', html: `<b>Стартовый пакет.</b> ${esc(pickupLine(p.event))}` },
         {
           kind: 'p',
-          html: 'Номер участника и все детали — в Telegram-приложении 5&amp;5. Туда же придёт напоминание накануне старта. За стартовым пакетом возьмите документ, удостоверяющий личность.',
+          html: 'Номер участника и все детали — в Telegram-приложении 5&amp;5. Туда же придёт напоминание накануне старта.',
         },
       ],
       button: { text: 'Страница старта', url: raceUrl(p.event) },
@@ -144,8 +150,9 @@ export function registrationEmail(p: {
       '',
       ...rows.map(([k, v]) => `${k}: ${v}`),
       '',
+      `Стартовый пакет. ${pickupLine(p.event)}`,
+      '',
       'Номер участника и все детали — в Telegram-приложении 5&5. Туда же придёт напоминание накануне старта.',
-      'За стартовым пакетом возьмите документ, удостоверяющий личность.',
       '',
       `Страница старта: ${raceUrl(p.event)}`,
     ]),
@@ -168,7 +175,10 @@ export function seasonPassEmail(p: { firstName: string | null; events: Event[]; 
           html: `Вы зарегистрированы на все старты сезона${p.distance ? `, дистанция ${esc(p.distance)}` : ''}.${paid ? ` ${esc(paid)}` : ''}`,
         },
         { kind: 'list', items: races.map(esc) },
-        { kind: 'p', html: 'Перед каждым стартом пришлём напоминание. Номер участника и детали — в Telegram-приложении 5&amp;5.' },
+        {
+          kind: 'p',
+          html: 'Стартовые пакеты выдаём за 2 и за 1 день до каждого старта (время и место — на странице старта), иногородним — ещё и в день старта, утром. Перед каждым стартом пришлём напоминание.',
+        },
       ],
       button: { text: 'Все старты', url: `${APP_URL}/#starty` },
     }),
@@ -180,6 +190,7 @@ export function seasonPassEmail(p: { firstName: string | null; events: Event[]; 
       '',
       ...races,
       '',
+      'Стартовые пакеты выдаём за 2 и за 1 день до каждого старта (время и место — на странице старта), иногородним — ещё и в день старта, утром.',
       'Перед каждым стартом пришлём напоминание. Номер участника и детали — в Telegram-приложении 5&5.',
     ]),
   };
@@ -193,7 +204,8 @@ export function dayBeforeEmail(p: { firstName: string | null; event: Event; dist
   const e = p.event;
   const rows = facts(e, p.distance);
   const plan = [
-    `${at(e, -90)}–${at(e, -20)} — выдача стартовых пакетов, камера хранения`,
+    `${at(e, -120)}–${at(e, -60)} — выдача стартовых пакетов, только для иногородних`,
+    `${at(e, -90)}–${at(e, -20)} — камера хранения`,
     `${at(e, -20)}–${at(e, -5)} — общая разминка`,
     `${at(e, 0)} — старт`,
     `${at(e, 60)} — закрытие финиша (контрольное время 1 час)`,
@@ -212,6 +224,10 @@ export function dayBeforeEmail(p: { firstName: string | null; event: Event; dist
       blocks: [
         { kind: 'p', html: `Напоминаем: завтра забег <b>«${esc(e.title)}»</b>.` },
         { kind: 'facts', rows },
+        {
+          kind: 'p',
+          html: `<b>Стартовый пакет — сегодня</b>, последний день основной выдачи: ${esc(pickupPlace(e))}. Иногородним — завтра ${esc(raceDayPickupText(e.date))}.`,
+        },
         { kind: 'p', html: '<b>Программа</b>' },
         { kind: 'list', items: plan.map(esc) },
         { kind: 'p', html: '<b>Что взять</b>' },
@@ -226,6 +242,8 @@ export function dayBeforeEmail(p: { firstName: string | null; event: Event; dist
       `Напоминаем: завтра забег «${e.title}».`,
       '',
       ...rows.map(([k, v]) => `${k}: ${v}`),
+      '',
+      `Стартовый пакет — сегодня, последний день основной выдачи: ${pickupPlace(e)}. Иногородним — завтра ${raceDayPickupText(e.date)}.`,
       '',
       'Программа:',
       ...plan.map((l) => `— ${l}`),
@@ -250,7 +268,7 @@ export function dayBeforeTelegram(e: Event, distance?: string | null): string {
     `📍 ${escHtml(e.location)}`,
     `📏 ${escHtml(distance ?? e.distance)}`,
     '',
-    `🎒 Стартовые пакеты — с ${at(e, -90)} до ${at(e, -20)}. Возьмите документ, удостоверяющий личность.`,
+    `🎒 Стартовый пакет — сегодня, последний день основной выдачи: ${escHtml(pickupPlace(e))}. Иногородним — завтра ${raceDayPickupText(e.date)}. Возьмите документ, удостоверяющий личность.`,
     '',
     'До встречи на старте!',
   ].join('\n');

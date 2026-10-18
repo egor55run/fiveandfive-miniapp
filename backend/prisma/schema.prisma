@@ -96,6 +96,9 @@ model Event {
   /// Положение о забеге — PDF, загруженный в админке: путь вида
   /// «/uploads/regulations/event-1-a3f9c1d2.pdf» (как у карты трассы).
   regulationsUrl       String?   @map("regulations_url")
+  /// Где и когда основная выдача стартовых пакетов (за 2 и за 1 день до
+  /// старта) — текст из админки. null — «[время и место уточняются]».
+  packetPickupInfo     String?   @map("packet_pickup_info")
   createdAt            DateTime  @default(now()) @map("created_at")
 
   season        Season?             @relation(fields: [seasonId], references: [id], onDelete: SetNull)

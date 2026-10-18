@@ -36,6 +36,8 @@ export function serializeEvent(e: Event & { distances?: EventDistance[]; routeMa
     // Программа дня и Положение (путь к PDF относительно корня API, как карта).
     program: e.program,
     regulationsUrl: e.regulationsUrl,
+    // Время и место основной выдачи стартовых пакетов; null — «уточняются».
+    packetPickupInfo: e.packetPickupInfo,
     registrationOpen: registrationOpen(),
     // Срок регистрации на этот старт (заданный в админке или за 7 дней до
     // старта) и прошёл ли он — с ним запись закрыта для всех, включая админов.

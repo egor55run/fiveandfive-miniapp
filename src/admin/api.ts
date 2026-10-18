@@ -137,6 +137,8 @@ export type AdminEvent = {
   /** Адрес страницы на сайте: /starty/<slug>. */
   slug: string | null;
   program: string | null;
+  /** Время и место основной выдачи пакетов; null — «уточняются». */
+  packetPickupInfo: string | null;
   /** Путь к PDF Положения относительно корня API, или null. */
   regulationsUrl: string | null;
   /** Когда закрывается регистрация — итоговая дата (заданная или за 7 дней до старта). */
@@ -168,6 +170,7 @@ export type EventInput = {
   /** null — сервер составит из названия и года. */
   slug: string | null;
   program: string | null;
+  packetPickupInfo: string | null;
 };
 
 export const getSeasons = () => request<SeasonOption[]>('/admin/seasons');
