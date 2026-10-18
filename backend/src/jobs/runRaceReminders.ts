@@ -13,13 +13,15 @@
  *   pm2 restart fiveandfive-reminders            — прогон на сервере
  */
 import { prisma } from '../prisma';
-import { jobLog, sendRaceReminders } from './raceReminders';
+import { jobLog, sendDayBeforeReminders, sendRaceReminders } from './raceReminders';
 
 async function main() {
   const started = Date.now();
   try {
     const stats = await sendRaceReminders();
-    jobLog.info({ ...stats, ms: Date.now() - started }, 'Напоминания: готово');
+    jobLog.info({ ...stats, ms: Date.now() - started }, 'Напоминания за 3 дня: готово');
+    const dayBefore = await sendDayBeforeReminders();
+    jobLog.info({ ...dayBefore, ms: Date.now() - started }, 'Напоминания накануне: готово');
   } finally {
     // Процесс одноразовый: держать пул открытым незачем, иначе pm2 будет
     // считать приложение живым и cron не сработает повторно.

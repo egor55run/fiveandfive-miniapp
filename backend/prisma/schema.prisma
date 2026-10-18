@@ -43,6 +43,7 @@ model User {
   results       Result[]
   seasonPasses  SeasonPass[]
   notifications Notification[]
+  emails        EmailNotification[]
   payments      Payment[]
   consents      Consent[]
 
@@ -97,13 +98,14 @@ model Event {
   regulationsUrl       String?   @map("regulations_url")
   createdAt            DateTime  @default(now()) @map("created_at")
 
-  season        Season?            @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+  season        Season?             @relation(fields: [seasonId], references: [id], onDelete: SetNull)
   distances     EventDistance[]
   routeMaps     RouteMap[]
   announcements RaceAnnouncement[]
   registrations Registration[]
   results       Result[]
   notifications Notification[]
+  emails        EmailNotification[]
 
   @@map("events")
 }
@@ -222,6 +224,8 @@ model Result {
 enum NotificationKind {
   /// Регистрация на один старт принята.
   REGISTERED
+  /// Напоминание накануне старта (Telegram и письмо).
+  RACE_DAY_BEFORE
   /// Оформлен абонемент на сезон — одно сообщение на все старты.
   SEASON_PASS
   /// Организатор внёс результат.
@@ -265,6 +269,29 @@ model Notification {
 
   @@unique([userId, eventId, kind])
   @@map("notifications")
+}
+
+/// Письма участникам (Yandex Cloud Postbox, lib/email). Те же события, что
+/// у бота: регистрация/оплата, абонемент, напоминание накануне. Одно письмо на
+/// событие: SENT повторно не отправляется, FAILED — пробуем ещё раз.
+model EmailNotification {
+  id        Int              @id @default(autoincrement())
+  userId    Int              @map("user_id")
+  /// null — у абонемента (письмо про сезон целиком) и у тестовых писем.
+  eventId   Int?             @map("event_id")
+  kind      NotificationKind
+  /// Кому ушло — адрес мог поменяться с тех пор.
+  to        String
+  status    String // SENT / FAILED / SKIPPED
+  error     String?
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([userId, eventId, kind])
+  @@map("email_notifications")
 }
 
 /// Сессия администратора в /admin. Пароля в системе нет: личность подтверждает

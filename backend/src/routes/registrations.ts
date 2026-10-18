@@ -1,4 +1,6 @@
 import type { FastifyInstance } from 'fastify';
+import { deliverEmail } from '../lib/email';
+import { registrationEmail } from '../lib/emailTemplates';
 import type { Prisma, Registration } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../prisma';
@@ -238,6 +240,15 @@ export async function registrationsRoutes(app: FastifyInstance) {
           eventId: event.id,
           kind: 'REGISTERED',
           text: registrationText(event, new Date(), distance.label),
+          log: req.log,
+        });
+        // То же — письмом (lib/email; на проде выключено, пока не решит юрист).
+        await deliverEmail({
+          userId: user.id,
+          eventId: event.id,
+          kind: 'REGISTERED',
+          to: user.email,
+          message: registrationEmail({ firstName: user.firstName, event, distance: distance.label }),
           log: req.log,
         });
         return reply.code(201).send({

@@ -1,5 +1,5 @@
 /**
- * Напоминания за 3 дня до старта — сама рассылка.
+ * Напоминания: за 3 дня до старта (Telegram) и накануне (Telegram + письмо).
  *
  * Здесь только логика, без запуска: точка входа — jobs/runRaceReminders.ts.
  * Модуль, который что-то делает при импорте, нельзя ни протестировать, ни
@@ -11,6 +11,8 @@
  * такой участник помечен BLOCKED, и следующий прогон его пропустит.
  */
 import { prisma } from '../prisma';
+import { deliverEmail } from '../lib/email';
+import { dayBeforeEmail, dayBeforeTelegram } from '../lib/emailTemplates';
 import {
   deliver,
   reminderText,
@@ -125,5 +127,65 @@ export async function sendRaceReminders(
     }
   }
 
+  return stats;
+}
+
+export type DayBeforeStats = { events: number; telegram: Record<string, number>; email: Record<string, number> };
+
+/**
+ * Накануне старта: участникам завтрашних стартов — сообщение в Telegram и
+ * письмо (решение пользователя 2026-10-18). Те же правила: отменённые не в
+ * счёт, повторный прогон не дублирует (журналы notifications и
+ * email_notifications).
+ */
+export async function sendDayBeforeReminders(now: Date = new Date(), log = jobLog): Promise<DayBeforeStats> {
+  const from = startOfDayInTz(shiftDays(now, 1));
+  const to = shiftDays(from, 1);
+  const events = await prisma.event.findMany({
+    where: { date: { gte: from, lt: to } },
+    include: {
+      registrations: {
+        where: { paymentStatus: { not: 'CANCELLED' } },
+        include: { user: true, distance: true },
+      },
+    },
+  });
+  const stats: DayBeforeStats = { events: events.length, telegram: {}, email: {} };
+  const bump = (bucket: Record<string, number>, key: string) => (bucket[key] = (bucket[key] ?? 0) + 1);
+
+  for (const event of events) {
+    const done = await prisma.notification.findMany({
+      where: { eventId: event.id, kind: 'RACE_DAY_BEFORE', status: { in: ['SENT', 'BLOCKED'] } },
+      select: { userId: true },
+    });
+    const doneIds = new Set(done.map((n) => n.userId));
+    for (const r of event.registrations) {
+      const label = r.distance?.label;
+      if (doneIds.has(r.userId)) bump(stats.telegram, 'ALREADY');
+      else
+        bump(
+          stats.telegram,
+          await deliver({
+            userId: r.userId,
+            telegramId: r.user.telegramId,
+            eventId: event.id,
+            kind: 'RACE_DAY_BEFORE',
+            text: dayBeforeTelegram(event, label),
+            log,
+          }),
+        );
+      bump(
+        stats.email,
+        await deliverEmail({
+          userId: r.userId,
+          eventId: event.id,
+          kind: 'RACE_DAY_BEFORE',
+          to: r.user.email,
+          message: dayBeforeEmail({ firstName: r.user.firstName, event, distance: label }),
+          log,
+        }),
+      );
+    }
+  }
   return stats;
 }

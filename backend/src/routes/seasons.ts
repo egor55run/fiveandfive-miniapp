@@ -1,4 +1,6 @@
 import type { FastifyInstance } from 'fastify';
+import { deliverEmail } from '../lib/email';
+import { seasonPassEmail } from '../lib/emailTemplates';
 import { EVENT_DETAILS } from '../lib/eventDetails';
 import type { Event, SeasonPass, User } from '@prisma/client';
 import { z } from 'zod';
@@ -337,6 +339,14 @@ export async function seasonsRoutes(app: FastifyInstance) {
           eventId: null,
           kind: 'SEASON_PASS',
           text: seasonPassText(result.events),
+          log: req.log,
+        });
+        await deliverEmail({
+          userId: result.user.id,
+          eventId: null,
+          kind: 'SEASON_PASS',
+          to: result.user.email,
+          message: seasonPassEmail({ firstName: result.user.firstName, events: result.events }),
           log: req.log,
         });
         return reply.code(201).send({

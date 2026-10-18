@@ -1,4 +1,6 @@
 import type { Payment, PaymentState, Prisma } from '@prisma/client';
+import { deliverEmail } from './email';
+import { registrationEmail, seasonPassEmail } from './emailTemplates';
 import { claimDistanceSlot, distanceIdOf, releaseDistanceSlot } from './distances';
 import { prisma } from '../prisma';
 import {
@@ -400,12 +402,26 @@ async function notifyPaid(payment: Payment, log: Logger): Promise<void> {
       text: registrationText(reg.event, new Date(), reg.distance?.label),
       log,
     });
+    await deliverEmail({
+      userId: user.id,
+      eventId: reg.eventId,
+      kind: 'REGISTERED',
+      to: user.email,
+      message: registrationEmail({
+        firstName: user.firstName,
+        event: reg.event,
+        distance: reg.distance?.label,
+        paidAmount: Number(payment.amount),
+      }),
+      log,
+    });
     return;
   }
 
   const regs = await prisma.registration.findMany({
     where: { seasonPassId: payment.seasonPassId!, paymentStatus: 'PAID' },
-    include: { event: true },
+    include: { event: true, distance: true },
+    orderBy: { event: { date: 'asc' } },
   });
   if (regs.length === 0) return;
   await deliver({
@@ -414,6 +430,19 @@ async function notifyPaid(payment: Payment, log: Logger): Promise<void> {
     eventId: null,
     kind: 'SEASON_PASS',
     text: seasonPassText(regs.map((r) => r.event)),
+    log,
+  });
+  await deliverEmail({
+    userId: user.id,
+    eventId: null,
+    kind: 'SEASON_PASS',
+    to: user.email,
+    message: seasonPassEmail({
+      firstName: user.firstName,
+      events: regs.map((r) => r.event),
+      distance: regs[0]?.distance?.label,
+      paidAmount: Number(payment.amount),
+    }),
     log,
   });
 }
