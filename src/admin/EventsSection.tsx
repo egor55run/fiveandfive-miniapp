@@ -17,6 +17,7 @@ import {
 import { formatDate, formatDateTime, priceFmt, toDateTimeLocal } from './helpers';
 import RouteMapsEditor from './RouteMapsEditor';
 import AnnounceRace from './AnnounceRace';
+import SeasonPassCard from './SeasonPassCard';
 
 /** Строка редактора дистанций: числа — строками, как в полях ввода. */
 type DistanceRow = {
@@ -329,6 +330,16 @@ export default function EventsSection() {
       {notice && <p className="ad-msg ad-msg--ok">{notice}</p>}
 
       {announcing && <AnnounceRace key={announcing.id} event={announcing} onClose={() => setAnnouncing(null)} />}
+
+      {seasons
+        .filter((s) => s.isActive)
+        .map((s) => (
+          <SeasonPassCard
+            key={s.id}
+            season={s}
+            onSaved={(saved) => setSeasons((prev) => prev.map((x) => (x.id === saved.id ? saved : x)))}
+          />
+        ))}
 
       {formOpen && (
         <div className="ad-card">

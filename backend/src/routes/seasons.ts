@@ -30,6 +30,7 @@ import {
   personNameField,
 } from '../lib/validation';
 import { serializeEvent } from './events';
+import { SEASON_PASS_MESSAGES, seasonPassBlock, seasonSalesClosesAt, seasonSalesOpen } from '../lib/seasonPass';
 import { claimDistanceSlot, seasonDistanceOf } from '../lib/distances';
 import { requireTelegramAuth, tgUserOf } from '../plugins/telegramAuth';
 import { serializeUser } from './auth';
@@ -102,8 +103,31 @@ export async function seasonsRoutes(app: FastifyInstance) {
       price,
       // Экономия против покупки всех стартов по отдельности (не меньше 0).
       savings: Math.max(0, eventsTotal - price),
+      // Продажа абонемента: до этой даты (заданной в админке или вместе с
+      // регистрацией на первый старт) и открыта ли сейчас.
+      salesClosesAt: seasonSalesClosesAt(season, season.events),
+      salesOpen: seasonSalesOpen(season, season.events),
       events: season.events.map(serializeEvent),
     };
+  });
+
+  /**
+   * GET /season-passes/eligibility — можно ли текущему участнику купить
+   * абонемент активного сезона (lib/seasonPass). Приложение по ответу
+   * показывает кнопку абонемента неактивной с причиной; решает всё равно
+   * POST /season-passes.
+   */
+  app.get('/season-passes/eligibility', { preHandler: requireTelegramAuth }, async (req) => {
+    const season = await prisma.season.findFirst({
+      where: { isActive: true },
+      include: { events: { select: { id: true, date: true, registrationClosesAt: true } } },
+      orderBy: { year: 'desc' },
+    });
+    if (!season) return { available: false, reason: 'no_season', message: 'Абонементов сейчас нет' };
+    const reason = await seasonPassBlock(season, season.events, BigInt(tgUserOf(req).id));
+    return reason
+      ? { available: false, reason, message: SEASON_PASS_MESSAGES[reason] }
+      : { available: true, reason: null, message: null };
   });
 
   // POST /season-passes — оформить абонемент на весь сезон и выставить ОДИН счёт.
@@ -150,6 +174,13 @@ export async function seasonsRoutes(app: FastifyInstance) {
       where: { seasonId: season.id },
       orderBy: { date: 'asc' },
     });
+    // Правила продажи (lib/seasonPass): срок продажи и «только до регистрации
+    // на отдельные старты». Неоплаченный истёкший счёт к этому моменту уже
+    // отменён вместе с записями — он не мешает.
+    const block = await seasonPassBlock(season, seasonEvents, telegramId);
+    if (block) {
+      return reply.code(409).send({ error: SEASON_PASS_MESSAGES[block], reason: block });
+    }
     const closedEvent = seasonEvents.find((e) => registrationDeadlinePassed(e));
     if (closedEvent) {
       return reply.code(409).send({
@@ -351,7 +382,7 @@ export async function seasonsRoutes(app: FastifyInstance) {
         const messages: Record<SeasonPassBlocked['reason'], string> = {
           already_has_pass: 'У вас уже есть абонемент на этот сезон',
           no_slots: `Нет мест на старт «${err.eventTitle}». Абонемент оформляется только на все старты сразу`,
-          already_registered: `Вы уже зарегистрированы на старт «${err.eventTitle}». Абонемент оформляется только на все старты сразу`,
+          already_registered: SEASON_PASS_MESSAGES.has_registrations,
           empty_season: 'В сезоне пока нет стартов',
           no_season_distance: `На старт «${err.eventTitle}» абонемент пока не действует. Запишитесь на него отдельно`,
         };

@@ -97,7 +97,16 @@ export type SeasonOption = {
   year: number;
   price: number;
   isActive: boolean;
+  /** Как задано в админке; null — вместе с регистрацией на первый старт. */
+  salesClosesAtCustom: string | null;
+  /** Итоговая дата закрытия продажи абонемента. */
+  salesClosesAt: string | null;
+  salesOpen: boolean;
+  firstEventDate: string | null;
 };
+
+export const updateSeason = (id: number, body: { price?: number; salesClosesAt?: string | null }) =>
+  request<SeasonOption>(`/admin/seasons/${id}`, { method: 'PATCH', body });
 
 export type AdminDistance = {
   id: number;

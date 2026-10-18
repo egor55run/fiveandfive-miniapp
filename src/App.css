@@ -1844,3 +1844,9 @@ select.rfield__input {
     transition: none;
   }
 }
+
+/* Абонемент недоступен этому участнику — видно, но не нажать (с причиной). */
+.upsell--off {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

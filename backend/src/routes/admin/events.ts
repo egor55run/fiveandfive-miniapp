@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { EVENT_DETAILS } from '../../lib/eventDetails';
-import type { Prisma } from '@prisma/client';
+import type { Prisma, Season } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
 import { requireAdmin } from '../../plugins/adminAuth';
@@ -8,6 +8,8 @@ import { MAX_ROUTE_IMAGE_BYTES, RouteImageError, saveRouteImage } from '../../li
 import { deleteRouteFileIfUnused, MAX_ROUTE_MAPS, syncFirstRouteMap } from '../../lib/routeMaps';
 import { serializeEvent } from '../events';
 import { syncEventTotals } from '../../lib/distances';
+import { seasonSalesClosesAt, seasonSalesOpen } from '../../lib/seasonPass';
+import { diffFields, writeAudit } from '../../lib/audit';
 import { eventSlug, SLUG_RE, uniqueEventSlug } from '../../lib/slug';
 import {
   deleteRegulations,
@@ -141,18 +143,82 @@ function parseId(raw: string): number | null {
 export async function adminEventsRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAdmin);
 
-  /** GET /admin/seasons — для селекта «привязка к сезону» в форме старта. */
+  const serializeSeason = (
+    s: Season & { events: { id: number; date: Date; registrationClosesAt: Date | null }[] },
+  ) => ({
+    id: s.id,
+    title: s.title,
+    year: s.year,
+    price: Number(s.price),
+    isActive: s.isActive,
+    // Как задано в админке; null — вместе с регистрацией на первый старт.
+    salesClosesAtCustom: s.salesClosesAt,
+    // Итоговая дата закрытия продажи и открыта ли она сейчас.
+    salesClosesAt: seasonSalesClosesAt(s, s.events),
+    salesOpen: seasonSalesOpen(s, s.events),
+    firstEventDate: s.events.length
+      ? s.events.map((e) => e.date).sort((a, b) => a.getTime() - b.getTime())[0]
+      : null,
+  });
+  const SEASON_EVENTS = { events: { select: { id: true, date: true, registrationClosesAt: true } } } as const;
+
+  /** GET /admin/seasons — сезоны: для селекта в форме старта и карточки абонемента. */
   app.get('/admin/seasons', async () => {
     const seasons = await prisma.season.findMany({
       orderBy: [{ year: 'desc' }, { id: 'desc' }],
+      include: SEASON_EVENTS,
     });
-    return seasons.map((s) => ({
-      id: s.id,
-      title: s.title,
-      year: s.year,
-      price: Number(s.price),
-      isActive: s.isActive,
-    }));
+    return seasons.map(serializeSeason);
+  });
+
+  /**
+   * PATCH /admin/seasons/:id — цена абонемента и дата закрытия его продажи
+   * (null — вместе с регистрацией на первый старт). Уже выставленные счета
+   * не меняются: цена записана в самом абонементе.
+   */
+  const seasonSchema = z
+    .object({
+      price: z.number().min(0).max(10_000_000),
+      salesClosesAt: z.coerce.date().nullable(),
+    })
+    .partial()
+    .refine((v) => Object.keys(v).length > 0, { message: 'Нужно передать хотя бы одно поле' });
+  app.patch<{ Params: { id: string } }>('/admin/seasons/:id', async (req, reply) => {
+    const id = parseId(req.params.id);
+    if (id === null) return reply.code(400).send({ error: 'Некорректный id' });
+    const parsed = seasonSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Проверьте поля', details: parsed.error.flatten() });
+    const season = await prisma.season.findUnique({ where: { id }, include: SEASON_EVENTS });
+    if (!season) return reply.code(404).send({ error: 'Сезон не найден' });
+    const first = season.events.map((e) => e.date).sort((a, b) => a.getTime() - b.getTime())[0];
+    if (parsed.data.salesClosesAt && first && parsed.data.salesClosesAt > first) {
+      return reply.code(400).send({
+        error: 'Продажа абонемента должна закрываться не позже первого старта сезона',
+        reason: 'closes_after_start',
+      });
+    }
+    const updated = await prisma.$transaction(async (tx) => {
+      const before = {
+        price: String(Number(season.price)),
+        salesClosesAt: season.salesClosesAt?.toISOString() ?? null,
+      };
+      const next = await tx.season.update({ where: { id }, data: parsed.data, include: SEASON_EVENTS });
+      const changes = diffFields(before, {
+        price: String(Number(next.price)),
+        salesClosesAt: next.salesClosesAt?.toISOString() ?? null,
+      });
+      if (Object.keys(changes).length > 0) {
+        await writeAudit(tx, {
+          adminTelegramId: req.admin!.telegramId,
+          action: 'season.update',
+          subject: `Абонемент «${season.title}»`,
+          changes,
+        });
+      }
+      return next;
+    });
+    req.log.info({ seasonId: id, ...parsed.data }, 'Абонемент сезона изменён из админки');
+    return serializeSeason(updated);
   });
 
   /** GET /admin/events — список со счётчиками регистраций по статусам. */

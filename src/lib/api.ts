@@ -360,7 +360,23 @@ export type SeasonDto = {
   price: number;
   savings: number;
   events: EventDto[];
+  /** До какого момента продаётся абонемент и открыта ли продажа сейчас. */
+  salesClosesAt?: string | null;
+  salesOpen?: boolean;
 };
+
+/** Можно ли текущему участнику купить абонемент; нет — причина для подписи. */
+export type SeasonPassEligibility = {
+  available: boolean;
+  reason: 'sales_closed' | 'has_registrations' | 'already_has_pass' | 'no_season' | null;
+  message: string | null;
+};
+
+export function getSeasonPassEligibility(): Promise<SeasonPassEligibility> {
+  return request<SeasonPassEligibility>('/season-passes/eligibility', {
+    fallback: (s) => `Не удалось проверить абонемент (${s})`,
+  });
+}
 
 export type SeasonPassDto = {
   id: number;

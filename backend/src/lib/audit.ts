@@ -6,7 +6,11 @@ import type { Prisma } from '@prisma/client';
  * в журнале быть не должно.
  */
 
-export type AuditAction = 'participant.update' | 'participant.create' | 'registration.status';
+export type AuditAction =
+  | 'participant.update'
+  | 'participant.create'
+  | 'registration.status'
+  | 'season.update';
 
 /** { поле: [было, стало] } — только то, что действительно изменилось. */
 export type AuditChanges = Record<string, [string | null, string | null]>;

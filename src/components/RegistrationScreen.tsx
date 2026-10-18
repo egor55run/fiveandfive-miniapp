@@ -10,6 +10,8 @@ import {
   createRegistration,
   createSeasonPass,
   getCurrentSeason,
+  getSeasonPassEligibility,
+  type SeasonPassEligibility,
   REGISTRATION_CLOSED_TEXT,
   REGISTRATION_ENDED_TEXT,
   registrationState,
@@ -150,6 +152,9 @@ function RegistrationScreen({
   // из профиля, если он уже регистрировался раньше.
   const [values, setValues] = useState<FormValues>(() => withPrefill(prefill));
   const [season, setSeason] = useState<SeasonDto | null>(null);
+  // Можно ли этому участнику купить абонемент (правила — на сервере,
+  // backend/src/lib/seasonPass.ts).
+  const [passCheck, setPassCheck] = useState<SeasonPassEligibility | null>(null);
   const [seasonChecked, setSeasonChecked] = useState(false);
   // Дистанция: по умолчанию первая, где есть места.
   const distances = event.distances ?? [];
@@ -187,6 +192,11 @@ function RegistrationScreen({
         if (alive) setSeason(s);
       })
       .catch(() => {});
+    getSeasonPassEligibility()
+      .then((r) => {
+        if (alive) setPassCheck(r);
+      })
+      .catch(() => {});
     return () => {
       alive = false;
     };
@@ -196,10 +206,19 @@ function RegistrationScreen({
   // регистрация открыта на все его старты (абонемент — всё или ничего).
   // Абонемент записывает только на свою дистанцию (пока 5 км) — на другой
   // дистанции его не предлагаем.
+  // Если участнику абонемент сейчас нельзя (уже есть запись на отдельный старт,
+  // продажа закрыта) — показываем его неактивным с причиной.
+  const seasonOffered = Boolean(
+    season?.events.some((e) => e.id === event.id) && (chosen === null || chosen.seasonPass),
+  );
+  const seasonBlockedText =
+    passCheck && !passCheck.available && passCheck.reason !== 'no_season'
+      ? passCheck.message
+      : season?.salesOpen === false
+        ? 'Продажа абонемента закрыта'
+        : null;
   const seasonAvailable = Boolean(
-    season?.events.some((e) => e.id === event.id) &&
-      season.events.every((e) => !e.registrationDeadlinePassed) &&
-      (chosen === null || chosen.seasonPass),
+    seasonOffered && !seasonBlockedText && season?.events.every((e) => !e.registrationDeadlinePassed),
   );
   const useSeason = seasonAvailable && seasonChecked;
   const total = useSeason && season ? season.price : (chosen?.price ?? event.price);
@@ -552,6 +571,16 @@ function RegistrationScreen({
               onChange={(e) => setField('promocode', e.target.value)}
             />
           </label>
+
+          {seasonOffered && season && seasonBlockedText && (
+            <div className="upsell upsell--off" aria-disabled="true">
+              <span className="checkbox" aria-hidden="true" />
+              <span className="upsell__body">
+                <span className="upsell__title u-display">Взять весь сезон 5&5</span>
+                <span className="upsell__desc">{seasonBlockedText}</span>
+              </span>
+            </div>
+          )}
 
           {seasonAvailable && season && (
             <button
