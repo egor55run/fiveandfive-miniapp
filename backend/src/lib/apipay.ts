@@ -187,6 +187,24 @@ export function getInvoice(id: number): Promise<ApiPayInvoice> {
   return call<ApiPayInvoice>('GET', `/invoices/${id}`);
 }
 
+export type ApiPayRefund = {
+  id: number;
+  amount: string;
+  /** pending / processing — ещё идёт; completed / failed — итог. */
+  status: 'pending' | 'processing' | 'completed' | 'failed' | string;
+  error_code?: string | null;
+};
+
+export type ApiPayInvoiceRefunds = {
+  invoice?: { id: number; amount?: string; total_refunded?: string; is_fully_refunded?: boolean };
+  refunds?: ApiPayRefund[];
+};
+
+/** Возвраты по счёту — источник правды для вебхука invoice.refunded. */
+export function getInvoiceRefunds(id: number): Promise<ApiPayInvoiceRefunds> {
+  return call<ApiPayInvoiceRefunds>('GET', `/invoices/${id}/refunds`);
+}
+
 export function cancelInvoice(id: number): Promise<ApiPayInvoice> {
   return call<ApiPayInvoice>('POST', `/invoices/${id}/cancel`, {});
 }

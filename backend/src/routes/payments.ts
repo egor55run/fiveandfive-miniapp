@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { prisma } from '../prisma';
 import { getInvoice, invoiceIdFromWebhook, verifyWebhookSignature } from '../lib/apipay';
 import { apiPayConfigured, applyInvoice, refreshPayment, serializePayment } from '../lib/payments';
+import { syncApiPayRefunds } from '../lib/refunds';
 import { requireTelegramAuth, tgUserOf } from '../plugins/telegramAuth';
 
 /** Не чаще раза в столько мс спрашиваем ApiPay из-за опроса приложения. */
@@ -86,6 +87,15 @@ export async function paymentsRoutes(app: FastifyInstance) {
       // ApiPay ждёт ответ до 5 секунд — отвечаем сразу, обрабатываем после.
       // Статус берём не из тела, а свежим GET: тело только повод проверить.
       const log = req.log;
+      // Возврат (полный или частичный) — сводим с оформленными в админке (lib/refunds).
+      if (event === 'invoice.refunded') {
+        setImmediate(() => {
+          syncApiPayRefunds(invoiceId, log).catch((err) =>
+            log.error({ invoiceId, err: String(err) }, 'Вебхук ApiPay: сбой учёта возврата'),
+          );
+        });
+        return reply.code(200).send({ ok: true });
+      }
       setImmediate(() => {
         getInvoice(invoiceId)
           .then((invoice) => applyInvoice(invoice, log))

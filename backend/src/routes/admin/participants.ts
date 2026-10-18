@@ -5,6 +5,7 @@ import { requireAdmin } from '../../plugins/adminAuth';
 import { ageOnStartDay, checkAge } from '../../lib/eligibility';
 import { ageFromBirthDate, formatBirthDate, parseBirthDate } from '../../lib/birthDate';
 import { diffFields, personLabel, writeAudit } from '../../lib/audit';
+import { REFUND_PERCENTS, RefundError, applyAdminRefund, money, refundPreview } from '../../lib/refunds';
 import {
   birthDateField,
   emailField,
@@ -50,7 +51,7 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
       const registrations = await prisma.registration.findMany({
         where: { eventId },
         orderBy: { registeredAt: 'asc' },
-        include: { user: true, distance: true },
+        include: { user: true, distance: true, refunds: { orderBy: { createdAt: 'asc' } } },
       });
 
       // Результаты подтягиваем одним запросом — чтобы в списке было видно,
@@ -91,6 +92,15 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
             // Абонемент: регистрация создана оптом, отменять её по одной нельзя
             // без последствий для остальных — помечаем, чтобы UI предупредил.
             seasonPassId: r.seasonPassId,
+            // Оформлен возврат: запись CANCELLED, в списке — «Возврат».
+            refund: r.refundedAt
+              ? {
+                  at: r.refundedAt,
+                  percent: r.refunds.at(-1)?.percent ?? null,
+                  amount: r.refunds.reduce((sum, x) => sum + Number(x.amount), 0),
+                  confirmed: r.refunds.length > 0 && r.refunds.every((x) => x.confirmedAt !== null),
+                }
+              : null,
             registeredAt: r.registeredAt,
             result: result
               ? { id: result.id, finishTime: result.finishTime, place: result.place }
@@ -130,6 +140,10 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
       }
 
       const prev = registration.paymentStatus;
+      // По оформленному возврату статус не меняем: человек записывается заново сам.
+      if (registration.refundedAt) {
+        return reply.code(409).send({ error: 'По этой записи оформлен возврат — статус не меняется', reason: 'refunded' });
+      }
       if (prev === next) {
         return { registrationId: id, paymentStatus: next, slotsChanged: 0 };
       }
@@ -345,6 +359,52 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
     return reply.code(201).send({ registrationId });
   });
 
+  /**
+   * GET /admin/registrations/:id/refund — что можно вернуть: сумма оплаты,
+   * этапы (для абонемента — все старты), подсказка по п. 5.1 оферты.
+   */
+  app.get<{ Params: { id: string } }>('/admin/registrations/:id/refund', async (req, reply) => {
+    const id = parseId(req.params.id);
+    if (id === null) return reply.code(400).send({ error: 'Некорректный id' });
+    try {
+      return await refundPreview(id);
+    } catch (err) {
+      if (err instanceof RefundError) return reply.code(err.status).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  /**
+   * POST /admin/registrations/:id/refund — оформить возврат. Деньги владелец
+   * возвращает сам в ApiPay/Kaspi; здесь — статус «Возврат», место, журнал.
+   */
+  const refundSchema = z.object({
+    stages: z
+      .array(
+        z.object({
+          registrationId: z.number().int().positive(),
+          percent: z.union([z.literal(REFUND_PERCENTS[0]), z.literal(REFUND_PERCENTS[1]), z.literal(REFUND_PERCENTS[2])]),
+        }),
+      )
+      .min(1)
+      .max(20),
+    wholePass: z.boolean().default(false),
+  });
+  app.post<{ Params: { id: string } }>('/admin/registrations/:id/refund', async (req, reply) => {
+    const id = parseId(req.params.id);
+    if (id === null) return reply.code(400).send({ error: 'Некорректный id' });
+    const parsed = refundSchema.safeParse(req.body);
+    if (!parsed.success) return sendValidationError(reply, parsed.error);
+    try {
+      const res = await applyAdminRefund({ registrationId: id, ...parsed.data, adminTelegramId: req.admin!.telegramId });
+      req.log.info({ registrationId: id, ...res }, 'Возврат оформлен из админки');
+      return { ...res, totalText: money(res.total) };
+    } catch (err) {
+      if (err instanceof RefundError) return reply.code(err.status).send({ error: err.message });
+      throw err;
+    }
+  });
+
   /** GET /admin/events/:id/audit — журнал изменений по старту, свежие сверху. */
   app.get<{ Params: { id: string } }>('/admin/events/:id/audit', async (req, reply) => {
     const eventId = parseId(req.params.id);
@@ -360,6 +420,7 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
       select: { telegramId: true, firstName: true, lastName: true, username: true },
     });
     const nameOf = (id: bigint) => {
+      if (id === 0n) return 'ApiPay';
       const u = admins.find((a) => a.telegramId === id);
       if (!u) return `id ${id}`;
       return u.username ? `@${u.username}` : personLabel(u);

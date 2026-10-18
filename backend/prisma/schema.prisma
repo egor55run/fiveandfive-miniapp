@@ -46,6 +46,7 @@ model User {
   emails        EmailNotification[]
   payments      Payment[]
   consents      Consent[]
+  refunds       Refund[]
 
   @@map("users")
 }
@@ -133,6 +134,10 @@ model Registration {
   /// Кто это, со слов администратора: «партнёр», «волонтёр»…
   manualNote    String?       @map("manual_note")
   paymentStatus PaymentStatus @default(PENDING) @map("payment_status")
+  /// Оформлен возврат (из админки или по вебхуку ApiPay): запись CANCELLED,
+  /// место освобождено, в списке — «Возврат». Сбрасывается, если человек
+  /// записался заново. Суммы — в refunds.
+  refundedAt    DateTime?     @map("refunded_at")
   qrCode        String?       @map("qr_code")
   registeredAt  DateTime      @default(now()) @map("registered_at")
 
@@ -142,6 +147,7 @@ model Registration {
   distance   EventDistance? @relation(fields: [distanceId], references: [id], onDelete: SetNull)
   payments   Payment[]
   consents   Consent[]
+  refunds    Refund[]
 
   // Один пользователь — одна регистрация на конкретный старт
   @@unique([userId, eventId])
@@ -196,6 +202,8 @@ model SeasonPass {
   seasonId      Int           @map("season_id")
   price         Decimal       @default(0) @db.Decimal(10, 2)
   paymentStatus PaymentStatus @default(PENDING) @map("payment_status")
+  /// Возврат за весь абонемент (все оставшиеся этапы): абонемент CANCELLED.
+  refundedAt    DateTime?     @map("refunded_at")
   createdAt     DateTime      @default(now()) @map("created_at")
 
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -203,6 +211,7 @@ model SeasonPass {
   registrations Registration[]
   payments      Payment[]
   consents      Consent[]
+  refunds       Refund[]
 
   // Один абонемент на сезон на пользователя
   @@unique([userId, seasonId])
@@ -367,6 +376,8 @@ model Payment {
   /// До какого момента держим место за участником.
   expiresAt         DateTime       @map("expires_at")
   paidAt            DateTime?      @map("paid_at")
+  /// Сколько вернули по счёту в ApiPay (total_refunded из вебхука invoice.refunded).
+  refundedAmount    Decimal        @default(0) @map("refunded_amount") @db.Decimal(10, 2)
   /// Когда последний раз спрашивали статус у ApiPay (ограничиваем частоту опроса).
   checkedAt         DateTime?      @map("checked_at")
   createdAt         DateTime       @default(now()) @map("created_at")
@@ -375,6 +386,7 @@ model Payment {
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   registration Registration? @relation(fields: [registrationId], references: [id], onDelete: Cascade)
   seasonPass   SeasonPass?   @relation(fields: [seasonPassId], references: [id], onDelete: Cascade)
+  refunds      Refund[]
 
   @@index([state, expiresAt])
   @@index([registrationId])
@@ -510,4 +522,41 @@ model AdminAuditLog {
 
   @@index([eventId, createdAt])
   @@map("admin_audit_log")
+}
+
+enum RefundSource {
+  /// Оформлен в админке («Оформить возврат»); деньги владелец возвращает сам в ApiPay/Kaspi.
+  ADMIN
+  /// Пришёл вебхук invoice.refunded, а в админке возврат ещё не отмечали.
+  APIPAY
+}
+
+/// Возврат стартового взноса (оферта, п. 5.1 и 5.3). Одна строка — один этап:
+/// для абонемента «целиком» — по строке на каждый оставшийся старт.
+model Refund {
+  id               Int          @id @default(autoincrement())
+  userId           Int          @map("user_id")
+  paymentId        Int?         @map("payment_id")
+  /// Регистрация на старт (у абонемента — регистрация этапа).
+  registrationId   Int?         @map("registration_id")
+  seasonPassId     Int?         @map("season_pass_id")
+  eventId          Int?         @map("event_id")
+  /// 100 / 50 / 0; null — сумма пришла из ApiPay, процент не выбирали.
+  percent          Int?
+  amount           Decimal      @db.Decimal(10, 2)
+  source           RefundSource
+  adminTelegramId  BigInt?      @map("admin_telegram_id")
+  /// id возврата в ApiPay, когда пришёл вебхук: по нему не учитываем дважды.
+  providerRefundId Int?         @unique @map("provider_refund_id")
+  confirmedAt      DateTime?    @map("confirmed_at")
+  createdAt        DateTime     @default(now()) @map("created_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment      Payment?      @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  registration Registration? @relation(fields: [registrationId], references: [id], onDelete: SetNull)
+  seasonPass   SeasonPass?   @relation(fields: [seasonPassId], references: [id], onDelete: SetNull)
+
+  @@index([paymentId])
+  @@index([registrationId])
+  @@map("refunds")
 }

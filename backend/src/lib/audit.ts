@@ -10,6 +10,7 @@ export type AuditAction =
   | 'participant.update'
   | 'participant.create'
   | 'registration.status'
+  | 'registration.refund'
   | 'season.update';
 
 /** { поле: [было, стало] } — только то, что действительно изменилось. */

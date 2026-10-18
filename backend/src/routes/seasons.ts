@@ -257,7 +257,7 @@ export async function seasonsRoutes(app: FastifyInstance) {
         const pass = existingPass
           ? await tx.seasonPass.update({
               where: { id: existingPass.id },
-              data: { paymentStatus: 'PENDING', price: season.price },
+              data: { paymentStatus: 'PENDING', price: season.price, refundedAt: null },
             })
           : await tx.seasonPass.create({
               data: {
@@ -296,7 +296,7 @@ export async function seasonsRoutes(app: FastifyInstance) {
             registrations.push(
               await tx.registration.update({
                 where: { id: reg.id },
-                data: { paymentStatus: 'PENDING', seasonPassId: pass.id, distanceId: distance.id },
+                data: { paymentStatus: 'PENDING', seasonPassId: pass.id, distanceId: distance.id, refundedAt: null },
               }),
             );
             continue;

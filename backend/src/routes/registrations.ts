@@ -198,7 +198,8 @@ export async function registrationsRoutes(app: FastifyInstance) {
         if (existing) {
           return tx.registration.update({
             where: { id: existing.id },
-            data: { paymentStatus: 'PENDING', seasonPassId: null, distanceId: distance.id },
+            // Записался заново после возврата — отметку «Возврат» снимаем.
+            data: { paymentStatus: 'PENDING', seasonPassId: null, distanceId: distance.id, refundedAt: null },
           });
         }
         const created = await tx.registration.create({
