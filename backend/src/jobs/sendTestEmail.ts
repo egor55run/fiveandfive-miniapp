@@ -10,7 +10,7 @@ import { dayBeforeEmail, registrationEmail, seasonPassEmail } from '../lib/email
 async function main() {
   const to = process.argv[2];
   if (!to || !to.includes('@')) throw new Error('Укажите адрес: node dist/jobs/sendTestEmail.js you@example.com');
-  if (!emailEnabled()) throw new Error('Почта выключена: нужны EMAIL_ENABLED=true, POSTBOX_SMTP_USER и POSTBOX_SMTP_PASSWORD в .env');
+  if (!emailEnabled()) throw new Error('Почта выключена: нужны EMAIL_ENABLED=true и BREVO_API_KEY в .env');
   const events = await prisma.event.findMany({ where: { date: { gt: new Date() } }, orderBy: { date: 'asc' } });
   if (events.length === 0) throw new Error('Нет будущих стартов для примера');
   const [first] = events;
@@ -22,6 +22,7 @@ async function main() {
   for (const msg of letters) {
     const res = await sendEmail(to, { ...msg, subject: `[ТЕСТ] ${msg.subject}` });
     console.log(res.ok ? 'отправлено:' : 'ошибка:', msg.subject, res.ok ? '' : res.error);
+    if (!res.ok) break;
   }
 }
 

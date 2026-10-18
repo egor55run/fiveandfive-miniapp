@@ -24,6 +24,7 @@ import { paymentsRoutes } from './routes/payments';
 import { openingSubscriptionRoutes } from './routes/openingSubscription';
 import { telegramWebhookRoutes } from './routes/telegramWebhook';
 import { apiPayConfigured, sweepPayments } from './lib/payments';
+import { emailEnabled, processEmailQueue } from './lib/email';
 import { registrationOpen } from './lib/registrationWindow';
 import { loadLegalDocuments } from './lib/legal';
 import { MAX_REGULATIONS_BYTES } from './lib/regulations';
@@ -155,6 +156,26 @@ async function main() {
     sweepTimer = setInterval(sweep, 60_000);
     sweepTimer.unref();
   }
+
+  // Очередь писем: то, что не ушло из-за дневного лимита Brevo (300 в день на
+  // бесплатном тарифе) или сбоя, — раз в 10 минут, как освободится лимит.
+  let emailTimer: NodeJS.Timeout | null = null;
+  if (emailEnabled()) {
+    let busy = false;
+    emailTimer = setInterval(async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        await processEmailQueue(app.log);
+      } catch (err) {
+        app.log.error({ err: String(err) }, 'Очередь писем: сбой');
+      } finally {
+        busy = false;
+      }
+    }, 10 * 60_000);
+    emailTimer.unref();
+    app.log.info('Письма участникам включены (Brevo)');
+  }
   if (!registrationOpen()) {
     app.log.warn('Регистрация на старты ЗАКРЫТА (нет оплаты или REGISTRATION_OPEN=false)');
   }
@@ -169,6 +190,7 @@ async function main() {
 
   app.addHook('onClose', async () => {
     if (sweepTimer) clearInterval(sweepTimer);
+    if (emailTimer) clearInterval(emailTimer);
     await prisma.$disconnect();
   });
 

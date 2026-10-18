@@ -274,9 +274,11 @@ model Notification {
   @@map("notifications")
 }
 
-/// Письма участникам (Yandex Cloud Postbox, lib/email). Те же события, что
-/// у бота: регистрация/оплата, абонемент, напоминание накануне. Одно письмо на
-/// событие: SENT повторно не отправляется, FAILED — пробуем ещё раз.
+/// Письма участникам (Brevo, lib/email). Те же события, что у бота:
+/// регистрация/оплата, абонемент, напоминание накануне. Одно письмо на
+/// событие: SENT повторно не отправляется. QUEUED — ждёт лимита (300 в день на
+/// бесплатном тарифе Brevo): его отправит очередь, текст лежит здесь же и
+/// стирается после отправки.
 model EmailNotification {
   id        Int              @id @default(autoincrement())
   userId    Int              @map("user_id")
@@ -285,8 +287,14 @@ model EmailNotification {
   kind      NotificationKind
   /// Кому ушло — адрес мог поменяться с тех пор.
   to        String
-  status    String // SENT / FAILED / SKIPPED
+  status    String // SENT / QUEUED / FAILED
   error     String?
+  /// Письмо целиком — пока оно в очереди (после отправки стирается).
+  subject   String?
+  html      String?
+  text      String?
+  attempts  Int              @default(0)
+  sentAt    DateTime?        @map("sent_at")
   createdAt DateTime         @default(now()) @map("created_at")
   updatedAt DateTime         @updatedAt @map("updated_at")
 
