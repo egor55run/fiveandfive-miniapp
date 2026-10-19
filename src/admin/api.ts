@@ -333,6 +333,8 @@ export type Participant = {
   distance: string | null;
   qrCode: string | null;
   seasonPassId: number | null;
+  /** Оформлен возврат: запись CANCELLED, в списке — «Возврат». */
+  refund: { at: string; percent: number | null; amount: number; confirmed: boolean } | null;
   registeredAt: string;
   result: { id: number; finishTime: number; place: number } | null;
 };
@@ -377,11 +379,51 @@ export type AuditEntry = {
   id: number;
   at: string;
   admin: string;
-  action: 'participant.update' | 'participant.create' | 'registration.status';
+  action: 'participant.update' | 'participant.create' | 'registration.status' | 'registration.refund';
   registrationId: number | null;
   subject: string;
   changes: Record<string, [string | null, string | null]>;
 };
+
+// ---------- Возвраты (оферта, п. 5.1 и 5.3) ----------
+
+export type RefundPercent = 100 | 50 | 0;
+
+export type RefundStage = {
+  registrationId: number;
+  eventId: number;
+  eventTitle: string;
+  eventDate: string;
+  base: number;
+  refundable: boolean;
+  note: string | null;
+  suggested: RefundPercent;
+  daysLeft: number;
+  rule: string;
+};
+
+export type RefundPreview = {
+  kind: 'single' | 'pass';
+  subject: string;
+  paymentId: number;
+  paid: number;
+  alreadyRefunded: number;
+  providerRefunded: number;
+  seasonPassId: number | null;
+  stages: RefundStage[];
+};
+
+export const getRefundPreview = (registrationId: number) =>
+  request<RefundPreview>(`/admin/registrations/${registrationId}/refund`);
+
+export const applyRefund = (
+  registrationId: number,
+  body: { stages: { registrationId: number; percent: RefundPercent }[]; wholePass: boolean },
+) =>
+  request<{ total: number; stages: number; totalText: string }>(`/admin/registrations/${registrationId}/refund`, {
+    method: 'POST',
+    body,
+  });
 
 export const getAudit = (eventId: number) => request<AuditEntry[]>(`/admin/events/${eventId}/audit`);
 

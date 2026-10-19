@@ -13,6 +13,7 @@ import {
 import { downloadParticipantsCsv } from './exportCsv';
 import AuditLog from './AuditLog';
 import ParticipantForm, { type ParticipantFormValues } from './ParticipantForm';
+import RefundForm from './RefundForm';
 import { formatDate, formatDateTime, formatSeconds, fullName, PAYMENT_LABEL } from './helpers';
 
 const STATUSES: PaymentStatus[] = ['PENDING', 'PAID', 'CANCELLED'];
@@ -26,6 +27,8 @@ export default function ParticipantsSection() {
   const [distanceFilter, setDistanceFilter] = useState<number | null>(null);
   // Форма участника: правка (registrationId) или добавление вручную ('new').
   const [editing, setEditing] = useState<Participant | 'new' | null>(null);
+  // «Оформить возврат» — по какой регистрации открыта форма.
+  const [refunding, setRefunding] = useState<number | null>(null);
   const [showAudit, setShowAudit] = useState(false);
   // Счётчик для перезагрузки журнала после правок.
   const [auditKey, setAuditKey] = useState(0);
@@ -126,6 +129,7 @@ export default function ParticipantsSection() {
 
   const afterSave = async (message: string) => {
     setEditing(null);
+    setRefunding(null);
     setNotice(message);
     setAuditKey((k) => k + 1);
     if (eventId !== null) await loadParticipants(eventId);
@@ -236,6 +240,15 @@ export default function ParticipantsSection() {
         />
       )}
 
+      {refunding !== null && (
+        <RefundForm
+          key={refunding}
+          registrationId={refunding}
+          onCancel={() => setRefunding(null)}
+          onDone={(message) => void afterSave(message)}
+        />
+      )}
+
       {showAudit && eventId !== null && (
         <div className="ad-card">
           <h3>Журнал изменений</h3>
@@ -307,6 +320,16 @@ export default function ParticipantsSection() {
                       : '—'}
                   </td>
                   <td>
+                    {p.refund ? (
+                      <span
+                        className="ad-tag ad-tag--refund"
+                        title={`Оформлен ${formatDateTime(p.refund.at)}${p.refund.confirmed ? ', ApiPay подтвердил' : ', ApiPay пока не подтвердил'}`}
+                      >
+                        {PAYMENT_LABEL.REFUNDED}
+                        {p.refund.percent !== null ? ` ${p.refund.percent}%` : ''} · {p.refund.amount.toLocaleString('ru-RU')} ₸
+                        {p.refund.confirmed ? ' ✓' : ''}
+                      </span>
+                    ) : (
                     <select
                       value={p.paymentStatus}
                       disabled={busyId === p.registrationId}
@@ -318,18 +341,32 @@ export default function ParticipantsSection() {
                         </option>
                       ))}
                     </select>
+                    )}
                   </td>
-                  <td>
+                  <td className="ad-nowrap">
                     <button type="button" className="ad-btn ad-btn--sm" onClick={() => setEditing(p)}>
                       Правка
                     </button>
+                    {p.paymentStatus === 'PAID' && !p.manual && !p.refund && (
+                      <button
+                        type="button"
+                        className="ad-btn ad-btn--sm"
+                        onClick={() => {
+                          setEditing(null);
+                          setRefunding(p.registrationId);
+                        }}
+                      >
+                        Оформить возврат
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
           <p className="ad-hint">
-            «Отменено» освобождает слот на старте, возврат из отмены — снова занимает.
+            «Отменено» освобождает слот на старте, возврат из отмены — снова занимает. «Оформить возврат» — по оферте
+            (100 / 50 / 0%): запись станет «Возврат», место освободится; деньги возвращаются вручную в ApiPay или Kaspi Pay.
           </p>
         </div>
       )}

@@ -637,3 +637,10 @@ select:focus {
   vertical-align: top;
   font-size: 13px;
 }
+
+/* Оформлен возврат (оферта, п. 5.1). */
+.ad-tag--refund {
+  background: rgba(229, 160, 72, 0.18);
+  color: #f0b46a;
+  white-space: nowrap;
+}

@@ -16,7 +16,7 @@ const COLUMNS: [string, (p: Participant) => string | number | null][] = [
   ['Email', (p) => p.email],
   ['Telegram', (p) => (p.username ? `@${p.username}` : p.telegramId)],
   ['Записался', (p) => formatDateTime(p.registeredAt)],
-  ['Оплата', (p) => PAYMENT_LABEL[p.paymentStatus]],
+  ['Оплата', (p) => (p.refund ? `${PAYMENT_LABEL.REFUNDED} ${p.refund.amount} ₸` : PAYMENT_LABEL[p.paymentStatus])],
   ['Абонемент', (p) => (p.seasonPassId !== null ? `#${p.seasonPassId}` : null)],
   ['Добавлен вручную', (p) => (p.manual ? p.manualNote || 'да' : null)],
   ['Время', (p) => (p.result ? formatSeconds(p.result.finishTime) : null)],

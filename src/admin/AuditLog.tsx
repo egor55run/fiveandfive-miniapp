@@ -12,12 +12,15 @@ const FIELD_LABEL: Record<string, string> = {
   distance: 'Дистанция',
   note: 'Кто это',
   paymentStatus: 'Оплата',
+  refund: 'Возврат',
+  pass: 'Абонемент',
 };
 
 const ACTION_LABEL: Record<AuditEntry['action'], string> = {
   'participant.update': 'Правка',
   'participant.create': 'Добавлен вручную',
   'registration.status': 'Статус',
+  'registration.refund': 'Возврат',
 };
 
 /** Значение поля — по-человечески: пол, статус оплаты, дата. */

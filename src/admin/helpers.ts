@@ -65,4 +65,6 @@ export const PAYMENT_LABEL: Record<string, string> = {
   PENDING: 'Ожидает',
   PAID: 'Оплачено',
   CANCELLED: 'Отменено',
+  /** Только для показа: в базе это CANCELLED + отметка о возврате. */
+  REFUNDED: 'Возврат',
 };
