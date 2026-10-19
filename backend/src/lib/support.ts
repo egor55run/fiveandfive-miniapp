@@ -135,11 +135,11 @@ async function packAnswer(): Promise<string> {
 }
 
 export const TOPICS: { key: string; label: string; answer: () => Promise<string> | string }[] = [
-  { key: 'races', label: 'Старты: даты и места', answer: racesAnswer },
+  { key: 'races', label: 'Даты и места стартов', answer: racesAnswer },
   { key: 'price', label: 'Цена и оплата', answer: priceAnswer },
   { key: 'pack', label: 'Стартовый пакет', answer: packAnswer },
   { key: 'refund', label: 'Возврат и передача слота', answer: () => [faqHtml('refund'), faqHtml('transfer')].join('\n\n') },
-  { key: 'minors', label: 'Если мне нет 18', answer: () => faqHtml('age') },
+  { key: 'minors', label: 'Если нет 18 лет', answer: () => faqHtml('age') },
   { key: 'bring', label: 'Что взять с собой', answer: () => [faqHtml('bring'), faqHtml('cloakroom')].join('\n\n') },
 ];
 
@@ -152,9 +152,8 @@ const MENU_TEXT = '<b>Частые вопросы</b>\n\nВыберите тем
 
 export async function sendSupportMenu(chatId: number): Promise<void> {
   const rows: InlineButton[][] = [];
-  for (let i = 0; i < TOPICS.length; i += 2) {
-    rows.push(TOPICS.slice(i, i + 2).map((t) => ({ text: t.label, callback_data: `ask:${t.key}` })));
-  }
+  // По одной кнопке в ряд: в два столбца Telegram обрезает названия на телефоне.
+  for (const t of TOPICS) rows.push([{ text: t.label, callback_data: `ask:${t.key}` }]);
   rows.push([WRITE_BUTTON], [PARTNER_BUTTON]);
   await sendMessage(String(chatId), MENU_TEXT, rows);
 }
