@@ -135,12 +135,12 @@ async function packAnswer(): Promise<string> {
 }
 
 export const TOPICS: { key: string; label: string; answer: () => Promise<string> | string }[] = [
-  { key: 'races', label: '🏁 Старты: даты и места', answer: racesAnswer },
-  { key: 'price', label: '💳 Цена и оплата', answer: priceAnswer },
-  { key: 'pack', label: '🎒 Стартовый пакет', answer: packAnswer },
-  { key: 'refund', label: '↩️ Возврат и передача слота', answer: () => [faqHtml('refund'), faqHtml('transfer')].join('\n\n') },
-  { key: 'minors', label: '🧒 Если мне нет 18', answer: () => faqHtml('age') },
-  { key: 'bring', label: '🎽 Что взять с собой', answer: () => [faqHtml('bring'), faqHtml('cloakroom')].join('\n\n') },
+  { key: 'races', label: 'Старты: даты и места', answer: racesAnswer },
+  { key: 'price', label: 'Цена и оплата', answer: priceAnswer },
+  { key: 'pack', label: 'Стартовый пакет', answer: packAnswer },
+  { key: 'refund', label: 'Возврат и передача слота', answer: () => [faqHtml('refund'), faqHtml('transfer')].join('\n\n') },
+  { key: 'minors', label: 'Если мне нет 18', answer: () => faqHtml('age') },
+  { key: 'bring', label: 'Что взять с собой', answer: () => [faqHtml('bring'), faqHtml('cloakroom')].join('\n\n') },
 ];
 
 export const ASK_BUTTON: InlineButton = { text: '❓ Задать вопрос', callback_data: 'ask' };
@@ -163,8 +163,8 @@ async function sendTopic(chatId: number, key: string): Promise<void> {
   const topic = TOPICS.find((t) => t.key === key);
   if (!topic) return sendSupportMenu(chatId);
   await sendMessage(String(chatId), await topic.answer(), [
-    [{ text: '👍 Помогло', callback_data: 'ask:ok' }],
-    [{ text: '✍️ Не помогло — написать нам', callback_data: 'ask:write' }],
+    [{ text: 'Помогло', callback_data: 'ask:ok' }],
+    [{ text: 'Не помогло — написать нам', callback_data: 'ask:write' }],
     [{ text: '⬅️ Другие вопросы', callback_data: 'ask' }],
   ]);
 }
