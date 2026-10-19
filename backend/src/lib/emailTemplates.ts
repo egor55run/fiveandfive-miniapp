@@ -11,6 +11,9 @@ import { dayMonth, pickupDaysText, pickupPlace, raceDayPickupText, timeOfDay } f
 
 const APP_URL = (process.env.APP_URL ?? 'https://fiveandfive.kz').replace(/\/+$/, '');
 const TZ = 'Asia/Almaty';
+/** Бот поддержки: staging — тестовый (BOT_USERNAME в .env), прод — боевой. */
+const BOT = (process.env.BOT_USERNAME?.trim() || 'fiveandfive_run_bot').replace(/^@/, '');
+const BOT_ASK_URL = `https://t.me/${BOT}?start=ask`;
 
 const INK = '#15130F';
 const PAPER = '#F2EEE7';
@@ -86,7 +89,8 @@ function layout(opts: {
 ${body}${button}
 </td></tr>
 <tr><td style="padding:20px 8px 0;font-size:12px;line-height:1.5;color:${MUTED};">
-Вы получили это письмо, потому что зарегистрировались на забег серии 5&amp;5. Вопросы — просто ответьте на это письмо.<br>
+Вопросы — в Telegram-боте <a href="${BOT_ASK_URL}" style="color:${MUTED};">@${BOT}</a>.<br>
+Вы получили это письмо, потому что зарегистрировались на забег серии 5&amp;5.<br>
 ИП «5&amp;5» · Астана · <a href="${APP_URL}/privacy" style="color:${MUTED};">Политика обработки персональных данных</a>
 </td></tr>
 </table>
@@ -102,8 +106,8 @@ function plain(lines: (string | null | false)[]): string {
     ...lines.filter((l): l is string => typeof l === 'string'),
     '',
     '—',
+    `Вопросы — в Telegram-боте @${BOT}: ${BOT_ASK_URL}`,
     'Вы получили это письмо, потому что зарегистрировались на забег серии 5&5.',
-    'Вопросы — просто ответьте на это письмо.',
     `ИП «5&5» · Астана · ${APP_URL}`,
   ].join('\n');
 }

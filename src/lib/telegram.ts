@@ -27,6 +27,8 @@ type TelegramWebApp = {
   ready: () => void;
   /** Открыть ссылку во встроенном браузере Telegram поверх Mini App. */
   openLink?: (url: string) => void;
+  /** Открыть t.me-ссылку внутри Telegram (чат с ботом) — Bot API 6.1+. */
+  openTelegramLink?: (url: string) => void;
   /** Попросить у пользователя разрешение боту писать ему (Bot API 6.9+). */
   requestWriteAccess?: (callback?: (granted: boolean) => void) => void;
   expand: () => void;
@@ -93,6 +95,21 @@ export function openExternalPage(path: string): boolean {
   const app = webApp();
   if (!app?.openLink || !isInsideTelegram()) return false;
   app.openLink(new URL(path, window.location.origin).toString());
+  return true;
+}
+
+/** «Задать вопрос»: чат с ботом сразу с меню частых вопросов (/start ask). */
+export const BOT_ASK_LINK = `${BOT_LINK}?start=ask`;
+
+/**
+ * Открыть чат с ботом на «Задать вопрос». Внутри Telegram — сам Telegram
+ * (Mini App сворачивается в чат), вне его — обычной ссылкой.
+ * true — открыли сами, переход по <a> не нужен.
+ */
+export function openBotAsk(): boolean {
+  const app = webApp();
+  if (!app?.openTelegramLink || !isInsideTelegram()) return false;
+  app.openTelegramLink(BOT_ASK_LINK);
   return true;
 }
 

@@ -5,14 +5,24 @@ import { appUrl, subscribe, unsubscribe } from '../lib/openingSubscribers';
 import { registrationOpen } from '../lib/registrationWindow';
 import { answerCallbackQuery, sendMessage, type InlineButton } from '../lib/telegramBot';
 import { stopBotContact, touchBotContact } from '../lib/raceAnnouncements';
+import {
+  ASK_BUTTON,
+  PARTNER_BUTTON,
+  handleSupportCallback,
+  handleSupportCommand,
+  handleSupportMessage,
+  sendSupportMenu,
+  type TgMessage,
+} from '../lib/support';
 
 /**
  * Входящие сообщения боту (вебхук Telegram, этап 2 сайта).
  *
- * Бот понимает немного: /start (в том числе /start notify-<slug> с кнопки сайта
- * «Узнать об открытии в Telegram»), кнопку «Сообщить об открытии регистрации» и
- * /stop. На всё остальное отвечает кнопкой приложения — разговаривать бот не
- * должен, всё делается в Mini App.
+ * Бот понимает: /start (в том числе /start notify-<slug> с кнопки сайта
+ * «Узнать об открытии в Telegram» и /start ask — «Задать вопрос» с сайта и из
+ * Mini App), кнопку «Сообщить об открытии регистрации», /stop и поддержку
+ * (lib/support: частые вопросы, вопрос команде, заявка партнёра, ответы
+ * админов реплаем). На остальное отвечает кнопками приложения и вопросов.
  *
  * Снаружи: https://<домен>/api/telegram/webhook. Адрес и секрет сообщает
  * Telegram скрипт dist/jobs/setWebhook.js (см. backend/README.md).
@@ -20,7 +30,7 @@ import { stopBotContact, touchBotContact } from '../lib/raceAnnouncements';
 
 type TgUser = { id: number; first_name?: string; username?: string };
 type Update = {
-  message?: { chat: { id: number; type: string }; from?: TgUser; text?: string };
+  message?: TgMessage;
   callback_query?: { id: string; from: TgUser; data?: string; message?: { chat: { id: number } } };
 };
 
@@ -63,6 +73,9 @@ function secretOk(header: string | string[] | undefined): boolean {
 
 async function handleStart(chatId: number, from: TgUser, payload: string | undefined) {
   const chat = String(chatId);
+  // «Задать вопрос» с сайта и из Mini App: t.me/<бот>?start=ask
+  if (payload === 'ask') return sendSupportMenu(chatId);
+  if (payload === 'partner') return void (await handleSupportCommand('/partner', chatId, from));
   // Кнопка сайта: /start notify-<slug> (или просто notify).
   if (payload?.startsWith('notify')) {
     const slug = payload.startsWith('notify-') ? payload.slice('notify-'.length) : undefined;
@@ -82,6 +95,7 @@ async function handleStart(chatId: number, from: TgUser, payload: string | undef
   });
   const rows: InlineButton[][] = [[appButton()]];
   if (!registrationOpen() && !subscribed) rows.push([NOTIFY_BUTTON]);
+  rows.push([ASK_BUTTON], [PARTNER_BUTTON]);
   await sendMessage(chat, WELCOME_TEXT, rows);
 }
 
@@ -90,6 +104,11 @@ async function handleUpdate(update: Update, log: FastifyBaseLogger) {
   if (cb) {
     // Нажал кнопку бота — значит, писать ему можно (аудитория «новый старт»).
     await touchBotContact(cb.from, { start: cb.data === 'notify' });
+    const cbChat = cb.message?.chat.id ?? cb.from.id;
+    if (cb.data && cb.data !== 'notify' && (await handleSupportCallback(cb.data, cbChat, cb.from))) {
+      await answerCallbackQuery(cb.id);
+      return;
+    }
     if (cb.data === 'notify') {
       if (registrationOpen()) {
         await answerCallbackQuery(cb.id, 'Регистрация уже открыта!');
@@ -128,8 +147,14 @@ async function handleUpdate(update: Update, log: FastifyBaseLogger) {
     await sendMessage(String(msg.chat.id), UNSUBSCRIBED_TEXT);
     return;
   }
-  // Всё остальное — коротко отправляем в приложение.
-  await sendMessage(String(msg.chat.id), 'Всё про забеги 5&amp;5 — в приложении:', [[appButton()]]);
+  if (command.startsWith('/') && (await handleSupportCommand(command, msg.chat.id, msg.from))) return;
+  // Вопрос, шаг анкеты партнёра, ответ админа или продолжение переписки.
+  if (!command.startsWith('/') && (await handleSupportMessage(msg, log))) return;
+  // Всё остальное — приложение и вопросы.
+  await sendMessage(String(msg.chat.id), 'Всё про забеги 5&amp;5 — в приложении. Есть вопрос — нажмите «Задать вопрос».', [
+    [appButton()],
+    [ASK_BUTTON],
+  ]);
 }
 
 export async function telegramWebhookRoutes(app: FastifyInstance) {

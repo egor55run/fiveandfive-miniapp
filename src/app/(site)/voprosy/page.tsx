@@ -48,7 +48,7 @@ export default function FaqPage() {
     <main className="site-wrap faq">
       <h1 className="h-title">{t.faq.title}</h1>
       <p className="faq__lead">
-        {t.faq.lead} <a href={botChatLink()}>{t.faq.ask}</a>
+        {t.faq.lead} <a href={botChatLink('ask')}>{t.faq.ask}</a>
       </p>
       <div className="faq__list">
         {items.map((item) => (

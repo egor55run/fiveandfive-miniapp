@@ -13,7 +13,7 @@ export default function SiteFooter({ lang }: { lang: Lang }) {
           <SiteLogo variant="light" />
         </span>
         <nav className="site-footer__links" aria-label={t.footer.documents}>
-          <a href={botChatLink()}>{t.footer.telegram}</a>
+          <a href={botChatLink('ask')}>{t.footer.telegram}</a>
           <a href={sitePath('/voprosy', lang)}>{t.footer.faq}</a>
           {/* Документы — через docPath: у них уже есть казахские версии на staging. */}
           <a href={docPath('oferta', lang)}>{t.footer.oferta}</a>

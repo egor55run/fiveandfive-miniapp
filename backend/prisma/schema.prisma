@@ -560,3 +560,37 @@ model Refund {
   @@index([registrationId])
   @@map("refunds")
 }
+
+/// Поддержка в боте (решение пользователя 2026-10-19, вместо ящика info@):
+/// на каком шаге человек — пишет вопрос или заполняет анкету партнёра.
+model SupportState {
+  telegramId BigInt   @id @map("telegram_id")
+  /// question — ждём вопрос; partner — анкета партнёра (step — номер поля).
+  mode       String
+  step       Int      @default(0)
+  /// Ответы анкеты партнёра по мере заполнения.
+  data       Json     @default("{}")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("support_states")
+}
+
+/// Переписка поддержки. IN — от человека (копия у каждого админа: по
+/// admin_chat_id + admin_message_id ответ реплаем находит, кому писать),
+/// OUT — ответ админа человеку.
+model SupportMessage {
+  id             Int      @id @default(autoincrement())
+  /// Кому принадлежит переписка — человек, который спрашивал.
+  telegramId     BigInt   @map("telegram_id")
+  direction      String
+  /// question / partner / followup / reply
+  kind           String
+  text           String?
+  adminChatId    BigInt?  @map("admin_chat_id")
+  adminMessageId Int?     @map("admin_message_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([adminChatId, adminMessageId])
+  @@index([telegramId, createdAt])
+  @@map("support_messages")
+}

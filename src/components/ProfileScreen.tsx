@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { ArrowRight, CalendarX2, FileText, Map, Pencil, PersonStanding, ShieldCheck, ShoppingBag, Ticket } from 'lucide-react';
+import { ArrowRight, CalendarX2, FileText, Map, MessageCircleQuestion, Pencil, PersonStanding, ShieldCheck, ShoppingBag, Ticket } from 'lucide-react';
+import { BOT_ASK_LINK, openBotAsk } from '../lib/telegram';
 import Header from './Header';
 import DocLink from './legal/DocLink';
 import { ApiError, patchMe, type EventDto, type UserDto } from '../lib/api';
@@ -365,6 +366,19 @@ function ProfileScreen({
       )}
 
       <div className="pf-links">
+        {/* Поддержка — в боте (lib/support на бэке): частые вопросы и вопрос команде. */}
+        <a
+          href={BOT_ASK_LINK}
+          target="_blank"
+          rel="noreferrer"
+          className="pf-link pf-link--ink"
+          onClick={(e) => {
+            if (openBotAsk()) e.preventDefault();
+          }}
+        >
+          <MessageCircleQuestion size={20} strokeWidth={2} />
+          Задать вопрос
+        </a>
         {/* TODO: заглушка — истории платежей на бэкенде пока нет. */}
         <button type="button" className="pf-link pf-link--ink">
           <Ticket size={20} strokeWidth={2} />

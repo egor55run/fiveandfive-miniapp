@@ -121,7 +121,7 @@ const ru = {
   faq: {
     title: 'Вопросы',
     lead: 'Не нашли ответа?',
-    ask: 'Напишите нам в Telegram',
+    ask: 'Задать вопрос в Telegram',
   },
   cta: {
     register: 'Зарегистрироваться',
@@ -132,7 +132,7 @@ const ru = {
   },
   footer: {
     documents: 'Документы',
-    telegram: 'Telegram',
+    telegram: 'Задать вопрос в Telegram',
     faq: 'Вопросы',
     oferta: 'Оферта',
     privacy: 'Политика данных',

@@ -24,7 +24,8 @@ const TIMEOUT_MS = 10_000;
 const THROTTLE_MS = 50;
 
 export type SendOutcome =
-  | { ok: true }
+  /** messageId — id отправленного сообщения (по нему поддержка находит ответ реплаем). */
+  | { ok: true; messageId?: number }
   /** blocked — 403: диалог не начат или бот заблокирован. Повторять бесполезно. */
   | { ok: false; blocked: boolean; error: string };
 
@@ -124,7 +125,10 @@ export async function sendMessage(
       };
     }
 
-    if (res.ok) return { ok: true };
+    if (res.ok) {
+      const sent = (await res.json().catch(() => null)) as { result?: { message_id?: number } } | null;
+      return { ok: true, messageId: sent?.result?.message_id };
+    }
 
     const body = (await res.json().catch(() => null)) as TelegramError | null;
     const description = body?.description ?? `HTTP ${res.status}`;
@@ -140,6 +144,49 @@ export async function sendMessage(
   }
 
   return { ok: false, blocked: false, error: 'Не удалось отправить после повтора' };
+}
+
+/** Вызов метода Bot API, ответ — result или ошибка значением. Не бросает. */
+async function callApi<T>(method: string, payload: object): Promise<{ ok: true; result: T } | { ok: false; error: string; blocked: boolean }> {
+  const token = process.env.BOT_TOKEN;
+  if (!token) return { ok: false, error: 'BOT_TOKEN не задан', blocked: false };
+  try {
+    const res = await fetch(`${API_ORIGIN}/bot${token}/${method}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    const body = (await res.json().catch(() => null)) as ({ result?: T } & TelegramError) | null;
+    if (res.ok && body?.result !== undefined) return { ok: true, result: body.result };
+    return { ok: false, error: body?.description ?? `HTTP ${res.status}`, blocked: res.status === 403 };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Сеть недоступна', blocked: false };
+  }
+}
+
+/**
+ * Скопировать сообщение (текст, фото с подписью…) в другой чат от имени бота —
+ * так вопрос с фото доходит до админа, а ответ админа — до человека.
+ */
+export async function copyMessage(
+  toChatId: string,
+  fromChatId: string,
+  messageId: number,
+  opts: { replyTo?: number } = {},
+): Promise<SendOutcome> {
+  const res = await callApi<{ message_id: number }>('copyMessage', {
+    chat_id: toChatId,
+    from_chat_id: fromChatId,
+    message_id: messageId,
+    ...(opts.replyTo ? { reply_parameters: { message_id: opts.replyTo, allow_sending_without_reply: true } } : {}),
+  });
+  return res.ok ? { ok: true, messageId: res.result.message_id } : { ok: false, blocked: res.blocked, error: res.error };
+}
+
+/** Меню команд бота (кнопка «Меню» слева от поля ввода). */
+export async function setMyCommands(commands: { command: string; description: string }[]): Promise<boolean> {
+  return (await callApi<boolean>('setMyCommands', { commands })).ok;
 }
 
 /**

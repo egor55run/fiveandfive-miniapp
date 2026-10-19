@@ -29,6 +29,7 @@ import { registrationOpen } from './lib/registrationWindow';
 import { loadLegalDocuments } from './lib/legal';
 import { MAX_REGULATIONS_BYTES } from './lib/regulations';
 import { ensureEventSlugs } from './lib/slug';
+import { setMyCommands } from './lib/telegramBot';
 import { registrationsRoutes } from './routes/registrations';
 import { seasonsRoutes } from './routes/seasons';
 
@@ -186,6 +187,14 @@ async function main() {
   }
   if (!process.env.TELEGRAM_WEBHOOK_SECRET) {
     app.log.warn('TELEGRAM_WEBHOOK_SECRET не задан — входящие сообщения боту отклоняются (подписка «узнать об открытии» не работает)');
+  } else {
+    // Меню команд бота (кнопка «Меню» у поля ввода). Повторный вызов безопасен.
+    void setMyCommands([
+      { command: 'start', description: 'Главное меню' },
+      { command: 'help', description: '❓ Задать вопрос' },
+      { command: 'partner', description: '🤝 Стать партнёром' },
+      { command: 'stop', description: 'Не присылать новости' },
+    ]).then((ok) => !ok && app.log.warn('Не удалось задать меню команд бота'));
   }
 
   app.addHook('onClose', async () => {

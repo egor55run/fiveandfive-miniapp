@@ -26,7 +26,8 @@ import { adminTelegramIds } from './telegramLogin';
  *   BREVO_API_KEY=<ключ API v3>
  *   EMAIL_FROM_NAME=5&5                     (по умолчанию)
  *   EMAIL_FROM=noreply@fiveandfive.kz       (по умолчанию)
- *   EMAIL_REPLY_TO=info@fiveandfive.kz      (по умолчанию)
+ *   EMAIL_REPLY_TO=egorkadirov1@gmail.com   (по умолчанию; ящика info@ нет —
+ *                                           вопросы идут в бота, решение 2026-10-19)
  *   EMAIL_DAILY_LIMIT=290                   (по умолчанию)
  */
 
@@ -34,7 +35,7 @@ const BREVO_URL = 'https://api.brevo.com/v3/smtp/email';
 
 export const EMAIL_FROM = process.env.EMAIL_FROM?.trim() || 'noreply@fiveandfive.kz';
 export const EMAIL_FROM_NAME = process.env.EMAIL_FROM_NAME?.trim() || '5&5';
-export const EMAIL_REPLY_TO = process.env.EMAIL_REPLY_TO?.trim() || 'info@fiveandfive.kz';
+export const EMAIL_REPLY_TO = process.env.EMAIL_REPLY_TO?.trim() || 'egorkadirov1@gmail.com';
 const DAILY_LIMIT = Number(process.env.EMAIL_DAILY_LIMIT) || 290;
 const DAY_MS = 86_400_000;
 /** Сколько раз пробуем письмо, которое Brevo отклоняет не из-за лимита. */
