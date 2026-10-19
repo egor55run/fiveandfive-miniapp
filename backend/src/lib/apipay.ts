@@ -74,7 +74,7 @@ export function apiPayConfigured(): boolean {
   return apiKey() !== null;
 }
 
-async function call<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
+async function call<T>(method: 'GET' | 'POST', path: string, body?: unknown, opts: { raw?: boolean } = {}): Promise<T> {
   const key = apiKey();
   if (!key) throw new ApiPayError('APIPAY_API_KEY не задан', 0, 'not_configured');
 
@@ -120,7 +120,8 @@ async function call<T>(method: 'GET' | 'POST', path: string, body?: unknown): Pr
     throw new ApiPayError(message, res.status, code);
   }
 
-  return unwrapInvoice(data) as T;
+  // raw — ответ не про один счёт (список возвратов: { invoice, refunds }).
+  return (opts.raw ? data : unwrapInvoice(data)) as T;
 }
 
 /** `{ phone_number: ['…'] }` → «phone_number: …». null — ошибок по полям нет. */
@@ -202,7 +203,7 @@ export type ApiPayInvoiceRefunds = {
 
 /** Возвраты по счёту — источник правды для вебхука invoice.refunded. */
 export function getInvoiceRefunds(id: number): Promise<ApiPayInvoiceRefunds> {
-  return call<ApiPayInvoiceRefunds>('GET', `/invoices/${id}/refunds`);
+  return call<ApiPayInvoiceRefunds>('GET', `/invoices/${id}/refunds`, undefined, { raw: true });
 }
 
 export function cancelInvoice(id: number): Promise<ApiPayInvoice> {
