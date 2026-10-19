@@ -1,5 +1,7 @@
 import type { NotificationKind } from '@prisma/client';
 import { prisma } from '../prisma';
+import { escapeHtml, sendMessage } from './telegramBot';
+import { adminTelegramIds } from './telegramLogin';
 
 /**
  * Письма участникам через Brevo (Франция, серверы в ЕС) — HTTP API.
@@ -76,11 +78,32 @@ export async function sendEmail(to: string, msg: EmailMessage, toName?: string |
   if (res.ok) return { ok: true };
   const body = (await res.json().catch(() => null)) as { code?: string; message?: string } | null;
   const error = `HTTP ${res.status}${body?.code ? ` ${body.code}` : ''}: ${body?.message ?? ''}`.trim();
+  // 401/403 — ключ отозван, неверен или IP сервера не в Authorised IPs.
+  // Письмо не виновато: держим в очереди и сразу пишем владельцу.
+  const keyProblem = res.status === 401 || res.status === 403;
+  if (keyProblem) void alertKeyProblem(error);
   // 429 — частота; 402 и «credits/limit/quota» в тексте — кончился дневной
   // лимит тарифа; 5xx — сбой у Brevo. Всё это — подождать, а не бросить.
   const limitWords = /credit|limit|quota/i.test(`${body?.code ?? ''} ${body?.message ?? ''}`);
-  const retryLater = res.status === 429 || res.status === 402 || res.status >= 500 || limitWords;
+  const retryLater = keyProblem || res.status === 429 || res.status === 402 || res.status >= 500 || limitWords;
   return { ok: false, error, retryLater };
+}
+
+/**
+ * Brevo отказал из-за ключа — сообщение админам в Telegram (просьба
+ * пользователя 2026-10-19). Не чаще раза в час, чтобы очередь, которая
+ * пробует каждые 10 минут, не засыпала сообщениями.
+ */
+const KEY_ALERT_EVERY_MS = 60 * 60_000;
+let lastKeyAlert = 0;
+async function alertKeyProblem(error: string): Promise<void> {
+  if (Date.now() - lastKeyAlert < KEY_ALERT_EVERY_MS) return;
+  lastKeyAlert = Date.now();
+  const text =
+    `⛔ Brevo не принимает письма: ${escapeHtml(error.slice(0, 200))}.\n` +
+    'Похоже, ключ API отозван или неверен, либо IP сервера убран из Authorised IPs. ' +
+    'Письма ждут в очереди и уйдут, когда ключ заработает. Новый ключ — scripts/set-email-key.sh prod.';
+  for (const id of adminTelegramIds()) await sendMessage(String(id), text).catch(() => undefined);
 }
 
 /** Сколько писем ушло за последние 24 часа — наш счётчик лимита Brevo. */
