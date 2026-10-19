@@ -115,4 +115,4 @@
 | Telegram | @fiveandfive\_run\_bot |
 | Сайт | https://fiveandfive.kz |
 
-Редакция от 10 октября 2026 г.
+Редакция от 19 октября 2026 г.

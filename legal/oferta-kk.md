@@ -114,4 +114,4 @@
 | Telegram | @fiveandfive_run_bot |
 | Сайт | https://fiveandfive.kz |
 
-[жарияланған күні] редакциясы.
+2026 жылғы 19 қазандағы редакциясы.

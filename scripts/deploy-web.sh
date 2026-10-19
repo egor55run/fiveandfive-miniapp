@@ -23,8 +23,7 @@ case "$TARGET" in
     # Staging обслуживает тестовый бот: его имя видно на экране «Откройте в
     # Telegram» и нужно виджету входа в админку (см. src/lib/telegram.ts).
     BOT="fiveandfive_test_bot"
-    # Казахские версии оферты/политики/бланка — пока только на staging:
-    # их ещё проверяет юрист (решение пользователя 2026-10-08).
+    # Казахские версии оферты/политики/бланка (на проде с 2026-10-19).
     LEGAL_KK=1
     # Адрес для canonical/og:image/sitemap; staging — вне поиска.
     SITE_URL="https://staging.fiveandfive.kz"; SITE_INDEX=0
@@ -38,12 +37,13 @@ case "$TARGET" in
     REMOTE_DIR="web"; APP="fiveandfive-web"; PORT=3001
     API_INTERNAL="http://127.0.0.1:3000"
     BOT="fiveandfive_run_bot"
-    # На прод казахские версии — только по явной команде пользователя.
-    LEGAL_KK=0
+    # Казахские версии — на проде с 2026-10-19 (юрист одобрил, команда пользователя).
+    LEGAL_KK=1
     SITE_URL="https://fiveandfive.kz"; SITE_INDEX=1
     PRICES_PUBLIC=0
-    # Umami на проде ещё не стоит — счётчика нет (сначала staging и юрист).
-    UMAMI_ID=""
+    # Umami — с 2026-10-19 (раздел 7 политики одобрен юристом). Тот же экземпляр,
+    # что у staging (/stats, ~/umami-staging), но свой сайт «5&5» (fiveandfive.kz).
+    UMAMI_ID="7634ffe3-a1e9-484b-9b56-7147b7ff0008"
     ;;
   *) echo "Использование: $0 staging|prod"; exit 1 ;;
 esac
