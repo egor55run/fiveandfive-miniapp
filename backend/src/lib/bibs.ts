@@ -39,7 +39,8 @@ export async function pickupStarted(tx: Tx, event: Pick<Event, 'id' | 'date'>, n
 
 /** Блокировка на время выбора номера: ключи разведены по типу, чтобы старт 1 и сезон 1 не мешали друг другу. */
 async function lock(tx: Tx, kind: 'event' | 'season', id: number): Promise<void> {
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${kind === 'event' ? 51_001 : 51_002}, ${id})`;
+  // Два int4 — так Postgres выбирает вариант функции с парой ключей (Prisma шлёт числа как bigint).
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${kind === 'event' ? 51_001 : 51_002}::int4, ${id}::int4)`;
 }
 
 /** Наименьший свободный номер дистанции на старте; null — диапазона нет или он исчерпан. */
