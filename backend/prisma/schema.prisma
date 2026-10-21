@@ -39,14 +39,15 @@ model User {
   gender     Gender?
   createdAt  DateTime  @default(now()) @map("created_at")
 
-  registrations Registration[]
-  results       Result[]
-  seasonPasses  SeasonPass[]
-  notifications Notification[]
-  emails        EmailNotification[]
-  payments      Payment[]
-  consents      Consent[]
-  refunds       Refund[]
+  registrations    Registration[]
+  results          Result[]
+  seasonPasses     SeasonPass[]
+  notifications    Notification[]
+  emails           EmailNotification[]
+  payments         Payment[]
+  consents         Consent[]
+  refunds          Refund[]
+  promoRedemptions PromoRedemption[]
 
   @@map("users")
 }
@@ -60,6 +61,10 @@ model Season {
   /// Когда закрывается продажа абонемента. null — вместе с регистрацией на
   /// первый старт сезона (lib/seasonPass). Задаётся в админке.
   salesClosesAt DateTime? @map("sales_closes_at")
+  /// Стартовые номера абонементов: один номер на весь сезон, из этого
+  /// диапазона. Диапазоны дистанций стартов с ним не пересекаются (админка).
+  passBibFrom   Int?      @map("pass_bib_from")
+  passBibTo     Int?      @map("pass_bib_to")
   createdAt     DateTime  @default(now()) @map("created_at")
 
   events       Event[]
@@ -99,13 +104,24 @@ model Event {
   regulationsUrl       String?   @map("regulations_url")
   /// Где и когда основная выдача стартовых пакетов (за 2 и за 1 день до
   /// старта) — текст из админки. null — «[время и место уточняются]».
+  /// Комментарий к выдаче пакетов (раньше — «время и место» одной строкой).
   packetPickupInfo     String?   @map("packet_pickup_info")
+  /// Где выдаём стартовые пакеты: название места и адрес. Даты и часы — pickup_slots.
+  pickupPlace          String?   @map("pickup_place")
+  pickupAddress        String?   @map("pickup_address")
+  /// Оформление старта в Mini App: фон, логотип (пути /uploads/…), акцентный цвет #RRGGBB.
+  themeBgUrl           String?   @map("theme_bg_url")
+  themeLogoUrl         String?   @map("theme_logo_url")
+  themeAccent          String?   @map("theme_accent")
   createdAt            DateTime  @default(now()) @map("created_at")
 
   season        Season?             @relation(fields: [seasonId], references: [id], onDelete: SetNull)
   distances     EventDistance[]
   routeMaps     RouteMap[]
   announcements RaceAnnouncement[]
+  pickupSlots   PickupSlot[]
+  bibReserves   BibReserve[]
+  promoCodes    PromoCode[]
   registrations Registration[]
   results       Result[]
   notifications Notification[]
@@ -134,6 +150,10 @@ model Registration {
   /// Кто это, со слов администратора: «партнёр», «волонтёр»…
   manualNote    String?       @map("manual_note")
   paymentStatus PaymentStatus @default(PENDING) @map("payment_status")
+  /// Стартовый номер. Выдаётся при оплате (lib/bibs), уникален в пределах
+  /// старта. У абонемента — номер абонемента. После начала выдачи пакетов
+  /// отмена и возврат номер не освобождают.
+  bibNumber     Int?          @map("bib_number")
   /// Оформлен возврат (из админки или по вебхуку ApiPay): запись CANCELLED,
   /// место освобождено, в списке — «Возврат». Сбрасывается, если человек
   /// записался заново. Суммы — в refunds.
@@ -151,6 +171,7 @@ model Registration {
 
   // Один пользователь — одна регистрация на конкретный старт
   @@unique([userId, eventId])
+  @@unique([eventId, bibNumber])
   @@map("registrations")
 }
 
@@ -168,10 +189,17 @@ model EventDistance {
   sortOrder  Int      @default(0) @map("sort_order")
   /// На эту дистанцию записывает абонемент сезона (одна на старт; пока 5 км).
   seasonPass Boolean  @default(false) @map("season_pass")
+  /// Дистанция из справочника (3 км, 5 км…): по ней фильтруются результаты.
+  catalogId  Int      @map("catalog_id")
+  /// Стартовые номера этой дистанции: выдаются по порядку с bibFrom.
+  bibFrom    Int?     @map("bib_from")
+  bibTo      Int?     @map("bib_to")
   createdAt  DateTime @default(now()) @map("created_at")
 
   event         Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  catalog       Distance       @relation(fields: [catalogId], references: [id])
   registrations Registration[]
+  results       Result[]
 
   @@unique([eventId, label])
   @@index([eventId])
@@ -204,6 +232,8 @@ model SeasonPass {
   paymentStatus PaymentStatus @default(PENDING) @map("payment_status")
   /// Возврат за весь абонемент (все оставшиеся этапы): абонемент CANCELLED.
   refundedAt    DateTime?     @map("refunded_at")
+  /// Один стартовый номер на весь сезон (Season.passBibFrom..passBibTo).
+  bibNumber     Int?          @map("bib_number")
   createdAt     DateTime      @default(now()) @map("created_at")
 
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -215,19 +245,23 @@ model SeasonPass {
 
   // Один абонемент на сезон на пользователя
   @@unique([userId, seasonId])
+  @@unique([seasonId, bibNumber])
   @@map("season_passes")
 }
 
 model Result {
-  id         Int      @id @default(autoincrement())
-  userId     Int      @map("user_id")
-  eventId    Int      @map("event_id")
-  finishTime Int      @map("finish_time") // финишное время в секундах
-  place      Int // место в общем зачёте
-  recordedAt DateTime @default(now()) @map("recorded_at")
+  id              Int      @id @default(autoincrement())
+  userId          Int      @map("user_id")
+  eventId         Int      @map("event_id")
+  finishTime      Int      @map("finish_time") // финишное время в секундах
+  place           Int // место в общем зачёте
+  /// Дистанция результата (из регистрации) — для протоколов и рейтинга по дистанциям.
+  eventDistanceId Int?     @map("event_distance_id")
+  recordedAt      DateTime @default(now()) @map("recorded_at")
 
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event         Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventDistance EventDistance? @relation(fields: [eventDistanceId], references: [id], onDelete: SetNull)
 
   @@unique([userId, eventId])
   @@map("results")
@@ -376,6 +410,10 @@ model Payment {
   /// До какого момента держим место за участником.
   expiresAt         DateTime       @map("expires_at")
   paidAt            DateTime?      @map("paid_at")
+  /// Цена до скидки и скидка по промокоду; amount — итог к оплате.
+  baseAmount        Decimal?       @map("base_amount") @db.Decimal(10, 2)
+  discount          Decimal        @default(0) @db.Decimal(10, 2)
+  promoCodeId       Int?           @map("promo_code_id")
   /// Сколько вернули по счёту в ApiPay (total_refunded из вебхука invoice.refunded).
   refundedAmount    Decimal        @default(0) @map("refunded_amount") @db.Decimal(10, 2)
   /// Когда последний раз спрашивали статус у ApiPay (ограничиваем частоту опроса).
@@ -383,10 +421,12 @@ model Payment {
   createdAt         DateTime       @default(now()) @map("created_at")
   updatedAt         DateTime       @updatedAt @map("updated_at")
 
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  registration Registration? @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-  seasonPass   SeasonPass?   @relation(fields: [seasonPassId], references: [id], onDelete: Cascade)
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  registration Registration?     @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  seasonPass   SeasonPass?       @relation(fields: [seasonPassId], references: [id], onDelete: Cascade)
   refunds      Refund[]
+  promoCode    PromoCode?        @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+  redemptions  PromoRedemption[]
 
   @@index([state, expiresAt])
   @@index([registrationId])
@@ -593,4 +633,114 @@ model SupportMessage {
   @@index([adminChatId, adminMessageId])
   @@index([telegramId, createdAt])
   @@map("support_messages")
+}
+
+/// Справочник дистанций: 3 км, 5 км, 10 км и любые новые. Дистанции стартов
+/// (event_distances) ссылаются сюда — по справочнику потом фильтруются
+/// протоколы, рейтинг и аналитика (решение пользователя 2026-10-21).
+model Distance {
+  id        Int      @id @default(autoincrement())
+  /// «5 км» — как в названии дистанции у старта.
+  label     String   @unique
+  /// Длина в метрах; null — не удалось понять из названия.
+  meters    Int?
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  eventDistances EventDistance[]
+
+  @@map("distances")
+}
+
+/// Резерв номеров у старта: автоматически не выдаются, только вручную.
+model BibReserve {
+  id        Int      @id @default(autoincrement())
+  eventId   Int      @map("event_id")
+  bibFrom   Int      @map("bib_from")
+  bibTo     Int      @map("bib_to")
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@map("bib_reserves")
+}
+
+/// Дата и часы выдачи стартовых пакетов. Начало первого слота — «начало
+/// выдачи»: после него возврат по оферте не производится и номер не
+/// освобождается. Слотов нет — запасной вариант: за 2 дня до старта.
+model PickupSlot {
+  id       Int      @id @default(autoincrement())
+  eventId  Int      @map("event_id")
+  startsAt DateTime @map("starts_at")
+  endsAt   DateTime @map("ends_at")
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, startsAt])
+  @@map("pickup_slots")
+}
+
+enum PromoKind {
+  PERCENT
+  FIXED
+}
+
+/// Промокод (решения пользователя 2026-10-21): один раз на человека, общий
+/// лимит, срок действия; привязан к старту или (eventId null) ко всей серии —
+/// тогда действует и на абонемент. Скидка — до выставления счёта.
+model PromoCode {
+  id         Int       @id @default(autoincrement())
+  /// Хранится в верхнем регистре: «RUN10».
+  code       String    @unique
+  kind       PromoKind
+  /// Процент (1–100) или сумма в тенге.
+  value      Int
+  /// Сколько раз всего можно использовать; null — без лимита.
+  maxUses    Int?      @map("max_uses")
+  validFrom  DateTime? @map("valid_from")
+  validUntil DateTime? @map("valid_until")
+  eventId    Int?      @map("event_id")
+  active     Boolean   @default(true)
+  note       String?
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  event       Event?            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  payments    Payment[]
+  redemptions PromoRedemption[]
+
+  @@map("promo_codes")
+}
+
+enum PromoRedemptionStatus {
+  /// Счёт выставлен, ждём оплату — использование уже засчитано в лимит.
+  HELD
+  /// Оплачено (или код на 100% — регистрация бесплатная).
+  USED
+  /// Счёт не оплатили — использование вернулось в лимит.
+  RELEASED
+}
+
+/// Кто, когда и где использовал промокод.
+model PromoRedemption {
+  id             Int                   @id @default(autoincrement())
+  promoCodeId    Int                   @map("promo_code_id")
+  userId         Int                   @map("user_id")
+  paymentId      Int?                  @map("payment_id")
+  registrationId Int?                  @map("registration_id")
+  seasonPassId   Int?                  @map("season_pass_id")
+  baseAmount     Decimal               @map("base_amount") @db.Decimal(10, 2)
+  discount       Decimal               @db.Decimal(10, 2)
+  status         PromoRedemptionStatus @default(HELD)
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+
+  promoCode PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment   Payment?  @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@index([promoCodeId, status])
+  @@index([userId])
+  @@map("promo_redemptions")
 }

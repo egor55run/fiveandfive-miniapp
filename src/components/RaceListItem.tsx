@@ -2,6 +2,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { priceShort } from '../lib/prices';
 import type { EventDto } from '../lib/api';
 import FitTitle from './FitTitle';
+import { raceTheme } from '../lib/raceTheme';
 
 type Props = {
   event: EventDto;
@@ -15,14 +16,18 @@ const timeFmt = new Intl.DateTimeFormat('ru-RU', { hour: 'numeric', minute: '2-d
 function RaceListItem({ event, onSelect }: Props) {
   const reduceMotion = useReducedMotion();
   const date = new Date(event.date);
+  // Оформление старта из админки: фон, логотип, акцентный цвет.
+  const theme = raceTheme(event);
 
   return (
     <motion.button
       type="button"
-      className="race-item"
+      className={`race-item${theme ? ` ${theme.className}` : ''}`}
+      style={theme?.style}
       onClick={onSelect}
       whileTap={reduceMotion ? undefined : { scale: 0.99 }}
     >
+      {theme?.logoUrl && <img className="race-logo race-logo--sm" src={theme.logoUrl} alt="" />}
       <FitTitle as="h3" className="race-item__title u-display">
         {event.title}
       </FitTitle>

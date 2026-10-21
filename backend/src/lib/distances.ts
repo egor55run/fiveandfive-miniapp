@@ -24,12 +24,38 @@ export function serializeDistance(d: EventDistance) {
   return {
     id: d.id,
     label: d.label,
+    // Дистанция из справочника — по ней фильтруются результаты.
+    catalogId: d.catalogId,
+    // Диапазон стартовых номеров (lib/bibs); null — номера не выдаются.
+    bibFrom: d.bibFrom,
+    bibTo: d.bibTo,
     slotsTotal: d.slotsTotal,
     slotsTaken: d.slotsTaken,
     slotsLeft: Math.max(0, d.slotsTotal - d.slotsTaken),
     price: Number(d.price),
     seasonPass: d.seasonPass,
   };
+}
+
+/** «5 км» → 5000, «21,1 км» → 21100, «500 м» → 500; не понять — null. */
+export function metersFromLabel(label: string): number | null {
+  const km = label.match(/^\s*(\d+(?:[.,]\d+)?)\s*км/i);
+  if (km) return Math.round(Number(km[1].replace(',', '.')) * 1000);
+  const m = label.match(/^\s*(\d+)\s*м/i);
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * Дистанция справочника по названию: «5 км» у разных стартов — одна запись
+ * (без учёта регистра и лишних пробелов). Нет такой — заводим новую.
+ */
+export async function catalogIdFor(tx: Tx, label: string): Promise<number> {
+  const clean = label.trim().replace(/\s+/g, ' ');
+  const found = await tx.distance.findFirst({ where: { label: { equals: clean, mode: 'insensitive' } } });
+  if (found) return found.id;
+  const meters = metersFromLabel(clean);
+  const created = await tx.distance.create({ data: { label: clean, meters, sortOrder: meters ?? 1_000_000 } });
+  return created.id;
 }
 
 /**

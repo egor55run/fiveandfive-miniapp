@@ -13,6 +13,8 @@ import {
 import { ageProfileFields, parseBirthDate } from '../lib/birthDate';
 import { KASPI_PHONE_ERROR, normalizeKzPhone } from '../lib/apipay';
 import { recordConsents } from '../lib/legal';
+import { assignRegistrationBib } from '../lib/bibs';
+import { PromoError, holdPromo, linkPromoPayment, quotePromo, releaseHeldFor, type PromoQuote } from '../lib/promo';
 import { INVOICE_LIMIT_MESSAGE, hasActiveInvoice, invoiceLimitReached } from '../lib/invoiceLimit';
 import { checkAge, registrationDeadlinePassed } from '../lib/eligibility';
 import { deliver, seasonPassText } from '../lib/notify';
@@ -63,6 +65,8 @@ const bodySchema = z.object({
   gender: genderField.optional(),
   phone: phoneField,
   consents: consentsField,
+  // Промокод серии (lib/promo): код одного старта на абонемент не действует.
+  promoCode: z.string().trim().max(40).nullable().optional(),
 });
 
 // Причина, по которой абонемент нельзя оформить (all-or-nothing).
@@ -161,8 +165,30 @@ export async function seasonsRoutes(app: FastifyInstance) {
     }
 
     const price = Math.round(Number(season.price));
-    const paid = price > 0 && apiPayConfigured();
     const kaspiPhone = normalizeKzPhone(data.phone);
+    // Промокод: проверка и скидка до того, как занять места.
+    let quote: PromoQuote | null = null;
+    if (data.promoCode && price > 0) {
+      const me = await prisma.user.findUnique({ where: { telegramId }, select: { id: true } });
+      const myPass = me
+        ? await prisma.seasonPass.findUnique({ where: { userId_seasonId: { userId: me.id, seasonId: season.id } }, select: { id: true } })
+        : null;
+      try {
+        quote = await quotePromo(prisma, {
+          code: data.promoCode,
+          target: { kind: 'pass', seasonId: season.id },
+          base: price,
+          userId: me?.id ?? null,
+          reuseFor: { seasonPassId: myPass?.id },
+        });
+      } catch (err) {
+        if (err instanceof PromoError) return reply.code(400).send({ error: err.message, reason: 'promo', fields: { promoCode: err.message } });
+        throw err;
+      }
+    }
+    const total = quote ? quote.total : price;
+    const paid = total > 0 && apiPayConfigured();
+    const priceInfo = { base: price, discount: quote?.discount ?? 0, total, promoCode: quote?.promo.code ?? null };
     if (paid && !kaspiPhone) {
       return reply.code(400).send({
         error: KASPI_PHONE_ERROR,
@@ -318,6 +344,22 @@ export async function seasonsRoutes(app: FastifyInstance) {
           );
         }
 
+        // Использование промокода — за этим абонементом (лимит — под блокировкой).
+        let redemptionId: number | null = null;
+        if (quote) {
+          const held = await holdPromo(tx, {
+            code: quote.promo.code,
+            target: { kind: 'pass', seasonId: season.id },
+            base: price,
+            userId: user.id,
+            seasonPassId: pass.id,
+            free: total === 0,
+          });
+          redemptionId = held.redemptionId;
+        } else {
+          await releaseHeldFor(tx, { seasonPassId: pass.id });
+        }
+
         // Согласия — в той же транзакции, что и абонемент (lib/legal).
         await recordConsents(
           tx,
@@ -325,20 +367,24 @@ export async function seasonsRoutes(app: FastifyInstance) {
           { parentalConsent: minor },
         );
 
-        return { user, pass, registrations, events };
+        return { user, pass, registrations, events, redemptionId };
       });
 
       // Бесплатный сезон или оплата не настроена — без счёта, как раньше.
       if (!paid) {
         let pass = result.pass;
-        if (price <= 0) {
+        if (total <= 0) {
           pass = await prisma.seasonPass.update({
             where: { id: pass.id },
             data: { paymentStatus: 'PAID' },
           });
-          await prisma.registration.updateMany({
-            where: { seasonPassId: pass.id, paymentStatus: 'PENDING' },
-            data: { paymentStatus: 'PAID' },
+          await prisma.$transaction(async (tx) => {
+            const pending = await tx.registration.findMany({ where: { seasonPassId: pass.id, paymentStatus: 'PENDING' } });
+            await tx.registration.updateMany({
+              where: { id: { in: pending.map((r) => r.id) } },
+              data: { paymentStatus: 'PAID' },
+            });
+            for (const r of pending) await assignRegistrationBib(tx, r.id);
           });
         }
         // Одно сообщение на весь абонемент, а не пять подряд: eventId = null,
@@ -356,7 +402,12 @@ export async function seasonsRoutes(app: FastifyInstance) {
           eventId: null,
           kind: 'SEASON_PASS',
           to: result.user.email,
-          message: seasonPassEmail({ firstName: result.user.firstName, events: result.events }),
+          message: seasonPassEmail({
+            firstName: result.user.firstName,
+            events: result.events,
+            bib: (await prisma.seasonPass.findUnique({ where: { id: pass.id } }))?.bibNumber ?? null,
+            price: quote && total === 0 ? priceInfo : null,
+          }),
           log: req.log,
         });
         return reply.code(201).send({
@@ -364,23 +415,29 @@ export async function seasonsRoutes(app: FastifyInstance) {
           seasonPass: serializeSeasonPass(pass),
           registrations: result.registrations,
           payment: null,
+          price: priceInfo,
         });
       }
 
       const target = { purpose: 'SEASON_PASS' as const, seasonPassId: result.pass.id };
       const active = await findActivePayment(target);
       const payment =
-        active && active.phone === kaspiPhone && Number(active.amount) === price
+        active && active.phone === kaspiPhone && Number(active.amount) === total
           ? active
           : await startPayment({
               userId: result.user.id,
               target,
-              amount: price,
+              amount: total,
+              baseAmount: price,
+              discount: priceInfo.discount,
+              promoCodeId: quote?.promo.id ?? null,
               phone: kaspiPhone!,
               description: invoiceDescription(`абонемент ${season.title}`),
               clientName: `${data.lastName} ${data.firstName}`,
               log: req.log,
             });
+
+      if (result.redemptionId !== null) await linkPromoPayment(prisma, result.redemptionId, payment.id);
 
       if (!['PENDING', 'CREATED', 'PAID'].includes(payment.state)) {
         const limited = isInvoiceLimitFailure(payment);
@@ -397,6 +454,7 @@ export async function seasonsRoutes(app: FastifyInstance) {
         seasonPass: serializeSeasonPass(pass ?? result.pass),
         registrations: result.registrations,
         payment: serializePayment(payment),
+        price: priceInfo,
       });
     } catch (err) {
       if (err instanceof SeasonPassBlocked) {
@@ -408,6 +466,9 @@ export async function seasonsRoutes(app: FastifyInstance) {
           no_season_distance: `На старт «${err.eventTitle}» абонемент пока не действует. Запишитесь на него отдельно`,
         };
         return reply.code(409).send({ error: messages[err.reason], reason: err.reason });
+      }
+      if (err instanceof PromoError) {
+        return reply.code(400).send({ error: err.message, reason: 'promo', fields: { promoCode: err.message } });
       }
       throw err;
     }

@@ -45,8 +45,18 @@ export type EventDto = {
   program?: string | null;
   /** Положение (PDF), путь относительно корня API — через apiAsset. */
   regulationsUrl?: string | null;
-  /** Время и место основной выдачи стартовых пакетов; null — «уточняются». */
+  /** Комментарий к выдаче пакетов (старое поле «время и место»). */
   packetPickupInfo?: string | null;
+  /** Выдача пакетов: место, адрес, даты и часы. Нет поля — старый сервер. */
+  pickup?: {
+    place: string | null;
+    address: string | null;
+    comment: string | null;
+    slots: { startsAt: string; endsAt: string }[];
+    configured: boolean;
+  };
+  /** Оформление старта: фон, логотип (через apiAsset), акцентный цвет. null — обычный вид. */
+  theme?: { bgUrl: string | null; logoUrl: string | null; accent: string | null } | null;
   /**
    * Можно ли записаться. Сервер закрывает регистрацию, пока не включена оплата
    * (или вручную, REGISTRATION_OPEN=false). Нет поля — старый сервер, открыто.
@@ -144,10 +154,14 @@ export function isPaymentOpen(p: PaymentDto): boolean {
   return p.state === 'CREATED' || p.state === 'PENDING';
 }
 
+/** Цена, скидка по промокоду и итог. */
+export type PriceDto = { base: number; discount: number; total: number; promoCode: string | null };
+
 export type RegistrationResult = {
   user: UserDto;
   registration: RegistrationDto;
   payment: PaymentDto | null;
+  price?: PriceDto;
 };
 
 export type RegistrationPayload = {
@@ -164,6 +178,8 @@ export type RegistrationPayload = {
   /** Обе галочки формы — без них сервер ответит 400. */
   /** parent — обещание согласия родителя, обязательно для 16–17 лет на день старта. */
   consents: { oferta: true; privacy: true; parent?: true };
+  /** Промокод; скидку считает сервер до счёта в Kaspi. */
+  promoCode?: string | null;
 };
 
 // Ошибка с HTTP-статусом от сервера — чтобы UI мог различать 409/400 и т.д.
@@ -272,6 +288,14 @@ export type MeRegistrationDto = {
   paymentStatus: string;
   qrCode: string | null;
   registeredAt: string;
+  /** Дистанция участника. */
+  distance?: string | null;
+  /** Стартовый номер; у абонемента — общий на сезон. null — ещё не выдан. */
+  bibNumber?: number | null;
+  /** Оформлен возврат. */
+  refunded?: boolean;
+  /** Цена, скидка, итог (у старта из абонемента — за абонемент). */
+  price?: PriceDto | null;
   event: EventDto;
 };
 
@@ -386,6 +410,10 @@ export type SeasonPassDto = {
   seasonId: number;
   price: number;
   paymentStatus: string;
+  /** Номер на весь сезон. */
+  bibNumber?: number | null;
+  /** Цена, скидка, итог по оплате. */
+  paid?: PriceDto | null;
   createdAt: string;
 };
 
@@ -401,6 +429,7 @@ export type SeasonPassPayload = {
   /** Обе галочки формы — без них сервер ответит 400. */
   /** parent — обещание согласия родителя, обязательно для 16–17 лет на день старта. */
   consents: { oferta: true; privacy: true; parent?: true };
+  promoCode?: string | null;
 };
 
 export type SeasonPassResult = {
@@ -408,7 +437,22 @@ export type SeasonPassResult = {
   seasonPass: SeasonPassDto;
   registrations: RegistrationDto[];
   payment: PaymentDto | null;
+  price?: PriceDto;
 };
+
+/** Проверка промокода до отправки формы: цена, скидка, итог. */
+export type PromoQuoteDto = { code: string; kind: 'PERCENT' | 'FIXED'; value: number; base: number; discount: number; total: number };
+
+export function checkPromo(
+  body: { code: string; eventId: number; distanceId?: number } | { code: string; seasonId: number },
+): Promise<PromoQuoteDto> {
+  return request<PromoQuoteDto>('/promo/check', {
+    method: 'POST',
+    body,
+    preferServerMessage: true,
+    fallback: (s) => `Не удалось проверить промокод (${s})`,
+  });
+}
 
 // Активный сезон. Возвращает null, если сезона нет (404) — тогда UI
 // откатывается к одиночной регистрации без опции абонемента.

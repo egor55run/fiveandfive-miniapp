@@ -11,6 +11,8 @@ import {
 } from '../lib/registrationWindow';
 import { KASPI_PHONE_ERROR, normalizeKzPhone } from '../lib/apipay';
 import { recordConsents } from '../lib/legal';
+import { assignRegistrationBib } from '../lib/bibs';
+import { PromoError, holdPromo, linkPromoPayment, quotePromo, releaseHeldFor, type PromoQuote } from '../lib/promo';
 import { INVOICE_LIMIT_MESSAGE, hasActiveInvoice, invoiceLimitReached } from '../lib/invoiceLimit';
 import {
   checkAge,
@@ -58,6 +60,8 @@ const bodySchema = z.object({
   gender: genderField.optional(),
   phone: phoneField,
   consents: consentsField,
+  // Промокод (lib/promo): скидка считается здесь, до счёта в Kaspi.
+  promoCode: z.string().trim().max(40).nullable().optional(),
 });
 
 /** Почему место занять нельзя — ответ 409 с готовой фразой. */
@@ -103,7 +107,7 @@ export async function registrationsRoutes(app: FastifyInstance) {
       const tg = tgUserOf(req);
       const telegramId = BigInt(tg.id);
 
-      const event = await prisma.event.findUnique({ where: { id: data.eventId } });
+      const event = await prisma.event.findUnique({ where: { id: data.eventId }, include: { pickupSlots: { orderBy: { startsAt: 'asc' } } } });
       if (!event) {
         return reply.code(404).send({ error: 'Event not found' });
       }
@@ -115,15 +119,7 @@ export async function registrationsRoutes(app: FastifyInstance) {
 
       // Цена — у дистанции: 5 км и 3 км могут стоить по-разному.
       const price = Math.round(Number(distance.price));
-      const paid = price > 0 && apiPayConfigured();
       const kaspiPhone = normalizeKzPhone(data.phone);
-      if (paid && !kaspiPhone) {
-        return reply.code(400).send({
-          error: KASPI_PHONE_ERROR,
-          reason: 'validation',
-          fields: { phone: KASPI_PHONE_ERROR },
-        });
-      }
 
       // Срок регистрации и возраст — до любой записи в базу (lib/eligibility).
       // Срок действует и для администраторов: если нужно дописать кого-то
@@ -148,6 +144,39 @@ export async function registrationsRoutes(app: FastifyInstance) {
         data.consents.parent === true,
       );
       if (!age.ok) return reply.code(400).send(age.body);
+
+      // Промокод: проверка и скидка до того, как занять место. Повторное
+      // нажатие с тем же кодом для той же записи — не второе использование.
+      let quote: PromoQuote | null = null;
+      if (data.promoCode && price > 0) {
+        const mine = known
+          ? await prisma.registration.findUnique({ where: { userId_eventId: { userId: known.id, eventId: event.id } }, select: { id: true } })
+          : null;
+        try {
+          quote = await quotePromo(prisma, {
+            code: data.promoCode,
+            target: { kind: 'race', eventId: event.id },
+            base: price,
+            userId: known?.id ?? null,
+            reuseFor: { registrationId: mine?.id },
+          });
+        } catch (err) {
+          if (err instanceof PromoError) return reply.code(400).send({ error: err.message, reason: 'promo', fields: { promoCode: err.message } });
+          throw err;
+        }
+      }
+      // Итог к оплате; 0 ₸ (код на 100%) — без счёта, сразу «оплачено».
+      const total = quote ? quote.total : price;
+      const paid = total > 0 && apiPayConfigured();
+      if (paid && !kaspiPhone) {
+        return reply.code(400).send({
+          error: KASPI_PHONE_ERROR,
+          reason: 'validation',
+          fields: { phone: KASPI_PHONE_ERROR },
+        });
+      }
+      const priceInfo = { base: price, discount: quote?.discount ?? 0, total, promoCode: quote?.promo.code ?? null };
+
       // Дневной лимит счетов Kaspi выбран — отказ до того, как занять место
       // (lib/invoiceLimit). Если счёт у человека уже ждёт — пропускаем.
       if (paid && (await invoiceLimitReached()) && !(known && (await hasActiveInvoice(known.id)))) {
@@ -213,9 +242,24 @@ export async function registrationsRoutes(app: FastifyInstance) {
       };
 
       let registration: Registration;
+      let redemptionId: number | null = null;
       try {
         registration = await prisma.$transaction(async (tx) => {
           const reg = await claimSlot(tx);
+          // Использование промокода — за этой записью (лимит перепроверяется под блокировкой).
+          if (quote) {
+            const held = await holdPromo(tx, {
+              code: quote.promo.code,
+              target: { kind: 'race', eventId: event.id },
+              base: price,
+              userId: user.id,
+              registrationId: reg.id,
+              free: total === 0,
+            });
+            redemptionId = held.redemptionId;
+          } else {
+            await releaseHeldFor(tx, { registrationId: reg.id });
+          }
           // Согласия с офертой и политикой — в той же транзакции: регистрации
           // без записанного согласия быть не должно (lib/legal).
           await recordConsents(
@@ -231,15 +275,19 @@ export async function registrationsRoutes(app: FastifyInstance) {
             .code(409)
             .send({ error: BLOCKED_MESSAGES[err.reason], reason: err.reason });
         }
+        if (err instanceof PromoError) {
+          return reply.code(400).send({ error: err.message, reason: 'promo', fields: { promoCode: err.message } });
+        }
         throw err;
       }
 
       // Бесплатный старт или оплата не настроена — без счёта.
       if (!paid) {
-        if (price <= 0) {
-          registration = await prisma.registration.update({
-            where: { id: registration.id },
-            data: { paymentStatus: 'PAID' },
+        if (total <= 0) {
+          registration = await prisma.$transaction(async (tx) => {
+            await tx.registration.update({ where: { id: registration.id }, data: { paymentStatus: 'PAID' } });
+            await assignRegistrationBib(tx, registration.id);
+            return tx.registration.findUniqueOrThrow({ where: { id: registration.id } });
           });
         }
         await deliver({
@@ -256,13 +304,22 @@ export async function registrationsRoutes(app: FastifyInstance) {
           eventId: event.id,
           kind: 'REGISTERED',
           to: user.email,
-          message: registrationEmail({ firstName: user.firstName, event, distance: distance.label }),
+          message: registrationEmail({
+            firstName: user.firstName,
+            event,
+            distance: distance.label,
+            bib: registration.bibNumber,
+            // Код на 100%: цена, скидка и итог 0 ₸ — как просил пользователь.
+            // (без оплаты при выключенном Kaspi суммы не пишем — денег не было).
+            price: quote && total === 0 ? priceInfo : null,
+          }),
           log: req.log,
         });
         return reply.code(201).send({
           user: serializeUser(user),
           registration,
           payment: null,
+          price: priceInfo,
         });
       }
 
@@ -270,17 +327,21 @@ export async function registrationsRoutes(app: FastifyInstance) {
       const target = { purpose: 'REGISTRATION' as const, registrationId: registration.id };
       const active = await findActivePayment(target);
       const payment =
-        active && active.phone === kaspiPhone && Number(active.amount) === price
+        active && active.phone === kaspiPhone && Number(active.amount) === total
           ? active
           : await startPayment({
               userId: user.id,
               target,
-              amount: price,
+              amount: total,
+              baseAmount: price,
+              discount: priceInfo.discount,
+              promoCodeId: quote?.promo.id ?? null,
               phone: kaspiPhone!,
               description: invoiceDescription(`${event.title}, ${distance.label}`),
               clientName: `${data.lastName} ${data.firstName}`,
               log: req.log,
             });
+      if (redemptionId !== null) await linkPromoPayment(prisma, redemptionId, payment.id);
 
       if (!['PENDING', 'CREATED', 'PAID'].includes(payment.state)) {
         const limited = isInvoiceLimitFailure(payment);
@@ -296,6 +357,7 @@ export async function registrationsRoutes(app: FastifyInstance) {
         user: serializeUser(user),
         registration: fresh ?? registration,
         payment: serializePayment(payment),
+        price: priceInfo,
       });
     },
   );

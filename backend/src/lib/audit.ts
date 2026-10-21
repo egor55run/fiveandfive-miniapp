@@ -11,6 +11,7 @@ export type AuditAction =
   | 'participant.create'
   | 'registration.status'
   | 'registration.refund'
+  | 'registration.bib'
   | 'season.update';
 
 /** { поле: [было, стало] } — только то, что действительно изменилось. */

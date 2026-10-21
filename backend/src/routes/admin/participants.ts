@@ -6,6 +6,7 @@ import { ageOnStartDay, checkAge } from '../../lib/eligibility';
 import { ageFromBirthDate, formatBirthDate, parseBirthDate } from '../../lib/birthDate';
 import { diffFields, personLabel, writeAudit } from '../../lib/audit';
 import { REFUND_PERCENTS, RefundError, applyAdminRefund, money, refundPreview } from '../../lib/refunds';
+import { BibError, assignMissingBibs, assignRegistrationBib, releaseRegistrationBib, setBibManually } from '../../lib/bibs';
 import {
   birthDateField,
   emailField,
@@ -59,6 +60,42 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
       const results = await prisma.result.findMany({ where: { eventId } });
       const resultByUser = new Map(results.map((r) => [r.userId, r]));
 
+      // Цена, скидка и итог: оплаченный счёт (старта или абонемента) или код на 100%.
+      const regIds = registrations.map((r) => r.id);
+      const passIds = registrations.map((r) => r.seasonPassId).filter((x): x is number => x !== null);
+      const paidPayments = await prisma.payment.findMany({
+        where: { state: 'PAID', OR: [{ registrationId: { in: regIds } }, { seasonPassId: { in: passIds } }] },
+        include: { promoCode: true },
+        orderBy: { paidAt: 'desc' },
+      });
+      const freeCodes = await prisma.promoRedemption.findMany({
+        where: { status: 'USED', paymentId: null, OR: [{ registrationId: { in: regIds } }, { seasonPassId: { in: passIds } }] },
+        include: { promoCode: true },
+      });
+      const priceOf = (r: { id: number; seasonPassId: number | null }) => {
+        const match = (x: { registrationId: number | null; seasonPassId: number | null }) =>
+          r.seasonPassId ? x.seasonPassId === r.seasonPassId : x.registrationId === r.id;
+        const pay = paidPayments.find(match);
+        if (pay) {
+          const total = Math.round(Number(pay.amount));
+          const discount = Math.round(Number(pay.discount));
+          return {
+            base: pay.baseAmount !== null ? Math.round(Number(pay.baseAmount)) : total + discount,
+            discount,
+            total,
+            promoCode: pay.promoCode?.code ?? null,
+            pass: r.seasonPassId !== null,
+          };
+        }
+        const free = freeCodes.find(match);
+        if (free) {
+          const base = Math.round(Number(free.baseAmount));
+          const discount = Math.round(Number(free.discount));
+          return { base, discount, total: base - discount, promoCode: free.promoCode.code, pass: r.seasonPassId !== null };
+        }
+        return null;
+      };
+
       return {
         event: { id: event.id, title: event.title, date: event.date },
         distances: (
@@ -83,6 +120,10 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
             telegramId: r.user.telegramId?.toString() ?? null,
             username: r.user.username,
             paymentStatus: r.paymentStatus,
+            // Стартовый номер (lib/bibs); у абонемента — номер на весь сезон.
+            bibNumber: r.bibNumber,
+            // Цена, скидка, итог (у абонемента — за весь абонемент, pass: true).
+            price: priceOf(r),
             // Добавлен администратором без оплаты (партнёр, волонтёр).
             manual: r.manual,
             manualNote: r.manualNote,
@@ -157,6 +198,7 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
         reason: 'no_slots',
       };
       let updated;
+      let bibNote: 'released' | 'kept' | 'none' | number | null = null;
       try {
         updated = await prisma.$transaction(async (tx) => {
           const distanceId = await distanceIdOf(tx, registration);
@@ -175,10 +217,14 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
             subject: personLabel(registration.user),
             changes: { paymentStatus: [prev, next] },
           });
-          return tx.registration.update({
+          const saved = await tx.registration.update({
             where: { id },
             data: { paymentStatus: next, ...(distanceId ? { distanceId } : {}) },
           });
+          // Номер: оплатили — выдать; отменили — в пул (до начала выдачи пакетов).
+          if (next === 'PAID') bibNote = await assignRegistrationBib(tx, id);
+          if (next === 'CANCELLED') bibNote = await releaseRegistrationBib(tx, saved);
+          return tx.registration.findUniqueOrThrow({ where: { id } });
         });
       } catch (err) {
         if ((err as Error).message === 'no_slots') return reply.code(409).send(NO_SLOTS);
@@ -197,6 +243,9 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
       return {
         registrationId: updated.id,
         paymentStatus: updated.paymentStatus,
+        bibNumber: updated.bibNumber,
+        // 'kept' — выдача пакетов уже началась: номер остался за записью.
+        bibNote,
         slotsChanged: delta,
         event: event
           ? {
@@ -338,6 +387,7 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
           },
         });
         await tx.registration.update({ where: { id: reg.id }, data: { qrCode: `fiveandfive://ticket/${reg.id}` } });
+        await assignRegistrationBib(tx, reg.id);
         await writeAudit(tx, {
           adminTelegramId: req.admin!.telegramId,
           action: 'participant.create',
@@ -357,6 +407,53 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
     }
     req.log.info({ eventId, registrationId }, 'Участник добавлен вручную из админки');
     return reply.code(201).send({ registrationId });
+  });
+
+  /**
+   * PATCH /admin/registrations/:id/bib — ручная смена номера { bib: число | null }.
+   * У абонемента — на весь сезон (все его старты). В журнал изменений.
+   */
+  const bibSchema = z.object({ bib: z.number().int().min(1).max(999_999).nullable() });
+  app.patch<{ Params: { id: string } }>('/admin/registrations/:id/bib', async (req, reply) => {
+    const id = parseId(req.params.id);
+    if (id === null) return reply.code(400).send({ error: 'Некорректный id' });
+    const parsed = bibSchema.safeParse(req.body);
+    if (!parsed.success) return sendValidationError(reply, parsed.error);
+    const reg = await prisma.registration.findUnique({ where: { id }, include: { user: true } });
+    if (!reg) return reply.code(404).send({ error: 'Регистрация не найдена' });
+    try {
+      const res = await prisma.$transaction(async (tx) => {
+        const out = await setBibManually(tx, id, parsed.data.bib);
+        const before = reg.bibNumber === null ? null : String(reg.bibNumber);
+        const after = parsed.data.bib === null ? null : String(parsed.data.bib);
+        for (const rid of out.changed) {
+          const r = await tx.registration.findUniqueOrThrow({ where: { id: rid } });
+          await writeAudit(tx, {
+            adminTelegramId: req.admin!.telegramId,
+            action: 'registration.bib',
+            eventId: r.eventId,
+            registrationId: rid,
+            userId: reg.userId,
+            subject: personLabel(reg.user),
+            changes: { bib: [before, after] },
+          });
+        }
+        return out;
+      });
+      return { bibNumber: parsed.data.bib, registrations: res.changed.length, seasonWide: reg.seasonPassId !== null };
+    } catch (err) {
+      if (err instanceof BibError) return reply.code(409).send({ error: err.message, reason: 'bib_taken' });
+      throw err;
+    }
+  });
+
+  /** POST /admin/events/:id/assign-bibs — выдать номера оплаченным без номера. */
+  app.post<{ Params: { id: string } }>('/admin/events/:id/assign-bibs', async (req, reply) => {
+    const eventId = parseId(req.params.id);
+    if (eventId === null) return reply.code(400).send({ error: 'Некорректный id' });
+    const res = await prisma.$transaction((tx) => assignMissingBibs(tx, eventId));
+    req.log.info({ eventId, ...res }, 'Номера выданы оплаченным без номера');
+    return res;
   });
 
   /**

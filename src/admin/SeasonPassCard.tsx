@@ -10,6 +10,8 @@ import { formatDateTime, priceFmt, toDateTimeLocal } from './helpers';
 export default function SeasonPassCard({ season, onSaved }: { season: SeasonOption; onSaved: (s: SeasonOption) => void }) {
   const [price, setPrice] = useState(String(season.price));
   const [closesAt, setClosesAt] = useState(season.salesClosesAtCustom ? toDateTimeLocal(season.salesClosesAtCustom) : '');
+  const [bibFrom, setBibFrom] = useState(season.passBibFrom === null ? '' : String(season.passBibFrom));
+  const [bibTo, setBibTo] = useState(season.passBibTo === null ? '' : String(season.passBibTo));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -24,12 +26,20 @@ export default function SeasonPassCard({ season, onSaved }: { season: SeasonOpti
       setError('Продажа абонемента должна закрываться не позже первого старта сезона');
       return;
     }
+    const from = bibFrom.trim() === '' ? null : Number(bibFrom);
+    const to = bibTo.trim() === '' ? null : Number(bibTo);
+    if ((from === null) !== (to === null) || (from !== null && to !== null && (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || from > to))) {
+      setError('Номера абонементов: укажите «с» и «по» целыми числами, «с» не больше «по»');
+      return;
+    }
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
       const saved = await updateSeason(season.id, {
         price: value,
+        passBibFrom: from,
+        passBibTo: to,
         // datetime-local — местное время браузера; на сервер — в UTC.
         salesClosesAt: closesAt ? new Date(closesAt).toISOString() : null,
       });
@@ -61,6 +71,17 @@ export default function SeasonPassCard({ season, onSaved }: { season: SeasonOpti
             {closesAt
               ? 'Задано вручную. Очистите поле — вернётся «вместе с регистрацией на 1-й этап»'
               : `Пусто — вместе с регистрацией на 1-й этап${season.salesClosesAt ? `: ${formatDateTime(season.salesClosesAt)}` : ''}`}
+          </span>
+        </label>
+        <label>
+          <span>Номера абонементов, с — по</span>
+          <span className="ad-nowrap">
+            <input type="number" min="1" className="ad-input--num" value={bibFrom} disabled={busy} placeholder="с" onChange={(e) => setBibFrom(e.target.value)} />
+            {' — '}
+            <input type="number" min="1" className="ad-input--num" value={bibTo} disabled={busy} placeholder="по" onChange={(e) => setBibTo(e.target.value)} />
+          </span>
+          <span className="ad-hint ad-hint--dim">
+            Один номер на весь сезон, выдаётся при оплате. Не должен пересекаться с номерами дистанций стартов.
           </span>
         </label>
       </div>

@@ -644,3 +644,66 @@ select:focus {
   color: #f0b46a;
   white-space: nowrap;
 }
+
+/* Предупреждение: что у старта не заполнено. */
+.ad-msg--warn {
+  background: rgba(229, 160, 72, 0.14);
+  color: #f0b46a;
+}
+.ad-warn {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #f0b46a;
+}
+
+/* Короткие числовые поля: номера, цвет. */
+.ad-input--num {
+  width: 90px;
+}
+
+/* Оформление старта: превью фона и логотипа. */
+.ad-theme__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.ad-theme__name {
+  min-width: 120px;
+  font-weight: 600;
+}
+.ad-theme__preview {
+  border-radius: 8px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.06);
+}
+.ad-theme__preview--bg {
+  width: 160px;
+  height: 80px;
+}
+.ad-theme__preview--logo {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+
+/* Стартовый номер в списке участников. */
+.ad-bib {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+/* Кнопка-ссылка в таблице (номер участника). */
+.ad-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+.ad-link:disabled {
+  cursor: default;
+  opacity: 0.6;
+}

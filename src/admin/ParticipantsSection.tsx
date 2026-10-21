@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
+  assignBibs,
+  setBib,
   getEvents,
   addParticipant,
   getParticipants,
@@ -10,7 +12,7 @@ import {
   type Participant,
   type PaymentStatus,
 } from './api';
-import { downloadParticipantsCsv } from './exportCsv';
+import { downloadParticipantsCsv, downloadStartListCsv } from './exportCsv';
 import AuditLog from './AuditLog';
 import ParticipantForm, { type ParticipantFormValues } from './ParticipantForm';
 import RefundForm from './RefundForm';
@@ -95,12 +97,22 @@ export default function ParticipantsSection() {
           x.registrationId === p.registrationId ? { ...x, paymentStatus: next } : x,
         ),
       );
+      setParticipants((prev) =>
+        prev.map((x) => (x.registrationId === p.registrationId ? { ...x, bibNumber: res.bibNumber } : x)),
+      );
       const slotNote =
-        res.slotsChanged === -1
+        (res.slotsChanged === -1
           ? ' Слот освобождён.'
           : res.slotsChanged === 1
             ? ' Слот снова занят.'
-            : '';
+            : '') +
+        (res.bibNote === 'kept'
+          ? ` Выдача пакетов уже началась — номер ${p.bibNumber} остаётся за записью.`
+          : res.bibNote === 'released'
+            ? ' Номер вернулся в пул.'
+            : typeof res.bibNote === 'number'
+              ? ` Номер ${res.bibNote}.`
+              : '');
       setNotice(
         `${fullName(p.lastName, p.firstName)}: ${PAYMENT_LABEL[next]}.${slotNote}` +
           (res.event ? ` На старте занято ${res.event.slotsTaken} из ${res.event.slotsTotal}.` : ''),
@@ -135,6 +147,62 @@ export default function ParticipantsSection() {
     if (eventId !== null) await loadParticipants(eventId);
     // Счётчики мест в шапке — из списка стартов.
     setEvents(await getEvents());
+  };
+
+  // Ручная смена номера: у абонемента — на весь сезон.
+  const editBib = async (p: Participant) => {
+    const scope = p.seasonPassId !== null ? ' (абонемент — номер сменится на всех стартах сезона)' : '';
+    const answer = window.prompt(
+      `Стартовый номер: ${fullName(p.lastName, p.firstName)}${scope}.\nПусто — снять номер.`,
+      p.bibNumber === null ? '' : String(p.bibNumber),
+    );
+    if (answer === null) return;
+    const bib = answer.trim() === '' ? null : Number(answer);
+    if (bib !== null && (!Number.isInteger(bib) || bib < 1)) {
+      setError('Номер — целое положительное число');
+      return;
+    }
+    setBusyId(p.registrationId);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await setBib(p.registrationId, bib);
+      setParticipants((prev) => prev.map((x) => (x.registrationId === p.registrationId ? { ...x, bibNumber: bib } : x)));
+      setNotice(
+        `${fullName(p.lastName, p.firstName)}: ${bib === null ? 'номер снят' : `номер ${bib}`}` +
+          (res.seasonWide ? ` на всех стартах абонемента (${res.registrations})` : '') +
+          '. Записано в журнал.',
+      );
+      setAuditKey((k) => k + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось сменить номер');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const giveBibs = async () => {
+    if (eventId === null) return;
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await assignBibs(eventId);
+      setNotice(
+        res.assigned === 0 && res.missing === 0
+          ? 'У всех оплаченных номера уже есть.'
+          : `Выдано номеров: ${res.assigned}.` + (res.missing > 0 ? ` Не хватило номеров: ${res.missing} — проверьте диапазоны дистанций.` : ''),
+      );
+      await loadParticipants(eventId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось выдать номера');
+    }
+  };
+
+  const missingBibs = participants.filter((p) => p.paymentStatus === 'PAID' && p.bibNumber === null).length;
+
+  const exportStartList = () => {
+    if (!selected) return;
+    downloadStartListCsv(participants, `startovyi-spisok-${selected.slug ?? selected.id}.csv`);
   };
 
   const exportCsv = () => {
@@ -183,6 +251,20 @@ export default function ParticipantsSection() {
           <button type="button" className="ad-btn" disabled={shown.length === 0} onClick={exportCsv}>
             Выгрузить в Excel (CSV)
           </button>
+          <button
+            type="button"
+            className="ad-btn"
+            disabled={participants.length === 0}
+            title="Номер, ФИО, пол, дата рождения, дистанция — для программы хронометража"
+            onClick={exportStartList}
+          >
+            Стартовый список (CSV)
+          </button>
+          {missingBibs > 0 && (
+            <button type="button" className="ad-btn" onClick={() => void giveBibs()} title="Оплачено, но номера нет">
+              Выдать номера ({missingBibs})
+            </button>
+          )}
           <button type="button" className="ad-btn" disabled={eventId === null} onClick={() => setEditing('new')}>
             + Добавить участника
           </button>
@@ -267,6 +349,7 @@ export default function ParticipantsSection() {
           <table className="ad-table">
             <thead>
               <tr>
+                <th className="num">№</th>
                 <th>ФИО</th>
                 <th>Дистанция</th>
                 <th>Телефон</th>
@@ -275,6 +358,7 @@ export default function ParticipantsSection() {
                 <th>Telegram</th>
                 <th>Записался</th>
                 <th>Результат</th>
+                <th title="Цена, скидка по промокоду, итог">Сумма</th>
                 <th>Оплата</th>
                 <th aria-label="Действия" />
               </tr>
@@ -285,6 +369,17 @@ export default function ParticipantsSection() {
                   key={p.registrationId}
                   className={p.paymentStatus === 'CANCELLED' ? 'ad-row--muted' : undefined}
                 >
+                  <td className="num ad-nowrap">
+                    <button
+                      type="button"
+                      className="ad-link ad-bib"
+                      disabled={busyId === p.registrationId}
+                      title={p.seasonPassId !== null ? 'Номер абонемента — на весь сезон. Нажмите, чтобы сменить' : 'Нажмите, чтобы сменить номер'}
+                      onClick={() => void editBib(p)}
+                    >
+                      {p.bibNumber ?? '—'}
+                    </button>
+                  </td>
                   <td>
                     {fullName(p.lastName, p.firstName)}
                     {p.ageOnStart !== null && p.ageOnStart >= 16 && p.ageOnStart < 18 && (
@@ -318,6 +413,24 @@ export default function ParticipantsSection() {
                     {p.result
                       ? `${formatSeconds(p.result.finishTime)} · ${p.result.place} место`
                       : '—'}
+                  </td>
+                  <td className="ad-nowrap">
+                    {p.price ? (
+                      p.price.discount > 0 ? (
+                        <span title={`Цена ${p.price.base} ₸, скидка ${p.price.discount} ₸ (${p.price.promoCode ?? 'промокод'})`}>
+                          <s>{p.price.base.toLocaleString('ru-RU')}</s> → {p.price.total.toLocaleString('ru-RU')} ₸
+                          <div className="ad-hint ad-hint--dim">
+                            {p.price.promoCode} −{p.price.discount.toLocaleString('ru-RU')} ₸{p.price.pass ? ' · абонемент' : ''}
+                          </div>
+                        </span>
+                      ) : (
+                        <>
+                          {p.price.total.toLocaleString('ru-RU')} ₸{p.price.pass && <div className="ad-hint ad-hint--dim">абонемент</div>}
+                        </>
+                      )
+                    ) : (
+                      '—'
+                    )}
                   </td>
                   <td>
                     {p.refund ? (

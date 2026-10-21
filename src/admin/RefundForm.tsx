@@ -62,6 +62,15 @@ export default function RefundForm({ registrationId, onDone, onCancel }: Props) 
   const total = chosen.reduce((sum, s) => sum + amountOf(s.base, percents[s.registrationId] ?? s.suggested), 0);
 
   const submit = async () => {
+    // После начала выдачи пакетов возврат по оферте не положен — переспрашиваем.
+    const late = chosen.filter((st) => st.pickupStarted);
+    if (late.length > 0) {
+      const ok = window.confirm(
+        `По старту «${late.map((st) => st.eventTitle).join('», «')}» выдача пакетов уже началась: по оферте (п. 5.1) ` +
+          'возврат не производится, номер останется за участником. Оформить возврат всё равно?',
+      );
+      if (!ok) return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -128,7 +137,15 @@ export default function RefundForm({ registrationId, onDone, onCancel }: Props) 
                   <tr key={s.registrationId} className={on ? undefined : 'ad-row--muted'}>
                     <td>{s.eventTitle}</td>
                     <td className="ad-nowrap">{formatDate(s.eventDate)}</td>
-                    <td>{s.note ?? `${s.daysLeft >= 0 ? `за ${s.daysLeft} дн.` : 'прошёл'}: ${s.rule}`}</td>
+                    <td>
+                      {s.note ?? `${s.daysLeft >= 0 ? `за ${s.daysLeft} дн.` : 'прошёл'}: ${s.rule}`}
+                      {on && s.pickupStarted && (
+                        <div className="ad-warn">
+                          ⚠ Выдача пакетов уже началась: по оферте возврат не производится
+                          {s.bibNumber !== null ? `, номер ${s.bibNumber} останется за участником` : ''}.
+                        </div>
+                      )}
+                    </td>
                     <td>
                       {on ? (
                         <select

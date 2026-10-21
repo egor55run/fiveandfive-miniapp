@@ -33,9 +33,10 @@ export async function syncFirstRouteMap(tx: Tx, eventId: number): Promise<void> 
  * висеть на двух стартах (одна трасса у этапа и финала) — тогда файл остаётся.
  */
 export async function deleteRouteFileIfUnused(url: string): Promise<boolean> {
+  // Тот же каталог хранит фон и логотип оформления старта — их тоже учитываем.
   const [maps, events] = await Promise.all([
     prisma.routeMap.count({ where: { url } }),
-    prisma.event.count({ where: { routeImageUrl: url } }),
+    prisma.event.count({ where: { OR: [{ routeImageUrl: url }, { themeBgUrl: url }, { themeLogoUrl: url }] } }),
   ]);
   if (maps > 0 || events > 0) return false;
   return deleteRouteImage(url);

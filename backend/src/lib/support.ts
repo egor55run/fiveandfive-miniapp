@@ -3,7 +3,7 @@ import path from 'node:path';
 import { prisma } from '../prisma';
 import { DISTANCE_ORDER } from './distances';
 import { registrationClosesAt } from './eligibility';
-import { dayMonth, pickupDaysText, pickupPlace, raceDayPickupText, timeOfDay } from './notify';
+import { dayMonth, pickupPlace, pickupWhenText, raceDayPickupText, timeOfDay } from './notify';
 import { registrationOpen } from './registrationWindow';
 import { copyMessage, escapeHtml, sendMessage, type InlineButton } from './telegramBot';
 import { adminTelegramIds } from './telegramLogin';
@@ -76,13 +76,13 @@ function faqHtml(id: string): string {
 // ---------- Ответы по темам ----------
 
 const pricesPublic = () => process.env.PRICES_PUBLIC?.trim().toLowerCase() === 'true';
-const money = (n: number) => `${new Intl.NumberFormat('ru-RU').format(n).replace(/ /g, ' ')} ₸`;
+const money = (n: number) => `${new Intl.NumberFormat('ru-RU').format(n).replace(/\u00a0/g, ' ')} ₸`;
 
 function upcomingEvents() {
   return prisma.event.findMany({
     where: { date: { gt: new Date() } },
     orderBy: { date: 'asc' },
-    include: { distances: { orderBy: DISTANCE_ORDER } },
+    include: { distances: { orderBy: DISTANCE_ORDER }, pickupSlots: { orderBy: { startsAt: 'asc' } } },
   });
 }
 
@@ -123,7 +123,7 @@ async function packAnswer(): Promise<string> {
   const events = await upcomingEvents();
   const pickup = events.map(
     (e) =>
-      `🎒 <b>${escapeHtml(e.title)}</b> (${dayMonth(e.date)}): ${pickupDaysText(e.date)} — ${escapeHtml(pickupPlace(e))}. ` +
+      `🎒 <b>${escapeHtml(e.title)}</b> (${dayMonth(e.date)}): ${escapeHtml(pickupWhenText(e))} — ${escapeHtml(pickupPlace(e))}. ` +
       `Иногородним — в день старта ${raceDayPickupText(e.date)}.`,
   );
   return [

@@ -56,6 +56,7 @@ export async function sendRaceReminders(
   const events = await prisma.event.findMany({
     where: { date: { gte: from, lt: to } },
     include: {
+      pickupSlots: { orderBy: { startsAt: 'asc' } },
       registrations: {
         // Отменённые регистрации не в счёт: человек на старт не идёт.
         where: { paymentStatus: { not: 'CANCELLED' } },
@@ -144,6 +145,7 @@ export async function sendDayBeforeReminders(now: Date = new Date(), log = jobLo
   const events = await prisma.event.findMany({
     where: { date: { gte: from, lt: to } },
     include: {
+      pickupSlots: { orderBy: { startsAt: 'asc' } },
       registrations: {
         where: { paymentStatus: { not: 'CANCELLED' } },
         include: { user: true, distance: true },

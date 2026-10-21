@@ -102,9 +102,34 @@ export function shiftDays(date: Date, days: number): Date {
  */
 export const PICKUP_TBD = '[время и место уточняются]';
 
-/** Время и место основной выдачи — из админки или «уточняются». */
-export function pickupPlace(event: { packetPickupInfo?: string | null }): string {
-  return event.packetPickupInfo?.trim() || PICKUP_TBD;
+/** Старт с полями выдачи пакетов (pickupSlots — если загружены вместе со стартом). */
+export type PickupEvent = {
+  date: Date;
+  packetPickupInfo?: string | null;
+  pickupPlace?: string | null;
+  pickupAddress?: string | null;
+  pickupSlots?: { startsAt: Date; endsAt: Date }[];
+};
+
+/**
+ * Где выдаём: «место, адрес» из админки (с комментарием в скобках). Не задано —
+ * старая строка «время и место» или «[время и место уточняются]».
+ */
+export function pickupPlace(event: PickupEvent): string {
+  const where = [event.pickupPlace?.trim(), event.pickupAddress?.trim()].filter(Boolean).join(', ');
+  const comment = event.packetPickupInfo?.trim();
+  if (where) return comment ? `${where} (${comment})` : where;
+  return comment || PICKUP_TBD;
+}
+
+/**
+ * Когда выдаём: даты и часы из админки («21 мая 12:00–20:00, 22 мая
+ * 10:00–18:00»). Слотов нет — запасное правило «за 2 и за 1 день до старта».
+ */
+export function pickupWhenText(event: PickupEvent): string {
+  const slots = event.pickupSlots ?? [];
+  if (slots.length === 0) return pickupDaysText(event.date);
+  return slots.map((s) => `${dayMonth(s.startsAt)} ${timeOfDay(s.startsAt)}–${timeOfDay(s.endsAt)}`).join(', ');
 }
 
 /** «с 07:00 до 08:00» — выдача в день старта (для иногородних). */
@@ -138,7 +163,7 @@ function packetLine(event: Event, now: Date): string {
   const pickupOver = now.getTime() >= startOfDayInTz(event.date).getTime();
   return pickupOver
     ? `🎒 Основная выдача стартовых пакетов уже прошла. ${raceDay}`
-    : `🎒 Стартовый пакет — ${pickupDaysText(event.date)}, ${escapeHtml(pickupPlace(event))}. ${raceDay} Возьмите документ, удостоверяющий личность.`;
+    : `🎒 Стартовый пакет — ${pickupWhenText(event)}, ${escapeHtml(pickupPlace(event))}. ${raceDay} Возьмите документ, удостоверяющий личность.`;
 }
 
 /**

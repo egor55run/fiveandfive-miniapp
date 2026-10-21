@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import { getInvoiceRefunds } from './apipay';
 import { personLabel, writeAudit } from './audit';
 import { distanceIdOf, releaseDistanceSlot } from './distances';
+import { pickupStarted, releasePassBib, releaseRegistrationBib } from './bibs';
 import { startOfDayInTz } from './notify';
 import { sendMessage } from './telegramBot';
 import { adminTelegramIds } from './telegramLogin';
@@ -40,7 +41,7 @@ export function suggestedPercent(eventDate: Date, now: Date = new Date()): { per
   return { percent: 0, daysLeft, rule: 'менее чем за 7 дней — без возврата' };
 }
 
-export const money = (n: number) => `${new Intl.NumberFormat('ru-RU').format(n).replace(/ /g, ' ')} ₸`;
+export const money = (n: number) => `${new Intl.NumberFormat('ru-RU').format(n).replace(/\u00a0/g, ' ')} ₸`;
 
 export class RefundError extends Error {
   constructor(message: string, public status = 409) {
@@ -82,6 +83,12 @@ export type RefundStage = {
   suggested: RefundPercent;
   daysLeft: number;
   rule: string;
+  /**
+   * Выдача пакетов на этом старте уже началась: по оферте возврат не
+   * производится, и номер при оформлении останется за участником.
+   */
+  pickupStarted: boolean;
+  bibNumber: number | null;
 };
 
 export type RefundPreview = {
@@ -117,8 +124,14 @@ export async function refundPreview(registrationId: number, now: Date = new Date
     : [{ ...reg }];
   const base = reg.seasonPassId ? Math.round(paid / regs.length) : paid;
 
+  const started = new Map<number, boolean>();
+  for (const r of regs) started.set(r.id, await pickupStarted(prisma, r.event, now));
+
   const stages = regs.map((r): RefundStage => {
-    const s = suggestedPercent(r.event.date, now);
+    const pickup = started.get(r.id)!;
+    const s = pickup
+      ? { percent: 0 as RefundPercent, daysLeft: suggestedPercent(r.event.date, now).daysLeft, rule: 'выдача пакетов уже началась — по оферте возврат не производится' }
+      : suggestedPercent(r.event.date, now);
     const note = r.refundedAt ? 'возврат уже оформлен' : r.paymentStatus !== 'PAID' ? 'запись не оплачена или отменена' : null;
     return {
       registrationId: r.id,
@@ -131,6 +144,8 @@ export async function refundPreview(registrationId: number, now: Date = new Date
       suggested: s.percent,
       daysLeft: s.daysLeft,
       rule: s.rule,
+      pickupStarted: pickup,
+      bibNumber: r.bibNumber,
     };
   });
 
@@ -155,6 +170,8 @@ async function markStageRefunded(tx: Prisma.TransactionClient, reg: Registration
   });
   if (res.count !== 1) throw new RefundError('Запись уже изменилась — обновите список');
   if (distanceId) await releaseDistanceSlot(tx, distanceId);
+  // Номер — в пул, если выдача пакетов ещё не началась; иначе остаётся за записью.
+  await releaseRegistrationBib(tx, reg);
 }
 
 const auditValue = (percent: number | null, amount: number) => `${percent === null ? '' : `${percent}% · `}${money(amount)}`;
@@ -239,6 +256,7 @@ export async function applyAdminRefund(input: {
         where: { id: preview.seasonPassId },
         data: { paymentStatus: 'CANCELLED', refundedAt: new Date() },
       });
+      await releasePassBib(tx, preview.seasonPassId);
     }
   });
   return { total, stages: rows.length };

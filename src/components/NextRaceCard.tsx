@@ -11,6 +11,7 @@ import {
   registrationState,
 } from '../lib/api';
 import FitTitle from './FitTitle';
+import { raceTheme } from '../lib/raceTheme';
 
 type Props = {
   event: EventDto;
@@ -61,14 +62,17 @@ function NextRaceCard({ event, onRegister, registrationOpenForMe }: Props) {
   // Карту загружает организатор в админке; у стартов без неё показываем
   // плейсхолдер, а не чужой маршрут.
   const maps = routeMapsOf(event);
+  const theme = raceTheme(event);
 
   return (
     <motion.section
-      className="hero-card hero"
+      className={`hero-card hero${theme ? ` ${theme.className}` : ''}`}
+      style={theme?.style}
       initial={reduceMotion ? false : { opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1], delay: 0.05 }}
     >
+      {theme?.logoUrl && <img className="race-logo" src={theme.logoUrl} alt="" />}
       <span className="hero__eyebrow">Ближайший старт</span>
       <FitTitle as="h2" className="hero__title u-display">
         {event.title}

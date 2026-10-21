@@ -236,6 +236,7 @@ function App() {
         <ProfileScreen
           participant={participant}
           registeredEvents={myEvents}
+          registrations={me?.registrations ?? []}
           results={raceResults}
           nearest={nearest}
           onUserUpdated={setParticipantOverride}

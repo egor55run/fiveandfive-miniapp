@@ -4,17 +4,19 @@ import { ArrowRight, CalendarX2, FileText, Map, MessageCircleQuestion, Pencil, P
 import { BOT_ASK_LINK, openBotAsk } from '../lib/telegram';
 import Header from './Header';
 import DocLink from './legal/DocLink';
-import { ApiError, patchMe, type EventDto, type UserDto } from '../lib/api';
+import { ApiError, patchMe, type EventDto, type MeRegistrationDto, type UserDto } from '../lib/api';
+import { pickupLines } from '../lib/pickup';
 import type { RaceResult } from '../data/results';
 import { useSeasonProgress } from '../hooks/useSeasonProgress';
 // TODO: номер участника бэкенд пока не отдаёт — см. комментарий в файле.
-import { profileMock } from '../data/profile';
 import FitTitle from './FitTitle';
 
 type Props = {
   participant: UserDto | null;
   // Старты, на которые участник зарегистрировался в этой сессии.
   registeredEvents: EventDto[];
+  // Регистрации из /me: стартовый номер, цена со скидкой.
+  registrations?: MeRegistrationDto[];
   // Пройденные старты с внесённым результатом, от старых к новым.
   results: RaceResult[];
   // Ближайший старт вообще — запасной вариант, если регистраций нет.
@@ -63,6 +65,7 @@ function formatDob(value: string | null | undefined): string {
 function ProfileScreen({
   participant,
   registeredEvents,
+  registrations = [],
   results,
   nearest,
   onUserUpdated,
@@ -89,6 +92,12 @@ function ProfileScreen({
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     return mine[0] ?? nearest;
   }, [registeredEvents, nearest, now]);
+  // Своя регистрация на этот старт (если это не просто «ближайший старт серии»).
+  const myReg = upcoming
+    ? registrations.find((r) => r.eventId === upcoming.id && r.paymentStatus !== 'CANCELLED') ?? null
+    : null;
+  const [pickupOpen, setPickupOpen] = useState(false);
+  const pickup = upcoming ? pickupLines(upcoming) : null;
 
   if (!participant) {
     return (
@@ -290,10 +299,13 @@ function ProfileScreen({
           </div>
 
           <div className="pf-next__stats">
-            <div className="pf-stat">
-              <span className="pf-stat__label">Номер:</span>
-              <span className="pf-stat__value u-display">{profileMock.bibNumber}</span>
-            </div>
+            {myReg && (
+              <div className="pf-stat">
+                <span className="pf-stat__label">Номер:</span>
+                {/* Номер выдаётся при оплате; нет — ещё не оплачено или диапазон не задан. */}
+                <span className="pf-stat__value u-display">{myReg.bibNumber ?? '—'}</span>
+              </div>
+            )}
             <div className="pf-stat">
               <span className="pf-stat__label">До старта:</span>
               <span className="pf-stat__value u-display">
@@ -302,17 +314,39 @@ function ProfileScreen({
             </div>
           </div>
 
-          {/* TODO: ссылки-заглушки — на Event нет ни карты трассы, ни точки выдачи. */}
+          {myReg?.price && (
+            <p className="pf-next__price">
+              {myReg.price.discount > 0 ? (
+                <>
+                  <s>{myReg.price.base.toLocaleString('ru-RU')} ₸</s> −{myReg.price.discount.toLocaleString('ru-RU')} ₸
+                  {myReg.price.promoCode ? ` (${myReg.price.promoCode})` : ''} ={' '}
+                  <b>{myReg.price.total > 0 ? `${myReg.price.total.toLocaleString('ru-RU')} ₸` : 'бесплатно'}</b>
+                </>
+              ) : (
+                <>Оплачено {myReg.price.total.toLocaleString('ru-RU')} ₸</>
+              )}
+              {myReg.seasonPassId !== null ? ' · абонемент' : ''}
+            </p>
+          )}
+
+          {/* TODO: карта — заглушка; выдача пакетов — из админки старта. */}
           <div className="pf-next__links">
             <button type="button" className="pf-link">
               <Map size={18} strokeWidth={2} />
               Карта старта
             </button>
-            <button type="button" className="pf-link">
+            <button type="button" className="pf-link" aria-expanded={pickupOpen} onClick={() => setPickupOpen((v) => !v)}>
               <ShoppingBag size={18} strokeWidth={2} />
               Выдача старт. набора
             </button>
           </div>
+          {pickupOpen && pickup && (
+            <div className="pf-pickup">
+              {pickup.map((line) => (
+                <p key={line}>{line}</p>
+              ))}
+            </div>
+          )}
         </section>
       )}
 

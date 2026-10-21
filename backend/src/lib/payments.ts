@@ -1,7 +1,9 @@
 import type { Payment, PaymentState, Prisma } from '@prisma/client';
 import { deliverEmail } from './email';
-import { registrationEmail, seasonPassEmail } from './emailTemplates';
+import { registrationEmail, seasonPassEmail, type PriceBreakdown } from './emailTemplates';
 import { claimDistanceSlot, distanceIdOf, releaseDistanceSlot } from './distances';
+import { assignRegistrationBib } from './bibs';
+import { markPromoUsed, releaseHeldFor } from './promo';
 import { prisma } from '../prisma';
 import {
   ApiPayError,
@@ -153,6 +155,10 @@ export type StartPaymentInput = {
   phone: string; // уже нормализован: 8XXXXXXXXXX
   description: string;
   clientName?: string;
+  /** Цена до скидки и скидка по промокоду; amount — итог. */
+  baseAmount?: number;
+  discount?: number;
+  promoCodeId?: number | null;
   log: Logger;
 };
 
@@ -177,6 +183,9 @@ export async function startPayment(input: StartPaymentInput): Promise<Payment> {
       registrationId: target.purpose === 'REGISTRATION' ? target.registrationId : null,
       seasonPassId: target.purpose === 'SEASON_PASS' ? target.seasonPassId : null,
       amount,
+      baseAmount: input.baseAmount ?? amount,
+      discount: input.discount ?? 0,
+      promoCodeId: input.promoCodeId ?? null,
       phone,
       state: 'CREATED',
       expiresAt: new Date(Date.now() + paymentTtlMs()),
@@ -344,6 +353,12 @@ export async function markPaid(
 
     const payment = (await tx.payment.findUnique({ where: { id: paymentId } }))!;
     const problems: string[] = [];
+    // Промокод по этой записи — использован окончательно.
+    await markPromoUsed(
+      tx,
+      payment.purpose === 'REGISTRATION' ? { registrationId: payment.registrationId! } : { seasonPassId: payment.seasonPassId! },
+      payment.id,
+    );
 
     if (payment.purpose === 'REGISTRATION') {
       const ok = await confirmRegistration(tx, payment.registrationId!);
@@ -409,7 +424,17 @@ async function confirmRegistration(tx: Prisma.TransactionClient, registrationId:
     where: { id: registrationId },
     data: { paymentStatus: 'PAID' },
   });
+  // Стартовый номер — при оплате (lib/bibs). Нет диапазона — без номера, админка покажет.
+  await assignRegistrationBib(tx, registrationId);
   return true;
+}
+
+/** Цена, скидка и итог платежа — для письма, приложения и админки. */
+export async function priceOfPayment(p: Payment): Promise<PriceBreakdown> {
+  const promo = p.promoCodeId ? await prisma.promoCode.findUnique({ where: { id: p.promoCodeId } }) : null;
+  const total = Math.round(Number(p.amount));
+  const discount = Math.round(Number(p.discount));
+  return { base: p.baseAmount !== null ? Math.round(Number(p.baseAmount)) : total + discount, discount, total, promoCode: promo?.code ?? null };
 }
 
 async function notifyPaid(payment: Payment, log: Logger): Promise<void> {
@@ -419,7 +444,7 @@ async function notifyPaid(payment: Payment, log: Logger): Promise<void> {
   if (payment.purpose === 'REGISTRATION') {
     const reg = await prisma.registration.findUnique({
       where: { id: payment.registrationId! },
-      include: { event: true, distance: true },
+      include: { event: { include: { pickupSlots: { orderBy: { startsAt: 'asc' } } } }, distance: true },
     });
     if (!reg || reg.paymentStatus !== 'PAID') return;
     await deliver({
@@ -439,7 +464,8 @@ async function notifyPaid(payment: Payment, log: Logger): Promise<void> {
         firstName: user.firstName,
         event: reg.event,
         distance: reg.distance?.label,
-        paidAmount: Number(payment.amount),
+        bib: reg.bibNumber,
+        price: await priceOfPayment(payment),
       }),
       log,
     });
@@ -448,7 +474,7 @@ async function notifyPaid(payment: Payment, log: Logger): Promise<void> {
 
   const regs = await prisma.registration.findMany({
     where: { seasonPassId: payment.seasonPassId!, paymentStatus: 'PAID' },
-    include: { event: true, distance: true },
+    include: { event: { include: { pickupSlots: { orderBy: { startsAt: 'asc' } } } }, distance: true },
     orderBy: { event: { date: 'asc' } },
   });
   if (regs.length === 0) return;
@@ -469,7 +495,8 @@ async function notifyPaid(payment: Payment, log: Logger): Promise<void> {
       firstName: user.firstName,
       events: regs.map((r) => r.event),
       distance: regs[0]?.distance?.label,
-      paidAmount: Number(payment.amount),
+      bib: (await prisma.seasonPass.findUnique({ where: { id: payment.seasonPassId! } }))?.bibNumber ?? null,
+      price: await priceOfPayment(payment),
     }),
     log,
   });
@@ -518,6 +545,11 @@ async function releaseTarget(tx: Prisma.TransactionClient, target: PaymentTarget
       data: { paymentStatus: 'CANCELLED' },
     });
   }
+  // Счёт не оплатили — использование промокода вернулось в лимит.
+  await releaseHeldFor(
+    tx,
+    target.purpose === 'REGISTRATION' ? { registrationId: target.registrationId } : { seasonPassId: target.seasonPassId },
+  );
 
   let released = 0;
   for (const r of regs) {

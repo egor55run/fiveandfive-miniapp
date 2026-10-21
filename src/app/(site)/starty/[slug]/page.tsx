@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import RouteCarousel from '../../../../components/RouteCarousel';
 import { routeMapsOf } from '../../../../lib/routeMaps';
+import { pickupWhen, pickupWhere } from '../../../../lib/pickup';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import RegistrationCta from '../../../../components/site/RegistrationCta';
@@ -76,8 +77,10 @@ export default async function RacePage({ params }: Props) {
   const monthOnly = new Intl.DateTimeFormat(t.locale, { month: 'long', timeZone: TZ });
   const d1 = new Date(start - 2 * 86_400_000);
   const d2 = new Date(start - 86_400_000);
-  const pickupDays =
-    monthOnly.format(d1) === monthOnly.format(d2)
+  // Дни и часы выдачи из админки; не заданы — «11 и 12 июня» по запасному правилу.
+  const pickupDays = event.pickup?.slots.length
+    ? pickupWhen(event)
+    : monthOnly.format(d1) === monthOnly.format(d2)
       ? `${dayOnly.format(d1)} и ${dayMonthFmt.format(d2)}`
       : `${dayMonthFmt.format(d1)} и ${dayMonthFmt.format(d2)}`;
 
@@ -183,7 +186,7 @@ export default async function RacePage({ params }: Props) {
 
         <Block title={r.pack}>
           {/* Основная выдача — за 2 и за 1 день; в день старта — иногородним. */}
-          <p>{r.packMain(pickupDays, event.packetPickupInfo?.trim() || r.pickupTbd)}</p>
+          <p>{r.packMain(pickupDays, pickupWhere(event))}</p>
           <p>{r.packRaceDay(at(-120), at(-60))}</p>
           <p>{r.packDocument}</p>
           <p className="race-tbd">{r.packText}</p>

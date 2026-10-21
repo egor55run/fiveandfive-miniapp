@@ -18,6 +18,7 @@ import { formatDate, formatDateTime, priceFmt, toDateTimeLocal } from './helpers
 import RouteMapsEditor from './RouteMapsEditor';
 import AnnounceRace from './AnnounceRace';
 import SeasonPassCard from './SeasonPassCard';
+import ThemeEditor from './ThemeEditor';
 
 /** Строка редактора дистанций: числа — строками, как в полях ввода. */
 type DistanceRow = {
@@ -28,9 +29,17 @@ type DistanceRow = {
   seasonPass: boolean;
   /** Сколько уже занято — лимит не ниже, удалить нельзя, если > 0. */
   slotsTaken: number;
+  /** Диапазон стартовых номеров; оба пустые — номера не выдаются. */
+  bibFrom: string;
+  bibTo: string;
 };
 
-const NEW_DISTANCE: DistanceRow = { label: '', slotsTotal: '1000', price: '5000', seasonPass: false, slotsTaken: 0 };
+const NEW_DISTANCE: DistanceRow = { label: '', slotsTotal: '1000', price: '5000', seasonPass: false, slotsTaken: 0, bibFrom: '', bibTo: '' };
+
+/** Слот выдачи пакетов: день и часы, как в полях ввода. */
+type SlotRow = { date: string; from: string; to: string };
+/** Резерв номеров. */
+type ReserveRow = { from: string; to: string; note: string };
 
 type FormState = {
   title: string;
@@ -41,27 +50,48 @@ type FormState = {
   closesAt: string; // datetime-local; '' = за 7 дней до старта
   slug: string; // '' = составит сервер
   program: string;
-  packetPickup: string; // '' = «[время и место уточняются]»
+  packetPickup: string; // комментарий к выдаче
+  pickupPlace: string;
+  pickupAddress: string;
+  pickupSlots: SlotRow[];
+  bibReserves: ReserveRow[];
 };
 
 const EMPTY_FORM: FormState = {
   title: '',
   date: '',
   location: '',
-  distances: [{ label: '5 км', slotsTotal: '2000', price: '5000', seasonPass: true, slotsTaken: 0 }],
+  distances: [{ label: '5 км', slotsTotal: '2000', price: '5000', seasonPass: true, slotsTaken: 0, bibFrom: '', bibTo: '' }],
   seasonId: '',
   closesAt: '',
   slug: '',
   program: '',
   packetPickup: '',
+  pickupPlace: '',
+  pickupAddress: '',
+  pickupSlots: [],
+  bibReserves: [],
 };
+
+const num = (v: string) => (v.trim() === '' ? null : Number(v));
+const pad = (n: number) => String(n).padStart(2, '0');
+/** ISO → { день, часы } в часовом поясе браузера (админ — в Астане). */
+function slotRow(startsAt: string, endsAt: string): SlotRow {
+  const a = new Date(startsAt);
+  const b = new Date(endsAt);
+  return {
+    date: `${a.getFullYear()}-${pad(a.getMonth() + 1)}-${pad(a.getDate())}`,
+    from: `${pad(a.getHours())}:${pad(a.getMinutes())}`,
+    to: `${pad(b.getHours())}:${pad(b.getMinutes())}`,
+  };
+}
 
 function toInput(form: FormState): EventInput | string {
   if (!form.title.trim()) return 'Укажите название';
   if (!form.date) return 'Укажите дату и время';
   if (!form.location.trim()) return 'Укажите локацию';
   if (form.distances.length === 0) return 'Нужна хотя бы одна дистанция';
-  const distances = [];
+  const distances: EventInput['distances'] = [];
   for (const d of form.distances) {
     const label = d.label.trim();
     if (!label) return 'Укажите название каждой дистанции';
@@ -70,7 +100,30 @@ function toInput(form: FormState): EventInput | string {
     const slotsTotal = Number(d.slotsTotal);
     if (!Number.isInteger(slotsTotal) || slotsTotal < 1) return `Некорректный лимит у «${label}»`;
     if (slotsTotal < d.slotsTaken) return `На «${label}» занято ${d.slotsTaken} — лимит не может быть меньше`;
-    distances.push({ ...(d.id ? { id: d.id } : {}), label, slotsTotal, price, seasonPass: d.seasonPass });
+    const bibFrom = num(d.bibFrom);
+    const bibTo = num(d.bibTo);
+    if ((bibFrom === null) !== (bibTo === null)) return `Номера «${label}»: укажите и «с», и «по»`;
+    if (bibFrom !== null && bibTo !== null && (!Number.isInteger(bibFrom) || !Number.isInteger(bibTo) || bibFrom < 1 || bibFrom > bibTo)) {
+      return `Номера «${label}»: «с» и «по» — целые числа, «с» не больше «по»`;
+    }
+    distances.push({ ...(d.id ? { id: d.id } : {}), label, slotsTotal, price, seasonPass: d.seasonPass, bibFrom, bibTo });
+  }
+  const pickupSlots: EventInput['pickupSlots'] = [];
+  for (const sl of form.pickupSlots) {
+    if (!sl.date || !sl.from || !sl.to) return 'Выдача пакетов: у каждой строки нужны день и часы';
+    const startsAt = new Date(`${sl.date}T${sl.from}`);
+    const endsAt = new Date(`${sl.date}T${sl.to}`);
+    if (!(endsAt > startsAt)) return 'Выдача пакетов: конец должен быть позже начала';
+    pickupSlots.push({ startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() });
+  }
+  const bibReserves: EventInput['bibReserves'] = [];
+  for (const r of form.bibReserves) {
+    const from = num(r.from);
+    const to = num(r.to) ?? from;
+    if (from === null || to === null || !Number.isInteger(from) || !Number.isInteger(to) || from < 1 || from > to) {
+      return 'Резерв номеров: «с» и «по» — целые числа, «с» не больше «по»';
+    }
+    bibReserves.push({ bibFrom: from, bibTo: to, note: r.note.trim() || null });
   }
   if (new Set(distances.map((d) => d.label.toLowerCase())).size !== distances.length) {
     return 'Названия дистанций не должны повторяться';
@@ -95,6 +148,10 @@ function toInput(form: FormState): EventInput | string {
     slug: form.slug.trim().toLowerCase() || null,
     program: form.program.trim() || null,
     packetPickupInfo: form.packetPickup.trim() || null,
+    pickupPlace: form.pickupPlace.trim() || null,
+    pickupAddress: form.pickupAddress.trim() || null,
+    pickupSlots,
+    bibReserves,
   };
 }
 
@@ -192,6 +249,8 @@ export default function EventsSection() {
         price: String(d.price),
         seasonPass: d.seasonPass,
         slotsTaken: d.slotsTaken,
+        bibFrom: d.bibFrom === null ? '' : String(d.bibFrom),
+        bibTo: d.bibTo === null ? '' : String(d.bibTo),
       })),
       seasonId: event.season ? String(event.season.id) : '',
       closesAt: event.registrationClosesAtCustom
@@ -200,6 +259,10 @@ export default function EventsSection() {
       slug: event.slug ?? '',
       program: event.program ?? '',
       packetPickup: event.packetPickupInfo ?? '',
+      pickupPlace: event.pickup.place ?? '',
+      pickupAddress: event.pickup.address ?? '',
+      pickupSlots: event.pickup.slots.map((sl) => slotRow(sl.startsAt, sl.endsAt)),
+      bibReserves: event.bibReserves.map((r) => ({ from: String(r.bibFrom), to: String(r.bibTo), note: r.note ?? '' })),
     });
     setFormOpen(true);
     setError(null);
@@ -290,8 +353,12 @@ export default function EventsSection() {
     }
   };
 
-  const field = (key: Exclude<keyof FormState, 'distances'>, value: string) =>
+  const field = (key: Exclude<keyof FormState, 'distances' | 'pickupSlots' | 'bibReserves'>, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+  const setSlot = (i: number, patch: Partial<SlotRow>) =>
+    setForm((prev) => ({ ...prev, pickupSlots: prev.pickupSlots.map((sl, j) => (j === i ? { ...sl, ...patch } : sl)) }));
+  const setReserve = (i: number, patch: Partial<ReserveRow>) =>
+    setForm((prev) => ({ ...prev, bibReserves: prev.bibReserves.map((r, j) => (j === i ? { ...r, ...patch } : r)) }));
 
   // Редактор дистанций: правка строки, перестановка, удаление, «для абонемента».
   const setDistance = (i: number, patch: Partial<DistanceRow>) =>
@@ -406,6 +473,7 @@ export default function EventsSection() {
                     <th>Лимит</th>
                     <th>Цена, ₸</th>
                     <th title="На эту дистанцию записывает абонемент сезона">Абонемент</th>
+                    <th title="Стартовые номера: выдаются по порядку при оплате">Номера с — по</th>
                     <th aria-label="Действия" />
                   </tr>
                 </thead>
@@ -448,6 +516,27 @@ export default function EventsSection() {
                           onChange={() => setDistance(i, { seasonPass: true })}
                         />
                       </td>
+                      <td className="ad-nowrap">
+                        <input
+                          type="number"
+                          min="1"
+                          className="ad-input--num"
+                          value={d.bibFrom}
+                          placeholder="с"
+                          aria-label="Номера с"
+                          onChange={(e) => setDistance(i, { bibFrom: e.target.value })}
+                        />
+                        {' — '}
+                        <input
+                          type="number"
+                          min="1"
+                          className="ad-input--num"
+                          value={d.bibTo}
+                          placeholder="по"
+                          aria-label="Номера по"
+                          onChange={(e) => setDistance(i, { bibTo: e.target.value })}
+                        />
+                      </td>
                       <td className="ad-dist__actions">
                         <button type="button" className="ad-btn ad-btn--sm" disabled={i === 0} onClick={() => moveDistance(i, -1)} aria-label="Выше">
                           ↑
@@ -480,8 +569,38 @@ export default function EventsSection() {
               </button>
               <span className="ad-hint ad-hint--dim">
                 Порядок — как участник увидит в приложении. Абонемент сезона записывает на отмеченную
-                дистанцию; без отметки абонемент на этот старт не оформить.
+                дистанцию; без отметки абонемент на этот старт не оформить. Название вида «5 км» — по нему
+                дистанция попадает в справочник (результаты и рейтинг потом фильтруются по нему). Номера выдаются
+                при оплате, наименьший свободный; диапазоны дистанций не пересекаются между собой и с номерами
+                абонементов сезона.
               </span>
+            </fieldset>
+            <fieldset className="ad-form__wide ad-dist">
+              <legend>Резерв номеров</legend>
+              {form.bibReserves.length === 0 && <p className="ad-hint ad-hint--dim">Резерва нет.</p>}
+              {form.bibReserves.map((r, i) => (
+                <div className="ad-actions" key={i}>
+                  <input type="number" min="1" className="ad-input--num" value={r.from} placeholder="с" aria-label="Резерв с" onChange={(e) => setReserve(i, { from: e.target.value })} />
+                  {' — '}
+                  <input type="number" min="1" className="ad-input--num" value={r.to} placeholder="по" aria-label="Резерв по" onChange={(e) => setReserve(i, { to: e.target.value })} />
+                  <input value={r.note} placeholder="для кого: элита, партнёры…" maxLength={100} aria-label="Для кого резерв" onChange={(e) => setReserve(i, { note: e.target.value })} />
+                  <button
+                    type="button"
+                    className="ad-btn ad-btn--sm ad-btn--danger"
+                    onClick={() => setForm((prev) => ({ ...prev, bibReserves: prev.bibReserves.filter((_, j) => j !== i) }))}
+                  >
+                    Удалить
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="ad-btn"
+                onClick={() => setForm((prev) => ({ ...prev, bibReserves: [...prev.bibReserves, { from: '', to: '', note: '' }] }))}
+              >
+                + Резерв
+              </button>
+              <span className="ad-hint ad-hint--dim">Эти номера автоматически не выдаются — только вручную в списке участников.</span>
             </fieldset>
             <label>
               <span>Сезон</span>
@@ -497,19 +616,60 @@ export default function EventsSection() {
                 ))}
               </select>
             </label>
-            <label className="ad-form__wide">
-              <span>Выдача стартовых пакетов: время и место</span>
-              <input
-                value={form.packetPickup}
-                onChange={(e) => field('packetPickup', e.target.value)}
-                placeholder="например: ТРЦ «Керуен», 2 этаж, 12:00–20:00"
-                maxLength={300}
-              />
+            <fieldset className="ad-form__wide ad-dist">
+              <legend>Выдача стартовых пакетов</legend>
+              {(!form.pickupPlace.trim() || !form.pickupAddress.trim() || form.pickupSlots.length === 0) && (
+                <p className="ad-msg ad-msg--warn">
+                  Не заполнено:{' '}
+                  {[!form.pickupPlace.trim() && 'место', !form.pickupAddress.trim() && 'адрес', form.pickupSlots.length === 0 && 'даты и часы']
+                    .filter(Boolean)
+                    .join(', ')}
+                  . В письмах и в приложении будет «[время и место уточняются]».
+                </p>
+              )}
+              <div className="ad-form">
+                <label>
+                  <span>Место</span>
+                  <input value={form.pickupPlace} onChange={(e) => field('pickupPlace', e.target.value)} placeholder="ТРЦ «Керуен»" maxLength={200} />
+                </label>
+                <label>
+                  <span>Адрес</span>
+                  <input value={form.pickupAddress} onChange={(e) => field('pickupAddress', e.target.value)} placeholder="Достык, 9, 2 этаж" maxLength={300} />
+                </label>
+              </div>
+              {form.pickupSlots.map((sl, i) => (
+                <div className="ad-actions" key={i}>
+                  <input type="date" value={sl.date} aria-label="День выдачи" onChange={(e) => setSlot(i, { date: e.target.value })} />
+                  <input type="time" value={sl.from} aria-label="С" onChange={(e) => setSlot(i, { from: e.target.value })} />
+                  {' — '}
+                  <input type="time" value={sl.to} aria-label="До" onChange={(e) => setSlot(i, { to: e.target.value })} />
+                  <button
+                    type="button"
+                    className="ad-btn ad-btn--sm ad-btn--danger"
+                    onClick={() => setForm((prev) => ({ ...prev, pickupSlots: prev.pickupSlots.filter((_, j) => j !== i) }))}
+                  >
+                    Удалить
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="ad-btn"
+                disabled={form.pickupSlots.length >= 14}
+                onClick={() => setForm((prev) => ({ ...prev, pickupSlots: [...prev.pickupSlots, { date: '', from: '12:00', to: '20:00' }] }))}
+              >
+                + День выдачи
+              </button>
+              <label className="ad-form__wide">
+                <span>Комментарий</span>
+                <input value={form.packetPickup} onChange={(e) => field('packetPickup', e.target.value)} placeholder="например: вход со стороны парковки" maxLength={300} />
+              </label>
               <span className="ad-hint ad-hint--dim">
-                Основная выдача — за 2 и за 1 день до старта (даты подставятся сами). Пусто — «[время и место
-                уточняются]». В день старта — иногородним, за 2 часа до старта и до часа до старта.
+                Подставляется в письмо после оплаты, в напоминание, в приложение, на сайт и в ответ бота. Начало первого
+                дня выдачи — граница возвратов: после него возврат по оферте не производится и номер не освобождается
+                (без дней — за 2 дня до старта). В день старта иногородним — за 2 часа до старта, как раньше.
               </span>
-            </label>
+            </fieldset>
             <label className="ad-form__wide">
               <span>Программа дня</span>
               <textarea
@@ -521,6 +681,16 @@ export default function EventsSection() {
               <span className="ad-hint ad-hint--dim">Показывается на странице старта на сайте</span>
             </label>
           </div>
+
+          {editingId !== null ? (
+            <ThemeEditor
+              key={`theme-${editingId}`}
+              event={events.find((e) => e.id === editingId)!}
+              onChange={(updated) => setEvents((prev) => prev.map((e) => (e.id === updated.id ? { ...e, theme: updated.theme } : e)))}
+            />
+          ) : (
+            <p className="ad-hint">Оформление (фон, логотип, цвет) можно задать после создания старта.</p>
+          )}
 
           {editingId !== null ? (
             <RouteMapsEditor
@@ -636,6 +806,11 @@ export default function EventsSection() {
                   <td>
                     {e.title}
                     {e.slug && <div className="ad-hint ad-hint--dim">/starty/{e.slug}</div>}
+                    {e.warnings.map((w) => (
+                      <div key={w} className="ad-warn">
+                        ⚠ {w}
+                      </div>
+                    ))}
                   </td>
                   <td>
                     {formatDate(e.date)}

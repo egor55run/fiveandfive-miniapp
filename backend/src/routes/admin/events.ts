@@ -7,7 +7,8 @@ import { requireAdmin } from '../../plugins/adminAuth';
 import { MAX_ROUTE_IMAGE_BYTES, RouteImageError, saveRouteImage } from '../../lib/routeImages';
 import { deleteRouteFileIfUnused, MAX_ROUTE_MAPS, syncFirstRouteMap } from '../../lib/routeMaps';
 import { serializeEvent } from '../events';
-import { syncEventTotals } from '../../lib/distances';
+import { catalogIdFor, syncEventTotals } from '../../lib/distances';
+import { rangesOverlap } from '../../lib/bibs';
 import { seasonSalesClosesAt, seasonSalesOpen } from '../../lib/seasonPass';
 import { diffFields, writeAudit } from '../../lib/audit';
 import { eventSlug, SLUG_RE, uniqueEventSlug } from '../../lib/slug';
@@ -36,9 +37,46 @@ const eventFields = {
     .optional(),
   // Программа дня — по строке на пункт («07:00 — старт»).
   program: z.string().trim().max(5000).nullable().optional(),
-  // Время и место основной выдачи стартовых пакетов (за 2 и за 1 день).
+  // Комментарий к выдаче пакетов (раньше — «время и место» одной строкой).
   packetPickupInfo: z.string().trim().max(300).nullable().optional(),
+  // Выдача пакетов: место, адрес и даты с часами (pickup_slots).
+  pickupPlace: z.string().trim().max(200).nullable().optional(),
+  pickupAddress: z.string().trim().max(300).nullable().optional(),
+  pickupSlots: z
+    .array(z.object({ startsAt: z.coerce.date(), endsAt: z.coerce.date() }))
+    .max(14)
+    .refine((list) => list.every((s) => s.endsAt > s.startsAt), { message: 'У выдачи конец должен быть позже начала' })
+    .optional(),
+  // Резерв номеров старта: автоматически не выдаются, только вручную.
+  bibReserves: z
+    .array(z.object({ bibFrom: z.number().int().min(1).max(999_999), bibTo: z.number().int().min(1).max(999_999), note: z.string().trim().max(100).nullable().default(null) }))
+    .max(50)
+    .refine((list) => list.every((r) => r.bibFrom <= r.bibTo), { message: 'Резерв номеров: «с» не больше «по»' })
+    .optional(),
+  // Акцентный цвет оформления старта в Mini App (#RRGGBB); фон и логотип — файлами.
+  themeAccent: z
+    .string()
+    .trim()
+    .regex(/^#[0-9a-fA-F]{6}$/, 'Цвет — в виде #RRGGBB')
+    .nullable()
+    .optional(),
 };
+
+/** Слоты выдачи и резерв номеров — списком целиком (как дистанции). */
+async function saveEventLists(
+  tx: Prisma.TransactionClient,
+  eventId: number,
+  lists: { pickupSlots?: { startsAt: Date; endsAt: Date }[]; bibReserves?: { bibFrom: number; bibTo: number; note: string | null }[] },
+) {
+  if (lists.pickupSlots) {
+    await tx.pickupSlot.deleteMany({ where: { eventId } });
+    if (lists.pickupSlots.length > 0) await tx.pickupSlot.createMany({ data: lists.pickupSlots.map((s) => ({ ...s, eventId })) });
+  }
+  if (lists.bibReserves) {
+    await tx.bibReserve.deleteMany({ where: { eventId } });
+    if (lists.bibReserves.length > 0) await tx.bibReserve.createMany({ data: lists.bibReserves.map((r) => ({ ...r, eventId })) });
+  }
+}
 
 /**
  * Дистанции старта — список целиком, в нужном порядке. Есть id — правка
@@ -53,6 +91,9 @@ const distancesField = z
       slotsTotal: z.number().int().min(1).max(1_000_000),
       price: z.number().min(0).max(10_000_000),
       seasonPass: z.boolean().default(false),
+      // Диапазон стартовых номеров дистанции; оба пустые — номера не выдаются.
+      bibFrom: z.number().int().min(1).max(999_999).nullable().default(null),
+      bibTo: z.number().int().min(1).max(999_999).nullable().default(null),
     }),
   )
   .min(1, 'Нужна хотя бы одна дистанция')
@@ -62,7 +103,17 @@ const distancesField = z
   })
   .refine((list) => list.filter((d) => d.seasonPass).length <= 1, {
     message: 'Абонемент может записывать только на одну дистанцию',
-  });
+  })
+  .refine((list) => list.every((d) => (d.bibFrom === null) === (d.bibTo === null) && (d.bibFrom ?? 0) <= (d.bibTo ?? 0)), {
+    message: 'Диапазон номеров: укажите «с» и «по», «с» не больше «по»',
+  })
+  .refine(
+    (list) => {
+      const r = list.filter((d) => d.bibFrom !== null).map((d) => [d.bibFrom!, d.bibTo!] as const);
+      return r.every((a, i) => r.every((b, j) => i === j || !rangesOverlap(a, b)));
+    },
+    { message: 'Диапазоны номеров дистанций не должны пересекаться' },
+  );
 
 type DistanceInput = z.infer<typeof distancesField>[number];
 
@@ -78,6 +129,18 @@ class DistanceConflict extends Error {
  */
 async function saveDistances(tx: Prisma.TransactionClient, eventId: number, list: DistanceInput[]) {
   const current = await tx.eventDistance.findMany({ where: { eventId } });
+  // Номера абонементов сезона идут на все его старты — диапазоны дистанций
+  // с ними пересекаться не должны.
+  const event = await tx.event.findUniqueOrThrow({ where: { id: eventId }, include: { season: true } });
+  const pass = event.season?.passBibFrom && event.season.passBibTo ? ([event.season.passBibFrom, event.season.passBibTo] as const) : null;
+  for (const d of list) {
+    if (pass && d.bibFrom !== null && rangesOverlap([d.bibFrom, d.bibTo!], pass)) {
+      throw new DistanceConflict({
+        error: `Номера «${d.label}» (${d.bibFrom}–${d.bibTo}) пересекаются с номерами абонементов сезона (${pass[0]}–${pass[1]})`,
+        reason: 'bib_overlap',
+      });
+    }
+  }
   const keepIds = new Set(list.filter((d) => d.id).map((d) => d.id!));
 
   for (const d of list) {
@@ -110,7 +173,16 @@ async function saveDistances(tx: Prisma.TransactionClient, eventId: number, list
         reason: 'slots_below_taken',
       });
     }
-    const data = { label: d.label, slotsTotal: d.slotsTotal, price: d.price, seasonPass: d.seasonPass, sortOrder: i };
+    const data = {
+      label: d.label,
+      catalogId: await catalogIdFor(tx, d.label),
+      slotsTotal: d.slotsTotal,
+      price: d.price,
+      seasonPass: d.seasonPass,
+      bibFrom: d.bibFrom,
+      bibTo: d.bibTo,
+      sortOrder: i,
+    };
     if (old) await tx.eventDistance.update({ where: { id: old.id }, data });
     else await tx.eventDistance.create({ data: { ...data, eventId } });
   }
@@ -158,6 +230,9 @@ export async function adminEventsRoutes(app: FastifyInstance) {
     // Итоговая дата закрытия продажи и открыта ли она сейчас.
     salesClosesAt: seasonSalesClosesAt(s, s.events),
     salesOpen: seasonSalesOpen(s, s.events),
+    // Номера абонементов: один на сезон из этого диапазона (lib/bibs).
+    passBibFrom: s.passBibFrom,
+    passBibTo: s.passBibTo,
     firstEventDate: s.events.length
       ? s.events.map((e) => e.date).sort((a, b) => a.getTime() - b.getTime())[0]
       : null,
@@ -182,6 +257,8 @@ export async function adminEventsRoutes(app: FastifyInstance) {
     .object({
       price: z.number().min(0).max(10_000_000),
       salesClosesAt: z.coerce.date().nullable(),
+      passBibFrom: z.number().int().min(1).max(999_999).nullable(),
+      passBibTo: z.number().int().min(1).max(999_999).nullable(),
     })
     .partial()
     .refine((v) => Object.keys(v).length > 0, { message: 'Нужно передать хотя бы одно поле' });
@@ -199,15 +276,38 @@ export async function adminEventsRoutes(app: FastifyInstance) {
         reason: 'closes_after_start',
       });
     }
+    // Диапазон номеров абонементов: оба поля или ни одного, без пересечения
+    // с диапазонами дистанций стартов сезона.
+    if (parsed.data.passBibFrom !== undefined || parsed.data.passBibTo !== undefined) {
+      const from = parsed.data.passBibFrom !== undefined ? parsed.data.passBibFrom : season.passBibFrom;
+      const to = parsed.data.passBibTo !== undefined ? parsed.data.passBibTo : season.passBibTo;
+      if ((from === null) !== (to === null) || (from !== null && to !== null && from > to)) {
+        return reply.code(400).send({ error: 'Номера абонементов: укажите «с» и «по», «с» не больше «по»', reason: 'bad_range' });
+      }
+      if (from !== null && to !== null) {
+        const clash = await prisma.eventDistance.findFirst({
+          where: { event: { seasonId: id }, bibFrom: { not: null, lte: to }, bibTo: { gte: from } },
+          include: { event: true },
+        });
+        if (clash) {
+          return reply.code(409).send({
+            error: `Пересекается с номерами «${clash.label}» старта «${clash.event.title}» (${clash.bibFrom}–${clash.bibTo})`,
+            reason: 'bib_overlap',
+          });
+        }
+      }
+    }
     const updated = await prisma.$transaction(async (tx) => {
       const before = {
         price: String(Number(season.price)),
         salesClosesAt: season.salesClosesAt?.toISOString() ?? null,
+        passBibs: season.passBibFrom ? `${season.passBibFrom}–${season.passBibTo}` : null,
       };
       const next = await tx.season.update({ where: { id }, data: parsed.data, include: SEASON_EVENTS });
       const changes = diffFields(before, {
         price: String(Number(next.price)),
         salesClosesAt: next.salesClosesAt?.toISOString() ?? null,
+        passBibs: next.passBibFrom ? `${next.passBibFrom}–${next.passBibTo}` : null,
       });
       if (Object.keys(changes).length > 0) {
         await writeAudit(tx, {
@@ -227,7 +327,11 @@ export async function adminEventsRoutes(app: FastifyInstance) {
   app.get('/admin/events', async () => {
     const events = await prisma.event.findMany({
       orderBy: { date: 'asc' },
-      include: { season: { select: { id: true, title: true, year: true } }, ...EVENT_DETAILS },
+      include: {
+        season: { select: { id: true, title: true, year: true, passBibFrom: true, passBibTo: true } },
+        bibReserves: { orderBy: { bibFrom: 'asc' } },
+        ...EVENT_DETAILS,
+      },
     });
 
     // Разбивка по статусам одним запросом, чтобы не дёргать БД на каждый старт.
@@ -248,6 +352,13 @@ export async function adminEventsRoutes(app: FastifyInstance) {
       by: ['eventId'],
       _count: { _all: true },
     });
+    // Оплаченные без стартового номера — значит, диапазон не задан или кончился.
+    const noBib = await prisma.registration.groupBy({
+      by: ['eventId'],
+      where: { paymentStatus: 'PAID', bibNumber: null },
+      _count: { _all: true },
+    });
+    const noBibByEvent = new Map(noBib.map((r) => [r.eventId, r._count._all]));
     const resultsByEvent = new Map(
       resultCounts.map((r) => [r.eventId, r._count._all]),
     );
@@ -268,6 +379,21 @@ export async function adminEventsRoutes(app: FastifyInstance) {
           cancelled: counts.CANCELLED ?? 0,
         },
         resultsCount: resultsByEvent.get(e.id) ?? 0,
+        bibReserves: e.bibReserves.map((r) => ({ bibFrom: r.bibFrom, bibTo: r.bibTo, note: r.note })),
+        // Предупреждения в списке стартов: что не заполнено для участников.
+        warnings: [
+          ...(!e.pickupPlace || !e.pickupAddress || e.pickupSlots.length === 0
+            ? ['Выдача пакетов не заполнена: место, адрес, даты и часы — в письмах и приложении «уточняются»']
+            : []),
+          ...e.distances
+            .filter((d) => d.bibFrom === null)
+            .map((d) => `У «${d.label}» не задан диапазон номеров — номера не выдаются`),
+          ...(e.season && e.season.passBibFrom === null && e.distances.some((d) => d.seasonPass)
+            ? ['У сезона не задан диапазон номеров абонементов']
+            : []),
+          ...(noBibByEvent.get(e.id) ? [`Оплачено без номера: ${noBibByEvent.get(e.id)}`] : []),
+        ],
+        paidWithoutBib: noBibByEvent.get(e.id) ?? 0,
       };
     });
   });
@@ -296,7 +422,7 @@ export async function adminEventsRoutes(app: FastifyInstance) {
     if (data.slug && (await slugTaken(data.slug))) return reply.code(409).send(SLUG_TAKEN);
     const slug = data.slug || (await uniqueEventSlug(eventSlug(data.title, data.date)));
 
-    const { distances, ...fields } = data;
+    const { distances, pickupSlots, bibReserves, ...fields } = data;
     const first = distances[0];
     const event = await prisma.$transaction(async (tx) => {
       // Сводные поля старта заполнит syncEventTotals; здесь — заглушки под NOT NULL.
@@ -312,6 +438,7 @@ export async function adminEventsRoutes(app: FastifyInstance) {
         },
       });
       await saveDistances(tx, created.id, distances);
+      await saveEventLists(tx, created.id, { pickupSlots, bibReserves });
       return tx.event.findUniqueOrThrow({ where: { id: created.id }, include: EVENT_DETAILS });
     });
     return reply.code(201).send(serializeEvent(event));
@@ -354,7 +481,7 @@ export async function adminEventsRoutes(app: FastifyInstance) {
       return reply.code(409).send(SLUG_TAKEN);
     }
 
-    const { distances, ...fields } = data;
+    const { distances, pickupSlots, bibReserves, ...fields } = data;
     let updated;
     try {
       updated = await prisma.$transaction(async (tx) => {
@@ -370,6 +497,7 @@ export async function adminEventsRoutes(app: FastifyInstance) {
         // Лимит дистанции нельзя опустить ниже занятых мест — иначе «мест
         // нет» вместе с бронью; проверка внутри saveDistances.
         if (distances) await saveDistances(tx, id, distances);
+        await saveEventLists(tx, id, { pickupSlots, bibReserves });
         return tx.event.findUniqueOrThrow({ where: { id }, include: EVENT_DETAILS });
       });
     } catch (err) {
@@ -464,6 +592,44 @@ export async function adminEventsRoutes(app: FastifyInstance) {
       await syncFirstRouteMap(tx, id);
     });
     req.log.info({ eventId: id, url: saved.url, bytes: saved.bytes, kind: saved.kind }, 'Карта трассы добавлена');
+    return serializeEvent(await eventWithDetails(id));
+  });
+
+  /**
+   * POST /admin/events/:id/theme/bg|logo — фон или логотип оформления старта
+   * (JPG/PNG/WebP до 5 МБ, multipart, поле `file`). DELETE — убрать.
+   */
+  const THEME_FIELD = { bg: 'themeBgUrl', logo: 'themeLogoUrl' } as const;
+  app.post<{ Params: { id: string; kind: string } }>('/admin/events/:id/theme/:kind', async (req, reply) => {
+    const id = parseId(req.params.id);
+    const field = THEME_FIELD[req.params.kind as keyof typeof THEME_FIELD];
+    if (id === null || !field) return reply.code(400).send({ error: 'Некорректный адрес' });
+    const event = await prisma.event.findUnique({ where: { id } });
+    if (!event) return reply.code(404).send({ error: 'Старт не найден' });
+    const upload = await readImage(req, reply, id);
+    if (!upload) return reply;
+    let saved;
+    try {
+      saved = await saveRouteImage(id, upload.buffer);
+    } catch (err) {
+      if (err instanceof RouteImageError) return reply.code(400).send({ error: err.message, reason: err.reason });
+      throw err;
+    }
+    const old = event[field];
+    await prisma.event.update({ where: { id }, data: { [field]: saved.url } });
+    if (old) await deleteRouteFileIfUnused(old);
+    req.log.info({ eventId: id, kind: req.params.kind, url: saved.url }, 'Оформление старта: файл загружен');
+    return serializeEvent(await eventWithDetails(id));
+  });
+  app.delete<{ Params: { id: string; kind: string } }>('/admin/events/:id/theme/:kind', async (req, reply) => {
+    const id = parseId(req.params.id);
+    const field = THEME_FIELD[req.params.kind as keyof typeof THEME_FIELD];
+    if (id === null || !field) return reply.code(400).send({ error: 'Некорректный адрес' });
+    const event = await prisma.event.findUnique({ where: { id } });
+    if (!event) return reply.code(404).send({ error: 'Старт не найден' });
+    const old = event[field];
+    await prisma.event.update({ where: { id }, data: { [field]: null } });
+    if (old) await deleteRouteFileIfUnused(old);
     return serializeEvent(await eventWithDetails(id));
   });
 

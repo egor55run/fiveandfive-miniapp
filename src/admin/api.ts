@@ -103,9 +103,15 @@ export type SeasonOption = {
   salesClosesAt: string | null;
   salesOpen: boolean;
   firstEventDate: string | null;
+  /** Номера абонементов: один на сезон из этого диапазона. */
+  passBibFrom: number | null;
+  passBibTo: number | null;
 };
 
-export const updateSeason = (id: number, body: { price?: number; salesClosesAt?: string | null }) =>
+export const updateSeason = (
+  id: number,
+  body: { price?: number; salesClosesAt?: string | null; passBibFrom?: number | null; passBibTo?: number | null },
+) =>
   request<SeasonOption>(`/admin/seasons/${id}`, { method: 'PATCH', body });
 
 export type AdminDistance = {
@@ -116,7 +122,23 @@ export type AdminDistance = {
   slotsLeft: number;
   price: number;
   seasonPass: boolean;
+  /** Дистанция из справочника (3 км, 5 км…). */
+  catalogId: number;
+  /** Диапазон стартовых номеров; null — номера не выдаются. */
+  bibFrom: number | null;
+  bibTo: number | null;
 };
+
+/** Выдача пакетов: место, адрес, даты и часы. */
+export type PickupInfo = {
+  place: string | null;
+  address: string | null;
+  comment: string | null;
+  slots: { startsAt: string; endsAt: string }[];
+  configured: boolean;
+};
+
+export type EventTheme = { bgUrl: string | null; logoUrl: string | null; accent: string | null };
 
 export type AdminEvent = {
   id: number;
@@ -137,8 +159,15 @@ export type AdminEvent = {
   /** Адрес страницы на сайте: /starty/<slug>. */
   slug: string | null;
   program: string | null;
-  /** Время и место основной выдачи пакетов; null — «уточняются». */
+  /** Комментарий к выдаче пакетов (раньше — «время и место»). */
   packetPickupInfo: string | null;
+  pickup: PickupInfo;
+  theme: EventTheme | null;
+  /** Резерв номеров: автоматически не выдаются. */
+  bibReserves: { bibFrom: number; bibTo: number; note: string | null }[];
+  /** Что не заполнено — показывается в списке стартов. */
+  warnings: string[];
+  paidWithoutBib: number;
   /** Путь к PDF Положения относительно корня API, или null. */
   regulationsUrl: string | null;
   /** Когда закрывается регистрация — итоговая дата (заданная или за 7 дней до старта). */
@@ -146,7 +175,7 @@ export type AdminEvent = {
   /** Как задано в админке; null — по умолчанию. */
   registrationClosesAtCustom: string | null;
   createdAt: string;
-  season: { id: number; title: string; year: number } | null;
+  season: { id: number; title: string; year: number; passBibFrom: number | null; passBibTo: number | null } | null;
   /** manual — добавленные вручную без оплаты, в paid не входят. */
   registrations: { total: number; pending: number; paid: number; manual: number; cancelled: number };
   resultsCount: number;
@@ -163,6 +192,8 @@ export type EventInput = {
     slotsTotal: number;
     price: number;
     seasonPass: boolean;
+    bibFrom: number | null;
+    bibTo: number | null;
   }[];
   seasonId: number | null;
   /** ISO или null — по умолчанию за 7 дней до старта. */
@@ -171,6 +202,12 @@ export type EventInput = {
   slug: string | null;
   program: string | null;
   packetPickupInfo: string | null;
+  pickupPlace: string | null;
+  pickupAddress: string | null;
+  pickupSlots: { startsAt: string; endsAt: string }[];
+  bibReserves: { bibFrom: number; bibTo: number; note: string | null }[];
+  /** Цвет меняет ThemeEditor; форма старта его не трогает. */
+  themeAccent?: string | null;
 };
 
 export const getSeasons = () => request<SeasonOption[]>('/admin/seasons');
@@ -235,6 +272,27 @@ export async function addRouteMap(eventId: number, file: File, caption: string):
   }
   return data as RouteMapsResult;
 }
+
+/** Фон или логотип оформления старта (JPG/PNG/WebP до 5 МБ). */
+export async function uploadTheme(eventId: number, kind: 'bg' | 'logo', file: File): Promise<AdminEvent> {
+  const body = new FormData();
+  body.append('file', file);
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/admin/events/${eventId}/theme/${kind}`, { method: 'POST', credentials: 'same-origin', body });
+  } catch {
+    throw new AdminApiError(0, 'Не удалось связаться с сервером');
+  }
+  const data: unknown = await res.json().catch(() => null);
+  if (!res.ok) {
+    const obj = (data ?? {}) as { error?: string; reason?: string };
+    throw new AdminApiError(res.status, obj.error ?? `Ошибка ${res.status}`, obj.reason);
+  }
+  return data as AdminEvent;
+}
+
+export const deleteTheme = (eventId: number, kind: 'bg' | 'logo') =>
+  request<AdminEvent>(`/admin/events/${eventId}/theme/${kind}`, { method: 'DELETE' });
 
 /** Порядок и подписи карт: все карты старта в нужном порядке. */
 export const updateRouteMaps = (eventId: number, maps: { id: number; caption: string }[]) =>
@@ -333,6 +391,10 @@ export type Participant = {
   distance: string | null;
   qrCode: string | null;
   seasonPassId: number | null;
+  /** Стартовый номер; у абонемента — общий на сезон. */
+  bibNumber: number | null;
+  /** Цена, скидка, итог; pass — цена абонемента целиком. */
+  price: { base: number; discount: number; total: number; promoCode: string | null; pass: boolean } | null;
   /** Оформлен возврат: запись CANCELLED, в списке — «Возврат». */
   refund: { at: string; percent: number | null; amount: number; confirmed: boolean } | null;
   registeredAt: string;
@@ -352,6 +414,9 @@ export const setPaymentStatus = (registrationId: number, paymentStatus: PaymentS
   request<{
     registrationId: number;
     paymentStatus: PaymentStatus;
+    bibNumber: number | null;
+    /** 'kept' — выдача пакетов началась, номер остался за записью. */
+    bibNote: 'released' | 'kept' | 'none' | number | null;
     slotsChanged: number;
     event: { id: number; slotsTaken: number; slotsTotal: number; slotsLeft: number } | null;
   }>(`/admin/registrations/${registrationId}`, { method: 'PATCH', body: { paymentStatus } });
@@ -379,7 +444,7 @@ export type AuditEntry = {
   id: number;
   at: string;
   admin: string;
-  action: 'participant.update' | 'participant.create' | 'registration.status' | 'registration.refund';
+  action: 'participant.update' | 'participant.create' | 'registration.status' | 'registration.refund' | 'registration.bib';
   registrationId: number | null;
   subject: string;
   changes: Record<string, [string | null, string | null]>;
@@ -400,6 +465,9 @@ export type RefundStage = {
   suggested: RefundPercent;
   daysLeft: number;
   rule: string;
+  /** Выдача пакетов на этом старте уже началась: по оферте возврата нет, номер останется. */
+  pickupStarted: boolean;
+  bibNumber: number | null;
 };
 
 export type RefundPreview = {
@@ -424,6 +492,57 @@ export const applyRefund = (
     method: 'POST',
     body,
   });
+
+/** Ручная смена номера; у абонемента — на весь сезон. */
+export const setBib = (registrationId: number, bib: number | null) =>
+  request<{ bibNumber: number | null; registrations: number; seasonWide: boolean }>(`/admin/registrations/${registrationId}/bib`, {
+    method: 'PATCH',
+    body: { bib },
+  });
+
+/** Выдать номера оплаченным без номера (после того как задали диапазоны). */
+export const assignBibs = (eventId: number) =>
+  request<{ assigned: number; missing: number }>(`/admin/events/${eventId}/assign-bibs`, { method: 'POST', body: {} });
+
+// ---------- Промокоды ----------
+
+export type PromoRedemption = {
+  id: number;
+  at: string;
+  who: string;
+  username: string | null;
+  telegramId: string | null;
+  target: string;
+  base: number;
+  discount: number;
+  total: number;
+  status: 'HELD' | 'USED' | 'RELEASED';
+};
+
+export type PromoCode = {
+  id: number;
+  code: string;
+  kind: 'PERCENT' | 'FIXED';
+  value: number;
+  maxUses: number | null;
+  validFrom: string | null;
+  validUntil: string | null;
+  eventId: number | null;
+  event: { id: number; title: string; date: string } | null;
+  active: boolean;
+  note: string | null;
+  createdAt: string;
+  used: number;
+  redemptions: PromoRedemption[];
+};
+
+export type PromoInput = Pick<PromoCode, 'code' | 'kind' | 'value' | 'maxUses' | 'validFrom' | 'validUntil' | 'eventId' | 'active' | 'note'>;
+
+export const getPromoCodes = () => request<PromoCode[]>('/admin/promo-codes');
+export const createPromoCode = (input: PromoInput) =>
+  request<{ id: number }>('/admin/promo-codes', { method: 'POST', body: input });
+export const updatePromoCode = (id: number, input: PromoInput) =>
+  request<{ id: number }>(`/admin/promo-codes/${id}`, { method: 'PATCH', body: input });
 
 export const getAudit = (eventId: number) => request<AuditEntry[]>(`/admin/events/${eventId}/audit`);
 

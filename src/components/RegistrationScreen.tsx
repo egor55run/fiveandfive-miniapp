@@ -7,6 +7,8 @@ import DocLink from './legal/DocLink';
 import OpeningSubscribe from './OpeningSubscribe';
 import {
   ApiError,
+  checkPromo,
+  type PromoQuoteDto,
   createRegistration,
   createSeasonPass,
   getCurrentSeason,
@@ -31,6 +33,8 @@ import {
   underageMessage,
 } from '../lib/eligibility';
 import FitTitle from './FitTitle';
+import { raceTheme } from '../lib/raceTheme';
+import { pickupLines } from '../lib/pickup';
 
 export type RegistrationOutcome = {
   user: UserDto;
@@ -179,6 +183,9 @@ function RegistrationScreen({
     setErrors((p) => ({ ...p, consents: undefined }));
   };
   const [errors, setErrors] = useState<FieldErrors>({});
+  // Промокод: проверенный сервером (цена, скидка, итог) — до отправки формы.
+  const [promo, setPromo] = useState<PromoQuoteDto | null>(null);
+  const [promoChecking, setPromoChecking] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const reduceMotion = useReducedMotion();
@@ -221,9 +228,14 @@ function RegistrationScreen({
     seasonOffered && !seasonBlockedText && season?.events.every((e) => !e.registrationDeadlinePassed),
   );
   const useSeason = seasonAvailable && seasonChecked;
-  const total = useSeason && season ? season.price : (chosen?.price ?? event.price);
+  const basePrice = useSeason && season ? season.price : (chosen?.price ?? event.price);
+  // Скидка считается для того, что выбрано сейчас; сменили дистанцию или
+  // абонемент — промокод проверяется заново.
+  const total = promo ? promo.total : basePrice;
   const date = new Date(event.date);
   const state = registrationState(event, registrationOpenForMe);
+  // Оформление старта из админки — шапка и кнопка оплаты в его стиле.
+  const theme = raceTheme(event);
 
   // Возраст — на день старта; для абонемента — на день первого старта сезона.
   const ageStart = useSeason && season?.events[0] ? season.events[0].date : event.date;
@@ -233,6 +245,7 @@ function RegistrationScreen({
   const minor = ageAtStart !== null && ageAtStart >= MIN_AGE && ageAtStart < ADULT_AGE;
 
   const setField = (name: keyof FormValues, value: string) => {
+    if (name === 'promocode') setPromo(null);
     setValues((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => (prev[name] ? { ...prev, [name]: undefined } : prev));
     if (serverError) setServerError(null);
@@ -279,6 +292,25 @@ function RegistrationScreen({
     return e;
   };
 
+  const applyPromo = async () => {
+    const code = values.promocode.trim();
+    if (!code) return;
+    setPromoChecking(true);
+    setErrors((prev) => ({ ...prev, promocode: undefined }));
+    try {
+      setPromo(
+        await checkPromo(
+          useSeason && season ? { code, seasonId: season.id } : { code, eventId: event.id, ...(chosen ? { distanceId: chosen.id } : {}) },
+        ),
+      );
+    } catch (err) {
+      setPromo(null);
+      setErrors((prev) => ({ ...prev, promocode: err instanceof Error ? err.message : 'Не удалось проверить промокод' }));
+    } finally {
+      setPromoChecking(false);
+    }
+  };
+
   const handleSubmit = async (ev: FormEvent) => {
     ev.preventDefault();
     const next = validate();
@@ -303,6 +335,8 @@ function RegistrationScreen({
       consents: minor
         ? ({ oferta: true, privacy: true, parent: true } as const)
         : ({ oferta: true, privacy: true } as const),
+      // Код проверяет сервер ещё раз; неприменённый тоже отправляем — ошибку покажем у поля.
+      promoCode: values.promocode.trim() || null,
     };
 
     setSubmitting(true);
@@ -335,9 +369,12 @@ function RegistrationScreen({
       const fieldErrors =
         err instanceof ApiError
           ? Object.fromEntries(
-              Object.entries(err.fields).filter(([name]) => name in EMPTY || name === 'consents'),
+              Object.entries(err.fields)
+                .map(([name, text]) => [name === 'promoCode' ? 'promocode' : name, text])
+                .filter(([name]) => name in EMPTY || name === 'consents'),
             )
           : {};
+      if ('promocode' in fieldErrors) setPromo(null);
       if (Object.keys(fieldErrors).length > 0) {
         setErrors((prev) => ({ ...prev, ...fieldErrors }));
       } else {
@@ -349,14 +386,16 @@ function RegistrationScreen({
 
   return (
     <motion.main
-      className="screen reg"
+      className={`screen reg${theme ? ' race-scope' : ''}`}
+      style={theme?.style}
       initial={reduceMotion ? false : { opacity: 0, x: 24 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
     >
       <Header onBack={onBack} />
 
-      <section className="reg-hero">
+      <section className={`reg-hero${theme ? ` ${theme.className}` : ''}`}>
+        {theme?.logoUrl && <img className="race-logo" src={theme.logoUrl} alt="" />}
         <span className="reg-hero__eyebrow">Регистрация на</span>
         <FitTitle as="h2" className="reg-hero__title u-display">
           {event.title}
@@ -373,6 +412,14 @@ function RegistrationScreen({
             Регистрация до {deadlineFmt.format(new Date(event.registrationClosesAt))}
           </span>
         )}
+      </section>
+
+      {/* Выдача стартового пакета — место, адрес, даты и часы из админки. */}
+      <section className="reg-pickup">
+        <span className="reg-pickup__title">Выдача стартового пакета</span>
+        {pickupLines(event).map((line) => (
+          <p key={line}>{line}</p>
+        ))}
       </section>
 
       {state !== 'open' ? (
@@ -527,6 +574,7 @@ function RegistrationScreen({
                       disabled={submitting || full}
                       onClick={() => {
                         setDistanceId(d.id);
+                        setPromo(null);
                         if (!d.seasonPass) setSeasonChecked(false);
                         if (serverError) setServerError(null);
                       }}
@@ -560,17 +608,43 @@ function RegistrationScreen({
             <ChevronDown className="rfield__chevron" size={18} strokeWidth={2} />
           </div>
 
-          <label className="rfield">
+          <div className={`rfield${errors.promocode ? ' rfield--error' : ''}`}>
             <span className="rfield__label">Промокод</span>
-            <input
-              className="rfield__input"
-              type="text"
-              placeholder="необязательно"
-              value={values.promocode}
-              disabled={submitting}
-              onChange={(e) => setField('promocode', e.target.value)}
-            />
-          </label>
+            <div className="promo-row">
+              <input
+                className="rfield__input"
+                type="text"
+                placeholder="необязательно"
+                autoCapitalize="characters"
+                maxLength={40}
+                value={values.promocode}
+                disabled={submitting}
+                onChange={(e) => setField('promocode', e.target.value.toUpperCase())}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    void applyPromo();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="promo-row__btn"
+                disabled={submitting || promoChecking || !values.promocode.trim() || promo !== null}
+                onClick={() => void applyPromo()}
+              >
+                {promoChecking ? '…' : promo ? 'Применён' : 'Применить'}
+              </button>
+            </div>
+            {errors.promocode ? (
+              <span className="rfield__err">{errors.promocode}</span>
+            ) : promo ? (
+              <span className="rfield__hint">
+                Скидка {promo.kind === 'PERCENT' ? `${promo.value}%` : `${priceFmt.format(promo.discount)} ₸`}
+                {promo.total === 0 ? ' — регистрация бесплатная' : ''}
+              </span>
+            ) : null}
+          </div>
 
           {seasonOffered && season && seasonBlockedText && (
             <div className="upsell upsell--off" aria-disabled="true">
@@ -587,7 +661,10 @@ function RegistrationScreen({
               type="button"
               className="upsell"
               aria-pressed={seasonChecked}
-              onClick={() => setSeasonChecked((s) => !s)}
+              onClick={() => {
+                setSeasonChecked((s) => !s);
+                setPromo(null);
+              }}
             >
               <span
                 className={`checkbox${seasonChecked ? ' checkbox--on' : ''}`}
@@ -680,6 +757,14 @@ function RegistrationScreen({
             </div>
           )}
 
+          {promo && promo.discount > 0 && (
+            <div className="reg-pay reg-pay--breakdown">
+              <span className="reg-pay__label">Цена</span>
+              <span className="reg-pay__old">{priceFmt.format(promo.base)} ₸</span>
+              <span className="reg-pay__label">Скидка ({promo.code})</span>
+              <span className="reg-pay__discount">−{priceFmt.format(promo.discount)} ₸</span>
+            </div>
+          )}
           <div className="reg-pay">
             <span className="reg-pay__label">К оплате</span>
             <span className="reg-pay__amount">{priceFmt.format(total)} ₸</span>
@@ -691,7 +776,13 @@ function RegistrationScreen({
             disabled={submitting}
             whileTap={reduceMotion || submitting ? undefined : { scale: 0.985 }}
           >
-            {submitting ? 'Выставляем счёт…' : 'Оплатить через Kaspi'}
+            {total === 0
+              ? submitting
+                ? 'Регистрируем…'
+                : 'Зарегистрироваться'
+              : submitting
+                ? 'Выставляем счёт…'
+                : 'Оплатить через Kaspi'}
           </motion.button>
         </form>
       )}

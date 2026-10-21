@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { serializeRouteMap } from '../lib/routeMaps';
 import { EVENT_DETAILS } from '../lib/eventDetails';
-import type { Event, EventDistance, RouteMap } from '@prisma/client';
+import type { Event, EventDistance, PickupSlot, RouteMap } from '@prisma/client';
 import { prisma } from '../prisma';
 import { registrationOpen } from '../lib/registrationWindow';
 import { registrationClosesAt, registrationDeadlinePassed } from '../lib/eligibility';
@@ -12,7 +12,8 @@ import { serializeDistance } from '../lib/distances';
  * старых клиентов и коротких строк), distances — сами дистанции: при записи
  * участник выбирает одну из них.
  */
-export function serializeEvent(e: Event & { distances?: EventDistance[]; routeMaps?: RouteMap[] }) {
+export function serializeEvent(e: Event & { distances?: EventDistance[]; routeMaps?: RouteMap[]; pickupSlots?: PickupSlot[] }) {
+  const slots = e.pickupSlots ?? [];
   return {
     id: e.id,
     title: e.title,
@@ -36,8 +37,21 @@ export function serializeEvent(e: Event & { distances?: EventDistance[]; routeMa
     // Программа дня и Положение (путь к PDF относительно корня API, как карта).
     program: e.program,
     regulationsUrl: e.regulationsUrl,
-    // Время и место основной выдачи стартовых пакетов; null — «уточняются».
+    // Комментарий к выдаче пакетов (старое поле «время и место»).
     packetPickupInfo: e.packetPickupInfo,
+    // Выдача пакетов: место, адрес, даты и часы. configured — заполнено всё
+    // (иначе в текстах «уточняются», в админке — предупреждение).
+    pickup: {
+      place: e.pickupPlace,
+      address: e.pickupAddress,
+      comment: e.packetPickupInfo,
+      slots: slots.map((s) => ({ startsAt: s.startsAt, endsAt: s.endsAt })),
+      configured: Boolean(e.pickupPlace && e.pickupAddress && slots.length > 0),
+    },
+    // Оформление старта в Mini App: пути к файлам — через apiAsset, как карта.
+    theme: e.themeBgUrl || e.themeLogoUrl || e.themeAccent
+      ? { bgUrl: e.themeBgUrl, logoUrl: e.themeLogoUrl, accent: e.themeAccent }
+      : null,
     registrationOpen: registrationOpen(),
     // Срок регистрации на этот старт (заданный в админке или за 7 дней до
     // старта) и прошёл ли он — с ним запись закрыта для всех, включая админов.

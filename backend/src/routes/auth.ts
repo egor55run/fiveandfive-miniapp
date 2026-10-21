@@ -113,6 +113,9 @@ export async function authRoutes(app: FastifyInstance) {
           orderBy: { event: { date: 'asc' } },
         },
         seasonPasses: { orderBy: { createdAt: 'desc' } },
+        // Цена, скидка и итог: по оплаченному счёту или по коду на 100% (без счёта).
+        payments: { where: { state: 'PAID' }, include: { promoCode: true }, orderBy: { paidAt: 'desc' } },
+        promoRedemptions: { where: { status: 'USED', paymentId: null }, include: { promoCode: true } },
       },
     });
 
@@ -137,6 +140,26 @@ export async function authRoutes(app: FastifyInstance) {
       }
     }
 
+    type Price = { base: number; discount: number; total: number; promoCode: string | null };
+    const priceFor = (where: { registrationId?: number | null; seasonPassId?: number | null }): Price | null => {
+      const match = (x: { registrationId: number | null; seasonPassId: number | null }) =>
+        where.seasonPassId ? x.seasonPassId === where.seasonPassId : x.registrationId === where.registrationId;
+      const pay = user.payments.find(match);
+      if (pay) {
+        const total = Math.round(Number(pay.amount));
+        const discount = Math.round(Number(pay.discount));
+        const base = pay.baseAmount !== null ? Math.round(Number(pay.baseAmount)) : total + discount;
+        return { base, discount, total, promoCode: pay.promoCode?.code ?? null };
+      }
+      const free = user.promoRedemptions.find(match);
+      if (free) {
+        const base = Math.round(Number(free.baseAmount));
+        const discount = Math.round(Number(free.discount));
+        return { base, discount, total: base - discount, promoCode: free.promoCode.code };
+      }
+      return null;
+    };
+
     return {
       user: serializeUser(user),
       registrations: user.registrations.map((r) => ({
@@ -149,6 +172,11 @@ export async function authRoutes(app: FastifyInstance) {
         // Дистанция участника — для билета и профиля.
         distanceId: r.distanceId,
         distance: r.distance?.label ?? null,
+        // Стартовый номер (у абонемента — общий на сезон) и оформлен ли возврат.
+        bibNumber: r.bibNumber,
+        refunded: r.refundedAt !== null,
+        // Цена, скидка, итог; у старта из абонемента — цена абонемента целиком.
+        price: priceFor(r.seasonPassId ? { seasonPassId: r.seasonPassId } : { registrationId: r.id }),
         event: serializeEvent(r.event),
       })),
       results: user.results.map((r) => ({
@@ -166,6 +194,8 @@ export async function authRoutes(app: FastifyInstance) {
         seasonId: p.seasonId,
         price: Number(p.price),
         paymentStatus: p.paymentStatus,
+        bibNumber: p.bibNumber,
+        paid: priceFor({ seasonPassId: p.id }),
         createdAt: p.createdAt,
       })),
     };

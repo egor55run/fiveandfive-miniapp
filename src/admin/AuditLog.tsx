@@ -14,6 +14,7 @@ const FIELD_LABEL: Record<string, string> = {
   paymentStatus: 'Оплата',
   refund: 'Возврат',
   pass: 'Абонемент',
+  bib: 'Стартовый номер',
 };
 
 const ACTION_LABEL: Record<AuditEntry['action'], string> = {
@@ -21,6 +22,7 @@ const ACTION_LABEL: Record<AuditEntry['action'], string> = {
   'participant.create': 'Добавлен вручную',
   'registration.status': 'Статус',
   'registration.refund': 'Возврат',
+  'registration.bib': 'Номер',
 };
 
 /** Значение поля — по-человечески: пол, статус оплаты, дата. */

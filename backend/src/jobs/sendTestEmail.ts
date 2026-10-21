@@ -11,7 +11,7 @@ async function main() {
   const to = process.argv[2];
   if (!to || !to.includes('@')) throw new Error('Укажите адрес: node dist/jobs/sendTestEmail.js you@example.com');
   if (!emailEnabled()) throw new Error('Почта выключена: нужны EMAIL_ENABLED=true и BREVO_API_KEY в .env');
-  const events = await prisma.event.findMany({ where: { date: { gt: new Date() } }, orderBy: { date: 'asc' } });
+  const events = await prisma.event.findMany({ where: { date: { gt: new Date() } }, orderBy: { date: 'asc' }, include: { pickupSlots: { orderBy: { startsAt: 'asc' } } } });
   if (events.length === 0) throw new Error('Нет будущих стартов для примера');
   const [first] = events;
   const letters = [

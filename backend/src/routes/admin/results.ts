@@ -135,8 +135,9 @@ export async function adminResultsRoutes(app: FastifyInstance) {
         await tx.result.upsert({
           where: { userId_eventId: { userId, eventId } },
           // place проставит recomputePlaces следующей строкой; 0 — временное значение.
-          create: { userId, eventId, finishTime, place: 0 },
-          update: { finishTime },
+          // Дистанция результата — из регистрации: протоколы и рейтинг пойдут по дистанциям.
+          create: { userId, eventId, finishTime, place: 0, eventDistanceId: registration.distanceId },
+          update: { finishTime, eventDistanceId: registration.distanceId },
         });
         await recomputePlaces(tx, eventId);
       });

@@ -8,4 +8,5 @@ import { ROUTE_MAP_ORDER } from './routeMaps';
 export const EVENT_DETAILS = {
   distances: { orderBy: DISTANCE_ORDER },
   routeMaps: { orderBy: ROUTE_MAP_ORDER },
+  pickupSlots: { orderBy: { startsAt: 'asc' } },
 } as const;

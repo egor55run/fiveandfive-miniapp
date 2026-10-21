@@ -766,6 +766,52 @@ select.rfield__input {
   color: var(--text-primary);
 }
 
+/* Цена и скидка по промокоду над «К оплате». */
+.reg-pay--breakdown {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  row-gap: 4px;
+  margin-top: 10px;
+}
+.reg-pay--breakdown .reg-pay__label {
+  font-size: 16px;
+  color: var(--text-muted);
+}
+.reg-pay__old {
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+.reg-pay__discount {
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+  color: var(--state-success);
+}
+
+/* Промокод: поле и кнопка «Применить» в одной строке. */
+.promo-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.promo-row__btn {
+  flex: none;
+  padding: 6px 14px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-full);
+  cursor: pointer;
+}
+.promo-row__btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .btn-register.btn-pay {
   padding: 18px;
   font-size: 20px;
@@ -1849,4 +1895,92 @@ select.rfield__input {
 .upsell--off {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+/* Профиль: цена со скидкой и выдача стартового пакета под ближайшим стартом. */
+.pf-next__price {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.pf-next__price b {
+  color: var(--text-primary);
+}
+.pf-pickup {
+  margin-top: 10px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.45;
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-md);
+}
+.pf-pickup p {
+  margin: 0 0 6px;
+}
+.pf-pickup p:last-child {
+  margin-bottom: 0;
+}
+
+/* ===================================================================
+   Оформление старта из админки (src/lib/raceTheme.ts): фон, логотип,
+   акцентный цвет. Переменные --race-* ставятся inline на карточке.
+   =================================================================== */
+.race-themed {
+  position: relative;
+}
+.race-themed--bg {
+  /* Фон старта под затемнением — белый текст читается на любой картинке. */
+  background:
+    linear-gradient(180deg, rgba(20, 20, 20, 0.35) 0%, rgba(20, 20, 20, 0.82) 100%),
+    var(--race-bg) center / cover no-repeat,
+    var(--bg-surface);
+}
+.race-themed--accent {
+  border-color: var(--race-accent);
+}
+.hero-card.race-themed--accent {
+  box-shadow: 0 0 32px color-mix(in srgb, var(--race-accent) 35%, transparent);
+}
+.race-themed--accent .btn-register {
+  background: var(--race-accent);
+  color: var(--race-on-accent);
+}
+/* Кнопка оплаты на странице старта: акцент, если задан, иначе фирменный градиент. */
+.race-scope .btn-register.btn-pay {
+  background: var(--race-accent, var(--grad-brand-cta));
+  color: var(--race-on-accent, var(--text-on-brand));
+}
+.race-logo {
+  display: block;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 8px;
+  object-fit: contain;
+}
+.race-logo--sm {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 0;
+}
+
+/* Выдача стартового пакета на странице старта. */
+.reg-pickup {
+  margin-top: 12px;
+  padding: 14px 16px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text-muted);
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg);
+}
+.reg-pickup__title {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.reg-pickup p {
+  margin: 0 0 4px;
 }

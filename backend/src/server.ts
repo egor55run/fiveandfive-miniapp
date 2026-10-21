@@ -17,6 +17,8 @@ import { adminParticipantsRoutes } from './routes/admin/participants';
 import { adminResultsRoutes } from './routes/admin/results';
 import { adminOpeningBroadcastRoutes } from './routes/admin/openingBroadcast';
 import { adminRaceAnnouncementsRoutes } from './routes/admin/raceAnnouncements';
+import { adminPromosRoutes } from './routes/admin/promos';
+import { promoRoutes } from './routes/promo';
 import { adminSessionRoutes } from './routes/admin/session';
 import { authRoutes } from './routes/auth';
 import { eventsRoutes } from './routes/events';
@@ -120,6 +122,7 @@ async function main() {
   await app.register(eventsRoutes);
   await app.register(registrationsRoutes);
   await app.register(seasonsRoutes);
+  await app.register(promoRoutes);
   await app.register(paymentsRoutes);
   await app.register(openingSubscriptionRoutes);
   // Входящие сообщения боту: подписка «узнать об открытии», /start, /stop.
@@ -134,6 +137,7 @@ async function main() {
   await app.register(adminResultsRoutes);
   await app.register(adminOpeningBroadcastRoutes);
   await app.register(adminRaceAnnouncementsRoutes);
+  await app.register(adminPromosRoutes);
 
   // Фоновая сверка оплат: раз в минуту освобождаем места по просроченным
   // счетам и перепроверяем те, по которым не пришёл вебхук. Процесс бэкенда
