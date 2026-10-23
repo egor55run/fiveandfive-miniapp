@@ -216,8 +216,10 @@ export async function seasonStandings(
     byUser.set(r.userId, row);
   }
   const table = (g: Gender) => {
+    // В таблице — только те, у кого есть хотя бы один финиш: не стартовавший
+    // на всех этапах с нулём баллов в рейтинге не нужен.
     const list = [...byUser.values()]
-      .filter((r) => r.gender === g)
+      .filter((r) => r.gender === g && r.bestTime !== null)
       .sort((a, b) => b.total - a.total || (a.bestTime ?? Infinity) - (b.bestTime ?? Infinity) || a.name.localeCompare(b.name));
     list.forEach((r, i) => {
       const prev = i > 0 ? list[i - 1] : null;
