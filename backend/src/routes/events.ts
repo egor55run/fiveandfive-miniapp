@@ -57,6 +57,8 @@ export function serializeEvent(e: Event & { distances?: EventDistance[]; routeMa
     // старта) и прошёл ли он — с ним запись закрыта для всех, включая админов.
     registrationClosesAt: registrationClosesAt(e),
     registrationDeadlinePassed: registrationDeadlinePassed(e),
+    // Результаты опубликованы — на сайте есть протокол /reiting/<slug>.
+    resultsPublished: e.resultsPublishedAt !== null,
     createdAt: e.createdAt,
   };
 }

@@ -19,6 +19,7 @@ import { adminOpeningBroadcastRoutes } from './routes/admin/openingBroadcast';
 import { adminRaceAnnouncementsRoutes } from './routes/admin/raceAnnouncements';
 import { adminPromosRoutes } from './routes/admin/promos';
 import { promoRoutes } from './routes/promo';
+import { ratingRoutes } from './routes/rating';
 import { adminSessionRoutes } from './routes/admin/session';
 import { authRoutes } from './routes/auth';
 import { eventsRoutes } from './routes/events';
@@ -123,6 +124,7 @@ async function main() {
   await app.register(registrationsRoutes);
   await app.register(seasonsRoutes);
   await app.register(promoRoutes);
+  await app.register(ratingRoutes);
   await app.register(paymentsRoutes);
   await app.register(openingSubscriptionRoutes);
   // Входящие сообщения боту: подписка «узнать об открытии», /start, /stop.

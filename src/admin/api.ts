@@ -398,7 +398,7 @@ export type Participant = {
   /** Оформлен возврат: запись CANCELLED, в списке — «Возврат». */
   refund: { at: string; percent: number | null; amount: number; confirmed: boolean } | null;
   registeredAt: string;
-  result: { id: number; finishTime: number; place: number } | null;
+  result: { id: number; finishTime: number | null; place: number | null; status: ResultStatus } | null;
 };
 
 export type ParticipantsResponse = {
@@ -444,7 +444,16 @@ export type AuditEntry = {
   id: number;
   at: string;
   admin: string;
-  action: 'participant.update' | 'participant.create' | 'registration.status' | 'registration.refund' | 'registration.bib';
+  action:
+    | 'participant.update'
+    | 'participant.create'
+    | 'registration.status'
+    | 'registration.refund'
+    | 'registration.bib'
+    | 'result.update'
+    | 'result.import'
+    | 'result.publish'
+    | 'user.merge';
   registrationId: number | null;
   subject: string;
   changes: Record<string, [string | null, string | null]>;
@@ -546,7 +555,9 @@ export const updatePromoCode = (id: number, input: PromoInput) =>
 
 export const getAudit = (eventId: number) => request<AuditEntry[]>(`/admin/events/${eventId}/audit`);
 
-// ---------- Результаты ----------
+// ---------- Результаты и рейтинг ----------
+
+export type ResultStatus = 'FINISHED' | 'DNF' | 'DNS' | 'DSQ';
 
 export type ResultRow = {
   id: number;
@@ -554,28 +565,77 @@ export type ResultRow = {
   lastName: string | null;
   firstName: string;
   username: string | null;
-  finishTime: number;
-  place: number;
+  gender: 'MALE' | 'FEMALE' | null;
+  bib: number | null;
+  status: ResultStatus;
+  /** Время от выстрела, секунды; null — не финишировал. */
+  finishTime: number | null;
+  place: number | null;
+  /** Место среди своего пола — зачёт рейтинга. */
+  genderPlace: number | null;
+  points: number;
   recordedAt: string;
 };
 
-export type ResultsResponse = {
-  event: { id: number; title: string; date: string; distance: string };
-  results: ResultRow[];
+export type ResultsEventInfo = {
+  id: number;
+  title: string;
+  date: string;
+  distance: string;
+  resultsPublishedAt: string | null;
+  /** До какого момента окно протестов; null — не опубликовано. */
+  protestUntil: string | null;
 };
 
-export const getResults = (eventId: number) =>
-  request<ResultsResponse>(`/admin/events/${eventId}/results`);
+export type ResultsResponse = { event: ResultsEventInfo; results: ResultRow[] };
 
-/** Место не передаём — его считает сервер сортировкой по времени. */
-export const putResult = (eventId: number, userId: number, finishTime: number) =>
-  request<{ results: ResultRow[] }>(`/admin/events/${eventId}/results`, {
-    method: 'PUT',
-    body: { userId, finishTime },
+export const getResults = (eventId: number) => request<ResultsResponse>(`/admin/events/${eventId}/results`);
+
+/** Место и баллы считает сервер. force — правка после окна протестов. */
+export const putResult = (
+  eventId: number,
+  body: { userId: number; status: ResultStatus; finishTime: number | null; force?: boolean },
+) => request<ResultsResponse>(`/admin/events/${eventId}/results`, { method: 'PUT', body });
+
+export const deleteResult = (resultId: number, force = false) =>
+  request<ResultsResponse>(`/admin/results/${resultId}${force ? '?force=1' : ''}`, { method: 'DELETE' });
+
+export type ImportPreview = {
+  matched: { bib: number; name: string; status: ResultStatus; finishTime: number | null }[];
+  unknown: number[];
+  duplicates: number[];
+  missing: { bib: number | null; name: string }[];
+  warnings: string[];
+};
+
+/** Файл хронометража: dryRun — только предпросмотр. */
+export const importResults = (eventId: number, body: { csv: string; dryRun: boolean; missingAsDns: boolean; force?: boolean }) =>
+  request<{ preview: ImportPreview; results?: ResultRow[]; event?: ResultsEventInfo }>(`/admin/events/${eventId}/results/import`, {
+    method: 'POST',
+    body,
   });
 
-export const deleteResult = (resultId: number) =>
-  request<{ results: ResultRow[] }>(`/admin/results/${resultId}`, { method: 'DELETE' });
+export const publishResults = (eventId: number) =>
+  request<{ event: ResultsEventInfo }>(`/admin/events/${eventId}/results/publish`, { method: 'POST', body: {} });
+export const unpublishResults = (eventId: number) =>
+  request<{ event: ResultsEventInfo }>(`/admin/events/${eventId}/results/unpublish`, { method: 'POST', body: {} });
+
+// ---------- Двойники ----------
+
+export type DuplicateCandidate = {
+  userId: number;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  birthDate: string | null;
+  telegram: boolean;
+  username: string | null;
+  events: string[];
+};
+
+export const getDuplicates = (userId: number) => request<DuplicateCandidate[]>(`/admin/users/${userId}/duplicates`);
+export const mergeUsers = (intoUserId: number, fromUserId: number) =>
+  request<{ moved: Record<string, number> }>('/admin/users/merge', { method: 'POST', body: { intoUserId, fromUserId } });
 
 // ---------- Подписка «Узнать об открытии» ----------
 

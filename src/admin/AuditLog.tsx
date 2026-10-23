@@ -15,6 +15,10 @@ const FIELD_LABEL: Record<string, string> = {
   refund: 'Возврат',
   pass: 'Абонемент',
   bib: 'Стартовый номер',
+  result: 'Результат',
+  import: 'Загрузка',
+  published: 'Результаты',
+  merge: 'Двойник',
 };
 
 const ACTION_LABEL: Record<AuditEntry['action'], string> = {
@@ -23,6 +27,10 @@ const ACTION_LABEL: Record<AuditEntry['action'], string> = {
   'registration.status': 'Статус',
   'registration.refund': 'Возврат',
   'registration.bib': 'Номер',
+  'result.update': 'Результат',
+  'result.import': 'Файл хронометража',
+  'result.publish': 'Публикация',
+  'user.merge': 'Объединение',
 };
 
 /** Значение поля — по-человечески: пол, статус оплаты, дата. */

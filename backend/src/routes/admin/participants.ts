@@ -6,6 +6,8 @@ import { ageOnStartDay, checkAge } from '../../lib/eligibility';
 import { ageFromBirthDate, formatBirthDate, parseBirthDate } from '../../lib/birthDate';
 import { diffFields, personLabel, writeAudit } from '../../lib/audit';
 import { REFUND_PERCENTS, RefundError, applyAdminRefund, money, refundPreview } from '../../lib/refunds';
+import { MergeError, mergeUsers } from '../../lib/merge';
+import type { Prisma } from '@prisma/client';
 import { BibError, assignMissingBibs, assignRegistrationBib, releaseRegistrationBib, setBibManually } from '../../lib/bibs';
 import {
   birthDateField,
@@ -144,7 +146,7 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
               : null,
             registeredAt: r.registeredAt,
             result: result
-              ? { id: result.id, finishTime: result.finishTime, place: result.place }
+              ? { id: result.id, finishTime: result.finishTime, place: result.genderPlace ?? result.place, status: result.status }
               : null,
           };
         }),
@@ -407,6 +409,52 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
     }
     req.log.info({ eventId, registrationId }, 'Участник добавлен вручную из админки');
     return reply.code(201).send({ registrationId });
+  });
+
+  /**
+   * GET /admin/users/:id/duplicates — возможные двойники: тот же телефон,
+   * email или те же фамилия и имя.
+   */
+  app.get<{ Params: { id: string } }>('/admin/users/:id/duplicates', async (req, reply) => {
+    const id = parseId(req.params.id);
+    if (id === null) return reply.code(400).send({ error: 'Некорректный id' });
+    const u = await prisma.user.findUnique({ where: { id } });
+    if (!u) return reply.code(404).send({ error: 'Участник не найден' });
+    const or: Prisma.UserWhereInput[] = [
+      { firstName: { equals: u.firstName, mode: 'insensitive' }, lastName: { equals: u.lastName ?? '', mode: 'insensitive' } },
+    ];
+    if (u.phone) or.push({ phone: u.phone });
+    if (u.email) or.push({ email: { equals: u.email, mode: 'insensitive' } });
+    const list = await prisma.user.findMany({
+      where: { id: { not: id }, OR: or },
+      include: { registrations: { include: { event: true } } },
+      take: 20,
+    });
+    return list.map((x) => ({
+      userId: x.id,
+      name: personLabel(x),
+      phone: x.phone,
+      email: x.email,
+      birthDate: formatBirthDate(x.birthDate),
+      telegram: x.telegramId !== null,
+      username: x.username,
+      events: x.registrations.map((r) => r.event.title),
+    }));
+  });
+
+  /** POST /admin/users/merge — { intoUserId, fromUserId }: перенести всё и удалить второго. */
+  const mergeSchema = z.object({ intoUserId: z.number().int().positive(), fromUserId: z.number().int().positive() });
+  app.post('/admin/users/merge', async (req, reply) => {
+    const parsed = mergeSchema.safeParse(req.body);
+    if (!parsed.success) return sendValidationError(reply, parsed.error);
+    try {
+      const moved = await prisma.$transaction((tx) => mergeUsers(tx, { ...parsed.data, adminTelegramId: req.admin!.telegramId }));
+      req.log.info({ ...parsed.data, moved }, 'Двойники объединены');
+      return { moved };
+    } catch (err) {
+      if (err instanceof MergeError) return reply.code(409).send({ error: err.message, reason: 'merge_conflict' });
+      throw err;
+    }
   });
 
   /**

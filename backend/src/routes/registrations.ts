@@ -57,7 +57,8 @@ const bodySchema = z.object({
   age: z.number().int().min(1).max(120),
   birthDate: birthDateField.optional(),
   // Необязателен: прод-фронт до этого поля его не присылает. Нет — не затираем.
-  gender: genderField.optional(),
+  // Пол обязателен с 2026-10-23: без него нет зачёта в рейтинге (М и Ж отдельно).
+  gender: genderField,
   phone: phoneField,
   consents: consentsField,
   // Промокод (lib/promo): скидка считается здесь, до счёта в Kaspi.

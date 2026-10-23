@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { EVENT_DETAILS } from '../lib/eventDetails';
 
-import type { Prisma, User } from '@prisma/client';
+import type { Gender, Prisma, User } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../prisma';
 import { registrationOpenFor } from '../lib/registrationWindow';
@@ -16,6 +16,7 @@ import {
 } from '../lib/validation';
 import { requireTelegramAuth, tgUserOf } from '../plugins/telegramAuth';
 import { serializeEvent } from './events';
+import { resultPoints, seasonStandings } from '../lib/rating';
 
 /**
  * Явная сериализация вместо отдачи модели Prisma напрямую: telegram_id — BigInt
@@ -36,6 +37,8 @@ export function serializeUser(u: User) {
     birthDate: formatBirthDate(u.birthDate),
     phone: u.phone,
     gender: u.gender,
+    // «Не показывать меня в публичном рейтинге».
+    hideFromRating: u.hideFromRating,
     createdAt: u.createdAt,
   };
 }
@@ -48,10 +51,28 @@ const patchSchema = z
     birthDate: birthDateField.optional(),
     gender: genderField.optional(),
     phone: phoneField.optional(),
+    hideFromRating: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, {
     message: 'Нужно передать хотя бы одно поле',
   });
+
+/** Баллы и место в рейтинге активного сезона; null — сезона или пола нет. */
+async function myRating(userId: number, gender: Gender | null) {
+  const season = await prisma.season.findFirst({ where: { isActive: true } });
+  if (!season || !gender) return null;
+  const table = await seasonStandings(season.id, { publicOnly: true, meUserId: userId });
+  const list = gender === 'MALE' ? table.men : table.women;
+  const mine = list.find((r) => r.userId === userId);
+  return {
+    seasonId: season.id,
+    gender,
+    points: mine?.total ?? 0,
+    place: mine?.place ?? null,
+    of: list.length,
+    stages: mine?.stages ?? table.events.map(() => null),
+  };
+}
 
 export async function authRoutes(app: FastifyInstance) {
   /**
@@ -108,7 +129,10 @@ export async function authRoutes(app: FastifyInstance) {
         },
         // От старых к новым: на этом порядке держатся динамика времени и
         // «минус X с первого старта» в аналитике.
+        // Только опубликованные финиши: до публикации результатов участник их
+        // не видит, сошедшие и не стартовавшие в аналитику не идут.
         results: {
+          where: { status: 'FINISHED', finishTime: { not: null }, event: { resultsPublishedAt: { not: null } } },
           include: { event: true },
           orderBy: { event: { date: 'asc' } },
         },
@@ -130,9 +154,14 @@ export async function authRoutes(app: FastifyInstance) {
     // результатов ещё нет (а это каждый новый пользователь) — вообще без запроса.
     const finishersByEvent = new Map<number, number>();
     if (user.results.length > 0) {
+      // Зачёт — среди своего пола: «N-е место из M мужчин/женщин».
       const finishers = await prisma.result.groupBy({
         by: ['eventId'],
-        where: { eventId: { in: user.results.map((r) => r.eventId) } },
+        where: {
+          eventId: { in: user.results.map((r) => r.eventId) },
+          status: 'FINISHED',
+          ...(user.gender ? { user: { gender: user.gender } } : {}),
+        },
         _count: { _all: true },
       });
       for (const row of finishers) {
@@ -183,12 +212,17 @@ export async function authRoutes(app: FastifyInstance) {
         id: r.id,
         eventId: r.eventId,
         finishTime: r.finishTime,
-        place: r.place,
+        // Место среди своего пола (зачёт рейтинга); пол не указан — общее.
+        place: (user.gender ? r.genderPlace : r.place) ?? r.place,
         // Считается на лету, в модели Result этого поля нет.
         finishersTotal: finishersByEvent.get(r.eventId) ?? 1,
+        status: r.status,
+        points: resultPoints(r, user.gender),
         recordedAt: r.recordedAt,
         event: serializeEvent(r.event),
       })),
+      // Рейтинг сезона: свои баллы и место среди своего пола.
+      rating: await myRating(user.id, user.gender),
       seasonPasses: user.seasonPasses.map((p) => ({
         id: p.id,
         seasonId: p.seasonId,

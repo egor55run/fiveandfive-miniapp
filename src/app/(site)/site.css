@@ -1550,3 +1550,116 @@ html.site-fonts body {
     text-decoration: none;
   }
 }
+
+/* ---------- Рейтинг серии (/reiting) и протокол этапа (/reiting/<старт>) ---------- */
+.rating {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 980px;
+  padding-top: 24px;
+  padding-bottom: 96px;
+}
+.rating-lead,
+.rating-empty,
+.rating-back {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.site .rating a {
+  color: var(--orange-text);
+}
+.rating-block {
+  padding: 20px;
+  border-radius: 20px;
+  background: #fff;
+}
+.rating-block__title {
+  margin: 0 0 12px;
+  font-family: var(--font-display);
+  font-size: 22px;
+}
+.rating-block p,
+.rating-block li {
+  font-size: 16px;
+  line-height: 1.55;
+}
+.rating-table-wrap {
+  overflow-x: auto;
+}
+.rating-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+.rating-table th,
+.rating-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid rgba(21, 19, 15, 0.08);
+  white-space: nowrap;
+}
+.rating-table th {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.rating-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.rating-hidden td {
+  color: var(--muted);
+  font-style: italic;
+}
+.calc {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--paper);
+}
+.calc__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.calc__field input {
+  width: 120px;
+  padding: 10px 12px;
+  font-size: 18px;
+  border: 1px solid rgba(21, 19, 15, 0.2);
+  border-radius: 10px;
+}
+.calc__gender {
+  display: flex;
+  gap: 6px;
+}
+.calc__gender button {
+  padding: 10px 14px;
+  font-size: 15px;
+  border: 1px solid rgba(21, 19, 15, 0.2);
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+}
+.calc__gender .calc__on {
+  background: var(--orange);
+  border-color: var(--orange);
+}
+.calc__result {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 18px;
+}
+.calc__result b {
+  font-family: var(--font-display);
+  font-size: 32px;
+}

@@ -62,7 +62,8 @@ const bodySchema = z.object({
   age: z.number().int().min(1).max(120),
   birthDate: birthDateField.optional(),
   // Необязателен: прод-фронт до этого поля его не присылает. Нет — не затираем.
-  gender: genderField.optional(),
+  // Пол обязателен: без него нет зачёта в рейтинге.
+  gender: genderField,
   phone: phoneField,
   consents: consentsField,
   // Промокод серии (lib/promo): код одного старта на абонемент не действует.

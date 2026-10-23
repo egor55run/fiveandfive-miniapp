@@ -707,3 +707,9 @@ select:focus {
   cursor: default;
   opacity: 0.6;
 }
+
+/* Участник без пола — вне зачёта рейтинга. */
+.ad-tag--warn {
+  background: rgba(229, 160, 72, 0.18);
+  color: #f0b46a;
+}

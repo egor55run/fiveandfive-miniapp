@@ -3,6 +3,7 @@ import './App.css';
 import AnalyticsScreen from './components/AnalyticsScreen';
 import HomeScreen from './components/HomeScreen';
 import ProfileScreen from './components/ProfileScreen';
+import RatingScreen from './components/RatingScreen';
 import OpenInTelegramScreen, {
   AuthErrorScreen,
   AuthLoadingScreen,
@@ -26,7 +27,7 @@ import { useTelegramAuth } from './hooks/useTelegramAuth';
 import { firstValidName, splitLegacyName } from './lib/personName';
 import { getUnsafeTelegramUser, requestedRaceSlug } from './lib/telegram';
 
-type Screen = 'analytics' | 'home' | 'profile' | 'registration' | 'payment' | 'success';
+type Screen = 'analytics' | 'home' | 'rating' | 'profile' | 'registration' | 'payment' | 'success';
 
 // Ближайший старт: самый ранний из будущих; иначе самый недавний из прошедших.
 function pickNearest(events: EventDto[]): EventDto | null {
@@ -221,7 +222,9 @@ function App() {
       ? 'analytics'
       : currentScreen === 'profile'
         ? 'profile'
-        : 'home';
+        : currentScreen === 'rating'
+          ? 'rating'
+          : 'home';
 
   // Основные экраны — с нижним таб-баром.
   return (
@@ -232,11 +235,14 @@ function App() {
           onBack={() => setCurrentScreen('home')}
           onViewRaces={() => setCurrentScreen('home')}
         />
+      ) : currentScreen === 'rating' ? (
+        <RatingScreen myGender={participant?.gender ?? me?.user.gender ?? null} />
       ) : currentScreen === 'profile' ? (
         <ProfileScreen
           participant={participant}
           registeredEvents={myEvents}
           registrations={me?.registrations ?? []}
+          rating={me?.rating ?? null}
           results={raceResults}
           nearest={nearest}
           onUserUpdated={setParticipantOverride}

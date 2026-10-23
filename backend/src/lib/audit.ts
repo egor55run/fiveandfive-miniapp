@@ -12,6 +12,10 @@ export type AuditAction =
   | 'registration.status'
   | 'registration.refund'
   | 'registration.bib'
+  | 'result.update'
+  | 'result.import'
+  | 'result.publish'
+  | 'user.merge'
   | 'season.update';
 
 /** { поле: [было, стало] } — только то, что действительно изменилось. */

@@ -4,7 +4,7 @@ import { ArrowRight, CalendarX2, FileText, Map, MessageCircleQuestion, Pencil, P
 import { BOT_ASK_LINK, openBotAsk } from '../lib/telegram';
 import Header from './Header';
 import DocLink from './legal/DocLink';
-import { ApiError, patchMe, type EventDto, type MeRegistrationDto, type UserDto } from '../lib/api';
+import { ApiError, patchMe, type EventDto, type MeRatingDto, type MeRegistrationDto, type UserDto } from '../lib/api';
 import { pickupLines } from '../lib/pickup';
 import type { RaceResult } from '../data/results';
 import { useSeasonProgress } from '../hooks/useSeasonProgress';
@@ -17,6 +17,8 @@ type Props = {
   registeredEvents: EventDto[];
   // Регистрации из /me: стартовый номер, цена со скидкой.
   registrations?: MeRegistrationDto[];
+  // Свои баллы и место в рейтинге сезона.
+  rating?: MeRatingDto | null;
   // Пройденные старты с внесённым результатом, от старых к новым.
   results: RaceResult[];
   // Ближайший старт вообще — запасной вариант, если регистраций нет.
@@ -66,6 +68,7 @@ function ProfileScreen({
   participant,
   registeredEvents,
   registrations = [],
+  rating = null,
   results,
   nearest,
   onUserUpdated,
@@ -98,6 +101,19 @@ function ProfileScreen({
     : null;
   const [pickupOpen, setPickupOpen] = useState(false);
   const pickup = upcoming ? pickupLines(upcoming) : null;
+
+  // «Не показывать меня в публичном рейтинге» — сразу в PATCH /me.
+  const toggleHidden = async (hide: boolean) => {
+    setSaving(true);
+    try {
+      const { user } = await patchMe({ hideFromRating: hide });
+      onUserUpdated(user);
+    } catch {
+      // Не сохранилось — галочка вернётся к значению с сервера.
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (!participant) {
     return (
@@ -347,6 +363,35 @@ function ProfileScreen({
               ))}
             </div>
           )}
+        </section>
+      )}
+
+      {/* Рейтинг серии: свои баллы и место среди своего пола. */}
+      {rating && (
+        <section className="glass-card pf-rating">
+          <div className="pf-rating__head">
+            <h3 className="pf-series__title u-display">Рейтинг серии</h3>
+            <span className="pf-rating__points">
+              <b className="u-display">{rating.points}</b> баллов
+            </span>
+          </div>
+          <p className="pf-rating__place">
+            {rating.place
+              ? `${rating.place} место из ${rating.of} среди ${rating.gender === 'FEMALE' ? 'женщин' : 'мужчин'}`
+              : 'Место появится после первого этапа с результатом'}
+          </p>
+          <label className="pf-rating__hide">
+            <input
+              type="checkbox"
+              checked={participant.hideFromRating ?? false}
+              disabled={saving}
+              onChange={(e) => void toggleHidden(e.target.checked)}
+            />
+            Не показывать меня в публичном рейтинге
+          </label>
+          <span className="pf-field__hint">
+            На сайте и в общем списке будет «Участник скрыл имя»; место и баллы останутся, себя вы видите.
+          </span>
         </section>
       )}
 

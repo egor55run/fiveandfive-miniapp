@@ -66,6 +66,8 @@ export type EventDto = {
   registrationClosesAt?: string;
   /** Срок прошёл — запись закрыта для всех, включая администраторов. */
   registrationDeadlinePassed?: boolean;
+  /** Опубликованы результаты этапа (протокол на /reiting/<slug>). */
+  resultsPublished?: boolean;
   createdAt: string;
 };
 
@@ -116,6 +118,8 @@ export type UserDto = {
   phone: string | null;
   /** Из прошлой регистрации; null — ещё не указывал. */
   gender: Gender | null;
+  /** «Не показывать меня в публичном рейтинге». */
+  hideFromRating?: boolean;
   createdAt: string;
 };
 
@@ -309,9 +313,21 @@ export type MeRaceResultDto = {
   eventId: number;
   finishTime: number; // секунды
   place: number; // место в общем зачёте
-  finishersTotal: number; // сколько всего финишировало на этом старте
+  finishersTotal: number; // сколько финишировало среди своего пола
+  /** Баллы рейтинга серии за этот этап. */
+  points?: number;
   recordedAt: string;
   event: EventDto;
+};
+
+/** Свои баллы и место в рейтинге активного сезона (среди своего пола). */
+export type MeRatingDto = {
+  seasonId: number;
+  gender: Gender;
+  points: number;
+  place: number | null;
+  of: number;
+  stages: (number | null)[];
 };
 
 export type MeResult = {
@@ -319,6 +335,7 @@ export type MeResult = {
   registrations: MeRegistrationDto[];
   results: MeRaceResultDto[];
   seasonPasses: SeasonPassDto[];
+  rating?: MeRatingDto | null;
 };
 
 /**
@@ -347,6 +364,7 @@ export type ProfilePatch = Partial<{
   birthDate: string; // yyyy-mm-dd
   phone: string;
   gender: Gender;
+  hideFromRating: boolean;
 }>;
 
 export function patchMe(patch: ProfilePatch): Promise<{ user: UserDto }> {

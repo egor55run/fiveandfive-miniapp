@@ -213,13 +213,14 @@ export function seasonPassText(events: Event[]): string {
 
 export function resultText(
   event: Event,
-  result: { finishTime: string; place: number; finishersTotal: number },
+  result: { finishTime: string; place: number; finishersTotal: number; points?: number; gender?: 'MALE' | 'FEMALE' | null },
 ): string {
   // «1 из 1» выглядит издевательски — когда финишёр один, показываем только место.
   const place =
     result.finishersTotal > 1
       ? `<b>${result.place} из ${result.finishersTotal}</b>`
       : `<b>${result.place}</b>`;
+  const among = result.gender === 'FEMALE' ? ' среди женщин' : result.gender === 'MALE' ? ' среди мужчин' : '';
 
   return [
     '🏁 <b>Результат готов</b>',
@@ -227,8 +228,10 @@ export function resultText(
     `«${escapeHtml(event.title)}», ${dayMonth(event.date)}`,
     '',
     `Время: <b>${escapeHtml(result.finishTime)}</b>`,
-    `Место: ${place}`,
+    `Место${among}: ${place}`,
+    ...(result.points !== undefined ? [`Баллы рейтинга серии: <b>${result.points}</b>`] : []),
     '',
+    'Результаты предварительные 48 часов — если заметили ошибку, напишите в бот «Задать вопрос».',
     'Подробнее — в приложении, кнопка ниже.',
   ].join('\n');
 }

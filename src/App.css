@@ -1984,3 +1984,127 @@ select.rfield__input {
 .reg-pickup p {
   margin: 0 0 4px;
 }
+
+/* ===================================================================
+   Рейтинг серии: вкладка «Рейтинг» и карточка в профиле.
+   =================================================================== */
+.rt__title {
+  margin: 4px 0 2px;
+  font-size: 26px;
+  line-height: 1.1;
+}
+.rt__sub,
+.rt__note,
+.rt__empty {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.rt__note {
+  margin-top: 16px;
+}
+.rt-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 14px 0 12px;
+}
+.rt-tab {
+  flex: 1;
+  padding: 10px;
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-full);
+  cursor: pointer;
+}
+.rt-tab--on {
+  color: var(--text-on-brand);
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+}
+.rt-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rt-row {
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-md);
+}
+.rt-row--me {
+  border-color: var(--brand-highlight);
+  background: rgba(255, 176, 3, 0.08);
+}
+.rt-row__main {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  font-family: var(--font-ui);
+  color: var(--text-primary);
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.rt-row__place {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.rt-row__name {
+  font-size: 15px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.rt-row__you {
+  color: var(--brand-highlight);
+}
+.rt-row__total {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 16px;
+}
+.rt-row__stages {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 14px 12px 60px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.pf-rating {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pf-rating__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pf-rating__points b {
+  font-size: 26px;
+}
+.pf-rating__place {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+.pf-rating__hide {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}

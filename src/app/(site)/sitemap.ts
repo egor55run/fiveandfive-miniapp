@@ -27,6 +27,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     page('/', 1, 'weekly'),
     ...events.filter((e) => e.slug).map((e) => page(`/starty/${e.slug}`, 0.9, 'weekly')),
+    page('/reiting', 0.7, 'weekly'),
     page('/voprosy', 0.6, 'monthly'),
     ...docs,
   ];

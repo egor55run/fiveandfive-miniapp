@@ -13,31 +13,34 @@ enum Gender {
 }
 
 model User {
-  id         Int       @id @default(autoincrement())
+  id             Int       @id @default(autoincrement())
   // Личность из подписанного Telegram initData — основной идентификатор.
   // Nullable только ради legacy-строк, созданных до Mini App: весь новый код
   // (plugins/telegramAuth.ts) заводит пользователя исключительно по нему.
-  telegramId BigInt?   @unique @map("telegram_id")
-  username   String?
-  firstName  String    @map("first_name")
-  lastName   String?   @map("last_name")
+  telegramId     BigInt?   @unique @map("telegram_id")
+  username       String?
+  firstName      String    @map("first_name")
+  lastName       String?   @map("last_name")
   // email/age/phone заполняются не при входе, а при регистрации на старт,
   // поэтому опциональны. @unique с email снят: идентификатор теперь telegram_id,
   // и два Telegram-аккаунта вправе указать один и тот же email.
-  email      String?
+  email          String?
   // Возраст держим рядом с датой рождения, а не вместо неё: он нужен протоколам
   // и возрастным группам, но сам по себе устаревает. Когда известна дата,
   // сервер пересчитывает age из неё, чтобы эти два поля не разошлись.
-  age        Int?
+  age            Int?
   // Только дата, без времени и часового пояса: @db.Date. DateTime здесь сдвинул
   // бы день на границе TZ — 14.12.1999 в Алматы стало бы 13-м в UTC.
-  birthDate  DateTime? @map("birth_date") @db.Date
-  phone      String?
+  birthDate      DateTime? @map("birth_date") @db.Date
+  /// «Не показывать меня в публичном рейтинге»: на сайте и в общем списке —
+  /// «Участник скрыл имя» (место и баллы остаются), себя человек видит.
+  hideFromRating Boolean   @default(false) @map("hide_from_rating")
+  phone          String?
   // Пол из формы регистрации — подставляется в следующую, как дата рождения.
   // Пригодится и для зачёта «среди мужчин/женщин». Nullable: у записей,
   // сделанных до этого поля, пола нет.
-  gender     Gender?
-  createdAt  DateTime  @default(now()) @map("created_at")
+  gender         Gender?
+  createdAt      DateTime  @default(now()) @map("created_at")
 
   registrations    Registration[]
   results          Result[]
@@ -84,6 +87,9 @@ model Event {
   /// Когда закрывается регистрация. null — по умолчанию за 7 дней до старта
   /// (lib/eligibility). Задаётся в админке, если нужно иначе.
   registrationClosesAt DateTime? @map("registration_closes_at")
+  /// Результаты опубликованы: участникам ушли сообщения, пошло окно протестов
+  /// 48 часов. null — результаты ещё не опубликованы (на сайте их не видно).
+  resultsPublishedAt   DateTime? @map("results_published_at")
   location             String
   distance             String
   slotsTotal           Int       @map("slots_total")
@@ -250,14 +256,20 @@ model SeasonPass {
 }
 
 model Result {
-  id              Int      @id @default(autoincrement())
-  userId          Int      @map("user_id")
-  eventId         Int      @map("event_id")
-  finishTime      Int      @map("finish_time") // финишное время в секундах
-  place           Int // место в общем зачёте
+  id              Int          @id @default(autoincrement())
+  userId          Int          @map("user_id")
+  eventId         Int          @map("event_id")
+  /// Время от выстрела (gun time) в секундах, из файла хронометража. null —
+  /// не финишировал (сошёл, не стартовал, дисквалифицирован).
+  finishTime      Int?         @map("finish_time")
+  /// Место среди финишировавших на старте (все вместе); null — без финиша.
+  place           Int?
+  /// Место среди своего пола — зачёт рейтинга (решение 2026-10-23).
+  genderPlace     Int?         @map("gender_place")
+  status          ResultStatus @default(FINISHED)
   /// Дистанция результата (из регистрации) — для протоколов и рейтинга по дистанциям.
-  eventDistanceId Int?     @map("event_distance_id")
-  recordedAt      DateTime @default(now()) @map("recorded_at")
+  eventDistanceId Int?         @map("event_distance_id")
+  recordedAt      DateTime     @default(now()) @map("recorded_at")
 
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   event         Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -743,4 +755,29 @@ model PromoRedemption {
   @@index([promoCodeId, status])
   @@index([userId])
   @@map("promo_redemptions")
+}
+
+enum ResultStatus {
+  FINISHED
+  /// Сошёл с дистанции.
+  DNF
+  /// Не стартовал.
+  DNS
+  /// Дисквалифицирован.
+  DSQ
+}
+
+/// Объединение двойников: кого (from) влили в кого (into) и что перенесли.
+/// Строка удалённого участника не сохраняется — здесь её имя и Telegram.
+model UserMerge {
+  id              Int      @id @default(autoincrement())
+  intoUserId      Int      @map("into_user_id")
+  fromUserId      Int      @map("from_user_id")
+  fromLabel       String   @map("from_label")
+  adminTelegramId BigInt   @map("admin_telegram_id")
+  /// { registrations: n, results: n, payments: n, … }
+  moved           Json
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("user_merges")
 }

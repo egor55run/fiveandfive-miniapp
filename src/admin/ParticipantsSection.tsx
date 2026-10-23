@@ -16,6 +16,7 @@ import { downloadParticipantsCsv, downloadStartListCsv } from './exportCsv';
 import AuditLog from './AuditLog';
 import ParticipantForm, { type ParticipantFormValues } from './ParticipantForm';
 import RefundForm from './RefundForm';
+import DuplicatesPanel from './DuplicatesPanel';
 import { formatDate, formatDateTime, formatSeconds, fullName, PAYMENT_LABEL } from './helpers';
 
 const STATUSES: PaymentStatus[] = ['PENDING', 'PAID', 'CANCELLED'];
@@ -31,6 +32,8 @@ export default function ParticipantsSection() {
   const [editing, setEditing] = useState<Participant | 'new' | null>(null);
   // «Оформить возврат» — по какой регистрации открыта форма.
   const [refunding, setRefunding] = useState<number | null>(null);
+  // «Двойники» — по какому участнику открыт поиск.
+  const [dupFor, setDupFor] = useState<Participant | null>(null);
   const [showAudit, setShowAudit] = useState(false);
   // Счётчик для перезагрузки журнала после правок.
   const [auditKey, setAuditKey] = useState(0);
@@ -322,6 +325,18 @@ export default function ParticipantsSection() {
         />
       )}
 
+      {dupFor && (
+        <DuplicatesPanel
+          key={dupFor.userId}
+          participant={dupFor}
+          onClose={() => setDupFor(null)}
+          onDone={(message) => {
+            setDupFor(null);
+            void afterSave(message);
+          }}
+        />
+      )}
+
       {refunding !== null && (
         <RefundForm
           key={refunding}
@@ -395,6 +410,11 @@ export default function ParticipantsSection() {
                         абонемент
                       </span>
                     )}
+                    {!p.gender && (
+                      <span className="ad-tag ad-tag--warn" title="Без пола участник не попадает в рейтинг — укажите в «Правка»">
+                        пол не указан
+                      </span>
+                    )}
                     {p.manual && (
                       <span className="ad-tag ad-tag--manual" title="Добавлен администратором без оплаты">
                         вручную{p.manualNote ? ` · ${p.manualNote}` : ''}
@@ -411,7 +431,9 @@ export default function ParticipantsSection() {
                   <td className="ad-nowrap">{formatDateTime(p.registeredAt)}</td>
                   <td className="ad-nowrap">
                     {p.result
-                      ? `${formatSeconds(p.result.finishTime)} · ${p.result.place} место`
+                      ? p.result.status === 'FINISHED' && p.result.finishTime !== null
+                        ? `${formatSeconds(p.result.finishTime)} · ${p.result.place ?? '—'} место`
+                        : p.result.status
                       : '—'}
                   </td>
                   <td className="ad-nowrap">
@@ -459,6 +481,17 @@ export default function ParticipantsSection() {
                   <td className="ad-nowrap">
                     <button type="button" className="ad-btn ad-btn--sm" onClick={() => setEditing(p)}>
                       Правка
+                    </button>
+                    <button
+                      type="button"
+                      className="ad-btn ad-btn--sm"
+                      title="Найти и объединить двойников (тот же телефон, email или ФИО)"
+                      onClick={() => {
+                        setEditing(null);
+                        setDupFor(p);
+                      }}
+                    >
+                      Двойники
                     </button>
                     {p.paymentStatus === 'PAID' && !p.manual && !p.refund && (
                       <button

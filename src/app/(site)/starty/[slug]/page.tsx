@@ -130,6 +130,11 @@ export default async function RacePage({ params }: Props) {
       <header className="race__head">
         {label && <span className="race__label">{label}</span>}
         <h1 className="h-title race__title">{event.title}</h1>
+        {event.resultsPublished && event.slug && (
+          <p className="race__results">
+            <a href={`/reiting/${event.slug}`}>Результаты и баллы рейтинга →</a>
+          </p>
+        )}
       </header>
 
       <dl className="race__facts">

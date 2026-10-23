@@ -1,7 +1,7 @@
 import { motion, useReducedMotion } from 'framer-motion';
-import { BarChart3, Home, User } from 'lucide-react';
+import { BarChart3, Home, Trophy, User } from 'lucide-react';
 
-export type TabId = 'analytics' | 'home' | 'profile';
+export type TabId = 'analytics' | 'home' | 'rating' | 'profile';
 
 type Props = {
   active: TabId;
@@ -11,6 +11,7 @@ type Props = {
 const TABS = [
   { id: 'analytics', label: 'Аналитика', icon: BarChart3 },
   { id: 'home', label: 'Главная', icon: Home },
+  { id: 'rating', label: 'Рейтинг', icon: Trophy },
   { id: 'profile', label: 'Профиль', icon: User },
 ] as const;
 

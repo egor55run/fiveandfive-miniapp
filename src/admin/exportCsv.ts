@@ -24,7 +24,7 @@ const COLUMNS: [string, (p: Participant) => string | number | null][] = [
   ['Итого', (p) => p.price?.total ?? null],
   ['Абонемент', (p) => (p.seasonPassId !== null ? `#${p.seasonPassId}` : null)],
   ['Добавлен вручную', (p) => (p.manual ? p.manualNote || 'да' : null)],
-  ['Время', (p) => (p.result ? formatSeconds(p.result.finishTime) : null)],
+  ['Время', (p) => (p.result ? (p.result.finishTime !== null ? formatSeconds(p.result.finishTime) : p.result.status) : null)],
   ['Место', (p) => p.result?.place ?? null],
 ];
 
