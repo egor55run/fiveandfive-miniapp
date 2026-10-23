@@ -102,19 +102,6 @@ function ProfileScreen({
   const [pickupOpen, setPickupOpen] = useState(false);
   const pickup = upcoming ? pickupLines(upcoming) : null;
 
-  // «Не показывать меня в публичном рейтинге» — сразу в PATCH /me.
-  const toggleHidden = async (hide: boolean) => {
-    setSaving(true);
-    try {
-      const { user } = await patchMe({ hideFromRating: hide });
-      onUserUpdated(user);
-    } catch {
-      // Не сохранилось — галочка вернётся к значению с сервера.
-    } finally {
-      setSaving(false);
-    }
-  };
-
   if (!participant) {
     return (
       <motion.main
@@ -380,18 +367,6 @@ function ProfileScreen({
               ? `${rating.place} место из ${rating.of} среди ${rating.gender === 'FEMALE' ? 'женщин' : 'мужчин'}`
               : 'Место появится после первого этапа с результатом'}
           </p>
-          <label className="pf-rating__hide">
-            <input
-              type="checkbox"
-              checked={participant.hideFromRating ?? false}
-              disabled={saving}
-              onChange={(e) => void toggleHidden(e.target.checked)}
-            />
-            Не показывать меня в публичном рейтинге
-          </label>
-          <span className="pf-field__hint">
-            На сайте и в общем списке будет «Участник скрыл имя»; место и баллы останутся, себя вы видите.
-          </span>
         </section>
       )}
 

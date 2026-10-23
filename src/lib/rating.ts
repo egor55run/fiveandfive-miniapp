@@ -44,7 +44,6 @@ export type SeasonRow = {
   total: number;
   stages: (number | null)[];
   bestTime: number | null;
-  hidden: boolean;
   me: boolean;
 };
 
@@ -64,7 +63,6 @@ export type StageRow = {
   time: number | null;
   status: 'FINISHED' | 'DNF' | 'DNS' | 'DSQ';
   points: number;
-  hidden: boolean;
   me: boolean;
 };
 

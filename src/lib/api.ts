@@ -118,8 +118,6 @@ export type UserDto = {
   phone: string | null;
   /** Из прошлой регистрации; null — ещё не указывал. */
   gender: Gender | null;
-  /** «Не показывать меня в публичном рейтинге». */
-  hideFromRating?: boolean;
   createdAt: string;
 };
 
@@ -364,7 +362,6 @@ export type ProfilePatch = Partial<{
   birthDate: string; // yyyy-mm-dd
   phone: string;
   gender: Gender;
-  hideFromRating: boolean;
 }>;
 
 export function patchMe(patch: ProfilePatch): Promise<{ user: UserDto }> {

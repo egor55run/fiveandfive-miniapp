@@ -13,8 +13,8 @@ import { prisma } from '../prisma';
  *    абсолютный, отдельно М и Ж. Ничья — выше тот, у кого лучшее время на
  *    одном этапе; если и оно равно — место делят.
  *  - Участник без пола в зачёт не попадает (пол обязателен с 23.10).
- *  - «Не показывать меня в публичном рейтинге» — имя скрыто, место и баллы
- *    остаются; сам человек себя видит.
+ *  - В рейтинге все участники — с именем (решение пользователя 2026-10-24:
+ *    «не показывать меня в публичном рейтинге» убрано).
  *  - Результаты этапа видны публично только после публикации
  *    (events.results_published_at); 48 часов после неё — окно протестов,
  *    результаты «предварительные».
@@ -82,9 +82,8 @@ export async function recomputePlaces(tx: Tx, eventId: number): Promise<void> {
   }
 }
 
-/** Имя для публичного списка: скрывшие себя — без имени. */
-function publicName(u: { lastName: string | null; firstName: string; hideFromRating: boolean }, reveal: boolean): string {
-  if (u.hideFromRating && !reveal) return 'Участник скрыл имя';
+/** Имя в рейтинге и протоколе: «Фамилия Имя». */
+function fullName(u: { lastName: string | null; firstName: string }): string {
   return [u.lastName, u.firstName].filter(Boolean).join(' ');
 }
 
@@ -97,7 +96,6 @@ export type StageRow = {
   time: number | null;
   status: ResultStatus;
   points: number;
-  hidden: boolean;
   me: boolean;
 };
 
@@ -142,14 +140,13 @@ export async function stageProtocol(
         const me = opts.meUserId === r.userId;
         return {
           place: r.genderPlace,
-          name: publicName(r.user, me || !opts.publicOnly),
+          name: fullName(r.user),
           userId: r.userId,
           bib: bibOf.get(r.userId) ?? null,
           gender: g,
           time: r.finishTime,
           status: r.status,
           points: resultPoints(r, g),
-          hidden: r.user.hideFromRating,
           me,
         };
       })
@@ -166,7 +163,6 @@ export type SeasonRow = {
   /** Баллы по этапам в порядке календаря; null — не участвовал. */
   stages: (number | null)[];
   bestTime: number | null;
-  hidden: boolean;
   me: boolean;
 };
 
@@ -198,13 +194,12 @@ export async function seasonStandings(
       byUser.get(r.userId) ??
       ({
         place: 0,
-        name: publicName(r.user, me || !opts.publicOnly),
+        name: fullName(r.user),
         userId: r.userId,
         gender: g,
         total: 0,
         stages: events.map(() => null),
         bestTime: null,
-        hidden: r.user.hideFromRating,
         me,
       } satisfies SeasonRow);
     const pts = resultPoints(r, g);

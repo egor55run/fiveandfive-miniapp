@@ -2102,9 +2102,3 @@ select.rfield__input {
   font-size: 15px;
   color: var(--text-primary);
 }
-.pf-rating__hide {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-}

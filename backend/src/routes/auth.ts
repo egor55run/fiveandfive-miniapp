@@ -37,8 +37,6 @@ export function serializeUser(u: User) {
     birthDate: formatBirthDate(u.birthDate),
     phone: u.phone,
     gender: u.gender,
-    // «Не показывать меня в публичном рейтинге».
-    hideFromRating: u.hideFromRating,
     createdAt: u.createdAt,
   };
 }
@@ -51,7 +49,6 @@ const patchSchema = z
     birthDate: birthDateField.optional(),
     gender: genderField.optional(),
     phone: phoneField.optional(),
-    hideFromRating: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, {
     message: 'Нужно передать хотя бы одно поле',
