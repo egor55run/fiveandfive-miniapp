@@ -33,8 +33,10 @@
   --grad-brand-cta: linear-gradient(90deg, #ffb003 0%, #e84f03 100%);
 
   /* --- Типографика --- */
-  --font-ui: 'Montserrat', system-ui, 'Segoe UI', sans-serif;
-  --font-display: 'Unbounded', 'Montserrat', system-ui, sans-serif;
+  /* Шрифты — next/font из src/app/fonts.ts (один источник для сайта, Mini App
+     и админки); переменные --font-face-* ставит класс на <html>. */
+  --font-ui: var(--font-face-ui), system-ui, 'Segoe UI', sans-serif;
+  --font-display: var(--font-face-display), var(--font-face-ui), system-ui, sans-serif;
 
   /* --- Форма --- */
   --r-sm: 5px;

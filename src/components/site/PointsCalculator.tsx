@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { CUTOFF_SECONDS, parseRunTime, pointsFor, type RatingGender } from '../../lib/rating';
+import { CUTOFF_SECONDS, parseRunTime, pointsCaption, pointsFor, type RatingGender } from '../../lib/rating';
 
 /** Калькулятор на /reiting: «сколько баллов за моё время». */
 export default function PointsCalculator() {
   const [time, setTime] = useState('25:00');
   const [gender, setGender] = useState<RatingGender>('MALE');
   const seconds = parseRunTime(time);
+  const points = seconds === null ? null : pointsFor(seconds, gender);
 
   return (
     <div className="calc">
@@ -30,12 +31,15 @@ export default function PointsCalculator() {
         ))}
       </div>
       <p className="calc__result" aria-live="polite">
-        {seconds === null ? (
+        {seconds === null || points === null ? (
           'Введите время в виде 25:00 или 1:02:30'
         ) : (
           <>
-            <b>{pointsFor(seconds, gender)}</b> баллов
-            {seconds > CUTOFF_SECONDS ? ' — финиш позже 60 минут' : ''}
+            <b>{points}</b>
+            <span className="calc__caption">
+              {pointsCaption(points)}
+              {seconds > CUTOFF_SECONDS ? ' — финиш позже 60 минут' : ''}
+            </span>
           </>
         )}
       </p>

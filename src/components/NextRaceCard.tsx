@@ -26,14 +26,14 @@ function getCountdown(target: Date): Countdown {
   return { days: diff <= 0 ? 0 : Math.floor(diff / 86_400_000), started: diff <= 0 };
 }
 
-// «День до старта» с русским склонением.
+// «Дней до старта» под числом: с заглавной (решение 2026-10-24), со склонением.
 function pluralDays(n: number): string {
   const mod100 = n % 100;
   const mod10 = n % 10;
-  if (mod100 >= 11 && mod100 <= 14) return 'дней';
-  if (mod10 === 1) return 'день';
-  if (mod10 >= 2 && mod10 <= 4) return 'дня';
-  return 'дней';
+  if (mod100 >= 11 && mod100 <= 14) return 'Дней';
+  if (mod10 === 1) return 'День';
+  if (mod10 >= 2 && mod10 <= 4) return 'Дня';
+  return 'Дней';
 }
 
 function useCountdown(target: Date): Countdown {

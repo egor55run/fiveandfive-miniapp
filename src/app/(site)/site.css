@@ -2,11 +2,8 @@
    «бумажный» фон, чёрный и оранжевый. Токены из src/index.css (тёмная тема
    Mini App) здесь перекрыты — их используют и страницы документов. */
 
-/* Шрифты сайта — next/font (src/app/(site)/layout.tsx), со своего сервера.
-   html.site-fonts специфичнее :root из index.css. */
+/* Шрифты — те же, что у Mini App (src/app/fonts.ts, --font-ui в index.css). */
 html.site-fonts {
-  --font-ui: var(--font-site-ui), system-ui, 'Segoe UI', sans-serif;
-  --font-display: var(--font-site-display), var(--font-site-ui), system-ui, sans-serif;
 
   --ink: #15130f;
   --paper: #f2eee7;
@@ -1656,6 +1653,14 @@ html.site-fonts body {
   font-size: 18px;
 }
 .calc__result b {
+  display: block;
   font-family: var(--font-display);
   font-size: 32px;
+  line-height: 1.1;
+}
+/* Подпись под числом: «Баллов». */
+.calc__caption {
+  display: block;
+  font-size: 15px;
+  color: var(--muted);
 }

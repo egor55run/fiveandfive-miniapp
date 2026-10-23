@@ -6,6 +6,7 @@ import Header from './Header';
 import DocLink from './legal/DocLink';
 import { ApiError, patchMe, type EventDto, type MeRatingDto, type MeRegistrationDto, type UserDto } from '../lib/api';
 import { pickupLines } from '../lib/pickup';
+import { pointsCaption } from '../lib/rating';
 import type { RaceResult } from '../data/results';
 import { useSeasonProgress } from '../hooks/useSeasonProgress';
 // TODO: номер участника бэкенд пока не отдаёт — см. комментарий в файле.
@@ -359,7 +360,7 @@ function ProfileScreen({
           <div className="pf-rating__head">
             <h3 className="pf-series__title u-display">Рейтинг серии</h3>
             <span className="pf-rating__points">
-              <b className="u-display">{rating.points}</b> баллов
+              <b className="u-display">{rating.points}</b> {pointsCaption(rating.points)}
             </span>
           </div>
           <p className="pf-rating__place">

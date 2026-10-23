@@ -2003,6 +2003,9 @@ select.rfield__input {
 .rt__note {
   margin-top: 16px;
 }
+.rt__note a {
+  color: var(--brand-highlight);
+}
 .rt-tabs {
   display: flex;
   gap: 8px;

@@ -13,6 +13,16 @@ export const T0: Record<RatingGender, number> = { MALE: 15 * 60, FEMALE: 17 * 60
 export const CUTOFF_SECONDS = 60 * 60;
 export const MIN_POINTS = 10;
 
+/** Подпись под числом баллов: «Балл», «Балла», «Баллов» (с заглавной — решение 2026-10-24). */
+export function pointsCaption(n: number): string {
+  const mod100 = Math.abs(n) % 100;
+  const mod10 = Math.abs(n) % 10;
+  if (mod100 >= 11 && mod100 <= 14) return 'Баллов';
+  if (mod10 === 1) return 'Балл';
+  if (mod10 >= 2 && mod10 <= 4) return 'Балла';
+  return 'Баллов';
+}
+
 export function pointsFor(seconds: number, gender: RatingGender): number {
   if (seconds > CUTOFF_SECONDS) return MIN_POINTS;
   return Math.max(MIN_POINTS, Math.round(1000 + 4340 * ((T0[gender] / seconds) ** 0.164 - 1)));

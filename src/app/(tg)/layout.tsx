@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
-import '../../styles/google-fonts.css';
+import { fontVariables } from '../fonts';
 import '../../index.css';
 // App.tsx импортирует его и сам, но он грузится только в браузере (ssr: false),
 // и без этого импорта стили приходили бы позже разметки — экран мигал бы.
@@ -27,7 +27,7 @@ export default function TelegramLayout({ children }: { children: ReactNode }) {
   return (
     // SDK Telegram ещё до гидратации пишет в <html> свои CSS-переменные
     // (--tg-viewport-height и т.п.) — это ожидаемо, а не расхождение разметки.
-    <html lang="ru" suppressHydrationWarning>
+    <html lang="ru" className={fontVariables} suppressHydrationWarning>
       <head>
         {/* Mini App SDK. Обязательно внешним синхронным тегом с telegram.org и
             до бандла приложения: npm-копия не создаёт рабочий

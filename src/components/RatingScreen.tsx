@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import Header from './Header';
 import { fetchSeasonRating, type RatingGender, type SeasonRating } from '../lib/rating';
+import { openExternalPage } from '../lib/telegram';
 
 /**
  * «Рейтинг» в Mini App: таблица сезона, отдельно мужчины и женщины. Своя
@@ -65,7 +66,7 @@ function RatingScreen({ myGender }: Props) {
       ) : data === undefined ? (
         <p className="rt__empty">Загружаем…</p>
       ) : !data || rows.length === 0 ? (
-        <p className="rt__empty">Рейтинг появится после первого этапа — когда опубликуем результаты.</p>
+        <p className="rt__empty">Рейтинг появится после первого этапа</p>
       ) : (
         <ol className="rt-list">
           {rows.map((r) => (
@@ -93,8 +94,17 @@ function RatingScreen({ myGender }: Props) {
       )}
 
       <p className="rt__note">
-        Баллы за этап — по времени на 5 км: быстрее — больше, каждая минута у быстрых дороже. Итог — сумма за все этапы,
-        при равенстве выше лучшее время на одном этапе. Формула и калькулятор — на сайте fiveandfive.kz/reiting.
+        Каждый этап приносит баллы. Пробеги все пять и поборись за вершину рейтинга. Калькулятор —{' '}
+        <a
+          href="https://fiveandfive.kz/reiting"
+          target="_blank"
+          rel="noreferrer"
+          onClick={(e) => {
+            if (openExternalPage('/reiting')) e.preventDefault();
+          }}
+        >
+          fiveandfive.kz/reiting
+        </a>
       </p>
     </motion.main>
   );

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 // Токены и базовые стили общие с приложением участников — чтобы админка не
 // разъезжалась с брендом. Правило #root оттуда сюда не действует: корневой
 // элемент называется admin-root.
-import '../../styles/google-fonts.css';
+import { fontVariables } from '../fonts';
 import '../../index.css';
 import '../../admin/admin.css';
 
@@ -23,7 +23,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
     // SDK Telegram ещё до гидратации пишет в <html> свои CSS-переменные
     // (--tg-viewport-height и т.п.) — это ожидаемо, а не расхождение разметки.
-    <html lang="ru" suppressHydrationWarning>
+    <html lang="ru" className={fontVariables} suppressHydrationWarning>
       <head>
         {/* Mini App SDK нужен только для одного случая: если /admin открыли
             внутри Telegram, вход пройдёт по initData и кнопка-виджет не

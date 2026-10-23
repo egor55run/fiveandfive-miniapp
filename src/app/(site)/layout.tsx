@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Montserrat, Unbounded } from 'next/font/google';
+import { fontVariables } from '../fonts';
 import type { ReactNode } from 'react';
 import SiteFooter from '../../components/site/SiteFooter';
 import SiteHeader from '../../components/site/SiteHeader';
@@ -7,24 +7,8 @@ import { SITE_INDEXABLE, SITE_NAME, SITE_URL } from '../../site/seo';
 import '../../index.css';
 import './site.css';
 
-// Шрифты бренда — с нашего сервера: next/font скачивает их при сборке, и
-// браузер не ходит на Google Fonts (быстрее, и посетитель не уходит к Google).
-// Наборы букв — латиница и кириллица: каждый набор браузер грузит заранее, а
-// казахских букв (cyrillic-ext) на русском сайте нет. Казахские документы
-// (пока только staging) берут эти буквы из системного шрифта; когда будет
-// казахский сайт — вернуть 'cyrillic-ext' в оба шрифта.
-// Без weight — вариативные шрифты: один файл на все начертания (макет главной
-// берёт Montserrat 400–700 и Unbounded до 900).
-const ui = Montserrat({
-  subsets: ['latin', 'cyrillic'],
-  variable: '--font-site-ui',
-  display: 'swap',
-});
-const display = Unbounded({
-  subsets: ['latin', 'cyrillic'],
-  variable: '--font-site-display',
-  display: 'swap',
-});
+// Шрифты бренда — src/app/fonts.ts (общие с Mini App и админкой, со своего
+// сервера, латиница + кириллица + казахские буквы).
 
 export const metadata: Metadata = {
   // Абсолютные адреса в og:image, canonical и т. п. — от адреса сайта.
@@ -74,7 +58,7 @@ const TELEGRAM_TO_APP = `(function(){var s=location.search,h=location.hash;if(/t
  */
 export default function SiteLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="ru" className={`${ui.variable} ${display.variable} site-fonts`}>
+    <html lang="ru" className={`${fontVariables} site-fonts`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: TELEGRAM_TO_APP }} />
         {UMAMI_ID && (
