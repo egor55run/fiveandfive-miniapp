@@ -56,17 +56,45 @@ export function pageMeta({ title, absoluteTitle, description, path, image = DEFA
   };
 }
 
-// Описания документов для поиска. Казахские страницы — с казахским
-// заголовком вместо описания: перевод описаний проверит юрист вместе с текстами.
-const DOC_DESCRIPTIONS: Record<LegalDocKey, string> = {
-  oferta: 'Условия участия в забегах 5&5: регистрация, оплата через Kaspi, возврат взноса, передача слота, перенос из-за погоды.',
-  privacy: 'Какие персональные данные собирает 5&5, зачем, где и сколько хранит, и как отозвать согласие.',
-  parentConsent: 'Бланк письменного согласия родителя для участников 16–17 лет: распечатать, заполнить и принести за стартовым пакетом.',
+/**
+ * Длина meta description: 120–160 знаков (Bing Webmaster Tools, 2026-10-24).
+ * Описания из шаблонов (страницы стартов, протоколы) собираются из частей:
+ * пока короче минимума — добавляется следующая часть; длиннее максимума —
+ * обрезается по слову.
+ */
+export const DESCRIPTION_MIN = 120;
+export const DESCRIPTION_MAX = 160;
+
+export function fitDescription(parts: string[]): string {
+  let out = parts[0];
+  for (const part of parts.slice(1)) {
+    if (out.length >= DESCRIPTION_MIN) break;
+    const next = `${out} ${part}`;
+    if (next.length <= DESCRIPTION_MAX) out = next;
+  }
+  if (out.length > DESCRIPTION_MAX) out = `${out.slice(0, DESCRIPTION_MAX - 1).replace(/\s+\S*$/, '')}…`;
+  return out;
+}
+
+// Описания документов для поиска — у каждой страницы своё, ru и kk, 120–160 знаков.
+const DOC_DESCRIPTIONS: Record<LegalDocKey, Record<Lang, string>> = {
+  oferta: {
+    ru: 'Публичная оферта серии забегов 5&5: регистрация и оплата через Kaspi, возврат стартового взноса, передача слота, перенос забега из-за погоды.',
+    kk: '5&5 жарыстар сериясының жария офертасы: тіркелу және Kaspi арқылы төлеу, жарнаны қайтару, слотты беру, ауа райына байланысты жарысты ауыстыру.',
+  },
+  privacy: {
+    ru: 'Политика обработки персональных данных 5&5: какие данные мы собираем и зачем, где и сколько храним, кому передаём и как отозвать согласие.',
+    kk: '5&5 дербес деректерді өңдеу саясаты: қандай деректер не үшін жиналады, қайда және қанша сақталады, кімге беріледі, келісімді қалай қайтаруға болады.',
+  },
+  parentConsent: {
+    ru: 'Бланк письменного согласия родителя для участников забегов 5&5 в возрасте 16–17 лет: распечатайте, заполните и принесите за стартовым пакетом.',
+    kk: '5&5 жарыстарына қатысатын 16–17 жастағылар үшін ата-ана келісімінің бланкі: басып шығарып, толтырыңыз және стартлық пакетті алғанда әкеліңіз.',
+  },
 };
 
 export function legalMeta(doc: LegalDocKey, lang: Lang): Metadata {
   const title = LEGAL_DOCS[doc].title[lang];
-  return pageMeta({ title, description: lang === 'ru' ? DOC_DESCRIPTIONS[doc] : title, path: docPath(doc, lang) });
+  return pageMeta({ title, description: DOC_DESCRIPTIONS[doc][lang], path: docPath(doc, lang) });
 }
 
 /** Время старта по Астане в ISO с поясом: «2027-05-23T09:00:00+05:00». */

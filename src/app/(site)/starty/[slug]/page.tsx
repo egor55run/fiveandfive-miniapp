@@ -10,7 +10,7 @@ import { docPath, type Lang } from '../../../../lib/legal';
 import { fetchEventBySlug, fetchEvents } from '../../../../site/data';
 import { PRICES_PUBLIC } from '../../../../site/links';
 import { sitePath, siteText } from '../../../../site/i18n';
-import { jsonLdString, pageMeta, raceJsonLd, raceOg } from '../../../../site/seo';
+import { fitDescription, jsonLdString, pageMeta, raceJsonLd, raceOg } from '../../../../site/seo';
 
 /**
  * Страница старта (этап 3). Дата, время, парк, цена, карта трассы и Положение —
@@ -37,7 +37,10 @@ const dayLong = (e: EventDto) =>
 /** Описание для поиска и превью — одно и то же в meta и в разметке события. */
 function raceDescription(e: EventDto): string {
   const time = new Intl.DateTimeFormat('ru-RU', { hour: 'numeric', minute: '2-digit', timeZone: TZ }).format(new Date(e.date));
-  return `Забег на 5 км в Астане: ${dayLong(e)}, старт в ${time}, ${parkOf(e)}. Программа дня, трасса, награды и регистрация через Telegram.`;
+  // 120–160 знаков при любом названии парка (fitDescription).
+  const full = `Забег на 5 км в Астане: ${dayLong(e)}, старт в ${time}, ${parkOf(e)}. Программа дня, трасса, награды и регистрация через Telegram.`;
+  const short = `Забег 5&5 на 5 км: ${dayLong(e)}, ${time}, ${parkOf(e)}. Программа, трасса, награды, регистрация.`;
+  return fitDescription([full.length <= 160 ? full : short, 'Серия из пяти забегов в парках Астаны.']);
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { fetchStageRating } from '../../../../site/data';
-import { pageMeta } from '../../../../site/seo';
+import { fitDescription, pageMeta } from '../../../../site/seo';
 import { formatRunTime, STATUS_SHORT, type StageRow } from '../../../../lib/rating';
 
 export const dynamic = 'force-dynamic';
@@ -18,9 +18,16 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const title = data ? `Результаты: ${data.event.title}` : 'Результаты этапа';
   return pageMeta({
     title,
-    description: data
-      ? `Протокол забега «${data.event.title}», ${dateFmt.format(new Date(data.event.date))}: места, время и баллы рейтинга серии 5&5, мужчины и женщины.`
-      : 'Протокол этапа серии 5&5.',
+    // 120–160 знаков при любом названии старта (fitDescription).
+    description: fitDescription(
+      data
+        ? [
+            `Протокол забега «${data.event.title}», ${dateFmt.format(new Date(data.event.date))}: места, время и баллы рейтинга серии 5&5, отдельно у мужчин и у женщин.`,
+            'Забег на 5 км в Астане.',
+            'Итоги этапа и рейтинг сезона.',
+          ]
+        : ['Протокол этапа серии забегов 5&5 в Астане: места, время и баллы рейтинга сезона, отдельно у мужчин и у женщин. Забег на 5 км.']
+    ),
     path: `/reiting/${slug}`,
   });
 }
