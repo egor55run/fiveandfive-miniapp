@@ -11,6 +11,8 @@ import type { RaceResult } from '../data/results';
 import { useSeasonProgress } from '../hooks/useSeasonProgress';
 // TODO: номер участника бэкенд пока не отдаёт — см. комментарий в файле.
 import FitTitle from './FitTitle';
+import RouteCarousel from './RouteCarousel';
+import { routeMapsOf } from '../lib/routeMaps';
 
 type Props = {
   participant: UserDto | null;
@@ -101,6 +103,7 @@ function ProfileScreen({
     ? registrations.find((r) => r.eventId === upcoming.id && r.paymentStatus !== 'CANCELLED') ?? null
     : null;
   const [pickupOpen, setPickupOpen] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
   const pickup = upcoming ? pickupLines(upcoming) : null;
 
   if (!participant) {
@@ -333,9 +336,9 @@ function ProfileScreen({
             </p>
           )}
 
-          {/* TODO: карта — заглушка; выдача пакетов — из админки старта. */}
+          {/* Карта трассы — те же карты, что на главной; выдача пакетов — из админки старта. */}
           <div className="pf-next__links">
-            <button type="button" className="pf-link">
+            <button type="button" className="pf-link" aria-expanded={mapOpen} onClick={() => setMapOpen((v) => !v)}>
               <Map size={18} strokeWidth={2} />
               Карта старта
             </button>
@@ -344,6 +347,17 @@ function ProfileScreen({
               Выдача старт. набора
             </button>
           </div>
+          {mapOpen && (
+            routeMapsOf(upcoming).length > 0 ? (
+              <div className="pf-map">
+                <RouteCarousel maps={routeMapsOf(upcoming)} title={upcoming.title} />
+              </div>
+            ) : (
+              <div className="pf-pickup">
+                <p>Карта трассы появится позже.</p>
+              </div>
+            )
+          )}
           {pickupOpen && pickup && (
             <div className="pf-pickup">
               {pickup.map((line) => (

@@ -9,8 +9,8 @@ type Props = {
 };
 
 const TABS = [
-  { id: 'analytics', label: 'Аналитика', icon: BarChart3 },
   { id: 'home', label: 'Главная', icon: Home },
+  { id: 'analytics', label: 'Аналитика', icon: BarChart3 },
   { id: 'rating', label: 'Рейтинг', icon: Trophy },
   { id: 'profile', label: 'Профиль', icon: User },
 ] as const;

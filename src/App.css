@@ -1921,6 +1921,9 @@ select.rfield__input {
 .pf-pickup p:last-child {
   margin-bottom: 0;
 }
+.pf-map {
+  margin-top: 10px;
+}
 
 /* ===================================================================
    Оформление старта из админки (src/lib/raceTheme.ts): фон, логотип,
