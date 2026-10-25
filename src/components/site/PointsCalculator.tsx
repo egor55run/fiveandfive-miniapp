@@ -64,9 +64,8 @@ export default function PointsCalculator() {
         ))}
       </div>
       <p className="calc__result" aria-live="polite">
-        {seconds === null || points === null ? (
-          'Наберите время цифрами: 2500 — это 25:00, 10512 — 1:05:12'
-        ) : (
+        {/* Пока время неполное — без подсказки (решение пользователя 2026-10-25). */}
+        {seconds === null || points === null ? null : (
           <>
             <b>{points}</b>
             <span className="calc__caption">
