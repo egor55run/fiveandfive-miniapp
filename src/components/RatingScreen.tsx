@@ -94,7 +94,7 @@ function RatingScreen({ myGender }: Props) {
       )}
 
       <p className="rt__note">
-        Каждый этап приносит баллы. Пробеги все пять и поборись за вершину рейтинга. Калькулятор —{' '}
+        Каждый этап приносит баллы. Лучшие по итогам сезона получат главные призы. Калькулятор —{' '}
         <a
           href="https://fiveandfive.kz/reiting"
           target="_blank"
