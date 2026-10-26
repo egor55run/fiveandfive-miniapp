@@ -676,7 +676,7 @@ export default function EventsSection() {
                 rows={5}
                 value={form.program}
                 onChange={(e) => field('program', e.target.value)}
-                placeholder={'По строке на пункт:\n07:30 — камера хранения\n09:00 — старт'}
+                placeholder={'По строке на пункт:\n07:00–08:00 — выдача стартовых пакетов иногородним участникам\n09:00 — старт'}
               />
               <span className="ad-hint ad-hint--dim">Показывается на странице старта на сайте</span>
             </label>
