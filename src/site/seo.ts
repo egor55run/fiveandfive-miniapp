@@ -39,15 +39,19 @@ type PageMetaInput = {
  */
 export function pageMeta({ title, absoluteTitle, description, path, image = DEFAULT_OG, imageAlt }: PageMetaInput): Metadata {
   const fullTitle = absoluteTitle ?? `${title} — ${SITE_NAME}`;
+  // Корень — «https://fiveandfive.kz/», как в sitemap.xml: из пути «/» Next
+  // собирает адрес без слеша, и canonical главной расходился с sitemap
+  // (Google Search Console, 2026-10-27). Остальные страницы — без слеша на конце.
+  const url = path === '/' ? `${SITE_URL}/` : path;
   return {
     title: absoluteTitle ? { absolute: absoluteTitle } : title,
     description,
-    alternates: { canonical: path },
+    alternates: { canonical: url },
     openGraph: {
       type: 'website',
       locale: 'ru_RU',
       siteName: SITE_NAME,
-      url: path,
+      url,
       title: fullTitle,
       description,
       images: [{ url: image, width: 1200, height: 630, alt: imageAlt ?? fullTitle }],
