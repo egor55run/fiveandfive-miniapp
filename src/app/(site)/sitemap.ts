@@ -13,8 +13,10 @@ export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const events = (await fetchEvents()) ?? [];
+  // Адрес — ровно как canonical страницы: у главной Next пишет его без слеша
+  // («https://fiveandfive.kz»), поэтому и здесь так (Google Search Console, 2026-10-27).
   const page = (path: string, priority: number, changeFrequency: 'weekly' | 'monthly' | 'yearly') => ({
-    url: `${SITE_URL}${path}`,
+    url: path === '/' ? SITE_URL : `${SITE_URL}${path}`,
     changeFrequency,
     priority,
   });
