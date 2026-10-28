@@ -6,6 +6,7 @@ import { registrationOpen } from '../lib/registrationWindow';
 import { answerCallbackQuery, sendMessage, type InlineButton } from '../lib/telegramBot';
 import { stopBotContact, touchBotContact } from '../lib/raceAnnouncements';
 import { statsText } from '../lib/botStats';
+import { UNSUBSCRIBE_CALLBACK } from '../lib/broadcasts';
 import { isAdminTelegramId } from '../lib/telegramLogin';
 import {
   ASK_BUTTON,
@@ -52,7 +53,7 @@ const WELCOME_TEXT = [
 ].join('\n');
 
 const UNSUBSCRIBED_TEXT =
-  'Хорошо, больше не будем присылать новости 5&amp;5 — ни об открытии регистрации, ни о новых стартах. ' +
+  'Хорошо, больше не будем присылать новости 5&amp;5 — ни рассылки, ни сообщения об открытии регистрации и новых стартах. ' +
   'Сообщения о ваших регистрациях придут как обычно. Передумаете — нажмите /start.';
 
 const appButton = (slug?: string): InlineButton => ({
@@ -108,6 +109,15 @@ async function handleUpdate(update: Update, log: FastifyBaseLogger) {
     // Нажал кнопку бота — значит, писать ему можно (аудитория «новый старт»).
     await touchBotContact(cb.from, { start: cb.data === 'notify' });
     const cbChat = cb.message?.chat.id ?? cb.from.id;
+    // «Не присылать новости» под рассылкой — как /stop.
+    if (cb.data === UNSUBSCRIBE_CALLBACK) {
+      await unsubscribe(cb.from.id);
+      await stopBotContact(cb.from.id);
+      await answerCallbackQuery(cb.id, 'Готово, новости больше не придут');
+      await sendMessage(String(cbChat), UNSUBSCRIBED_TEXT);
+      log.info({ telegramId: cb.from.id }, 'Отписка от рассылок (кнопка под рассылкой)');
+      return;
+    }
     if (cb.data && cb.data !== 'notify' && (await handleSupportCallback(cb.data, cbChat, cb.from))) {
       await answerCallbackQuery(cb.id);
       return;

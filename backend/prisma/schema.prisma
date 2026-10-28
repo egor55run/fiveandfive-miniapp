@@ -118,6 +118,7 @@ model Event {
   distances     EventDistance[]
   routeMaps     RouteMap[]
   announcements RaceAnnouncement[]
+  broadcasts    Broadcast[]
   pickupSlots   PickupSlot[]
   bibReserves   BibReserve[]
   promoCodes    PromoCode[]
@@ -770,4 +771,58 @@ model UserMerge {
   createdAt       DateTime @default(now()) @map("created_at")
 
   @@map("user_merges")
+}
+
+/// Рассылка из админки («Рассылки», 2026-10-28): текст, картинка, кнопка,
+/// аудитория. Отправка — очередью BroadcastDelivery (lib/broadcasts.ts).
+model Broadcast {
+  id          Int       @id @default(autoincrement())
+  /// HTML Telegram (b, i, u, s, a, code, blockquote) — очищен сервером.
+  text        String
+  /// Картинка в uploads (/uploads/broadcasts/…) и её file_id в Telegram после
+  /// первой отправки — дальше шлём по нему, без повторной загрузки.
+  photoUrl    String?   @map("photo_url")
+  photoFileId String?   @map("photo_file_id")
+  /// Кнопка: null — без неё; url — ссылка; app — открыть Mini App.
+  buttonKind  String?   @map("button_kind")
+  buttonText  String?   @map("button_text")
+  buttonUrl   String?   @map("button_url")
+  /// ALL — все пользователи бота; EVENT — оплатившие старт eventId; PASS — с
+  /// оплаченным абонементом; NO_REG — без оплаченных регистраций.
+  audience    String    @default("ALL")
+  eventId     Int?      @map("event_id")
+  /// DRAFT → SENDING → DONE; CANCELLED — остановлена админом.
+  status      String    @default("DRAFT")
+  /// Тест ушёл админу. Правка черновика сбрасывает: разослать можно только проверенное.
+  testedAt    DateTime? @map("tested_at")
+  createdBy   BigInt    @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  startedAt   DateTime? @map("started_at")
+  finishedAt  DateTime? @map("finished_at")
+
+  event      Event?              @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  deliveries BroadcastDelivery[]
+
+  @@map("broadcasts")
+}
+
+/// Получатель рассылки — очередь в базе: после перезапуска сервера отправка
+/// продолжается с того же места, ничего не теряется и не уходит дважды.
+model BroadcastDelivery {
+  id          Int       @id @default(autoincrement())
+  broadcastId Int       @map("broadcast_id")
+  telegramId  BigInt    @map("telegram_id")
+  /// PENDING / SENT / BLOCKED (заблокировал бота) / UNREACHABLE (не начинал
+  /// диалог с ботом) / FAILED (сбой после 3 попыток) / SKIPPED (отписался).
+  status      String    @default("PENDING")
+  attempts    Int       @default(0)
+  error       String?
+  sentAt      DateTime? @map("sent_at")
+
+  broadcast Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+
+  @@unique([broadcastId, telegramId])
+  @@index([broadcastId, status])
+  @@map("broadcast_deliveries")
 }

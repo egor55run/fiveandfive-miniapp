@@ -146,6 +146,66 @@ export async function sendMessage(
   return { ok: false, blocked: false, error: 'Не удалось отправить после повтора' };
 }
 
+/** Картинка для sendPhoto: file_id уже загруженной в Telegram или сам файл. */
+export type PhotoSource = { fileId: string } | { buffer: Buffer; filename: string; mime: string };
+
+/**
+ * Фото с подписью (HTML) и кнопками — для рассылок. Как sendMessage: не
+ * бросает, 429 повторяет один раз. fileId в ответе — чтобы следующим
+ * получателям слать по нему, не загружая файл заново.
+ */
+export async function sendPhoto(
+  chatId: string,
+  photo: PhotoSource,
+  caption: string,
+  buttons?: Buttons,
+): Promise<SendOutcome & { fileId?: string }> {
+  const token = process.env.BOT_TOKEN;
+  if (!token) return { ok: false, blocked: false, error: 'BOT_TOKEN не задан' };
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    // Тело собираем заново на каждую попытку: FormData одноразовая.
+    const body = new FormData();
+    body.append('chat_id', chatId);
+    body.append('caption', caption);
+    body.append('parse_mode', 'HTML');
+    const markup = replyMarkup(buttons);
+    if ('reply_markup' in markup) body.append('reply_markup', JSON.stringify(markup.reply_markup));
+    if ('fileId' in photo) body.append('photo', photo.fileId);
+    else body.append('photo', new Blob([new Uint8Array(photo.buffer)], { type: photo.mime }), photo.filename);
+
+    let res: Response;
+    try {
+      res = await fetch(`${API_ORIGIN}/bot${token}/sendPhoto`, {
+        method: 'POST',
+        body,
+        // Загрузка файла дольше обычного сообщения.
+        signal: AbortSignal.timeout(TIMEOUT_MS * 3),
+      });
+    } catch (err) {
+      return { ok: false, blocked: false, error: err instanceof Error ? err.message : 'Сеть недоступна' };
+    }
+
+    if (res.ok) {
+      const sent = (await res.json().catch(() => null)) as {
+        result?: { message_id?: number; photo?: { file_id: string }[] };
+      } | null;
+      const sizes = sent?.result?.photo ?? [];
+      return { ok: true, messageId: sent?.result?.message_id, fileId: sizes[sizes.length - 1]?.file_id };
+    }
+
+    const err = (await res.json().catch(() => null)) as TelegramError | null;
+    const description = err?.description ?? `HTTP ${res.status}`;
+    if (res.status === 429 && attempt === 0) {
+      await sleep(Math.min(err?.parameters?.retry_after ?? 1, 30) * 1000);
+      continue;
+    }
+    return { ok: false, blocked: res.status === 403, error: description };
+  }
+
+  return { ok: false, blocked: false, error: 'Не удалось отправить после повтора' };
+}
+
 /** Вызов метода Bot API, ответ — result или ошибка значением. Не бросает. */
 async function callApi<T>(method: string, payload: object): Promise<{ ok: true; result: T } | { ok: false; error: string; blocked: boolean }> {
   const token = process.env.BOT_TOKEN;

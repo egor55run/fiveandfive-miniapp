@@ -713,3 +713,83 @@ select:focus {
   background: rgba(229, 160, 72, 0.18);
   color: #f0b46a;
 }
+
+/* Рассылки */
+.ad-bc__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ad-bc__toolbar .ad-btn {
+  min-width: 40px;
+  padding: 6px 10px;
+}
+.ad-bc__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-sm, 8px);
+  margin: var(--sp-md) 0 4px;
+}
+.ad-bc__row input,
+.ad-bc__row select {
+  min-width: 0;
+  flex: 1 1 200px;
+}
+.ad-bc__label {
+  flex: 0 0 90px;
+  font-weight: 600;
+}
+.ad-bc__photo {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+}
+.ad-bc__photo img {
+  max-width: 220px;
+  max-height: 160px;
+  border-radius: var(--r-sm);
+  object-fit: cover;
+}
+.ad-bc__file {
+  cursor: pointer;
+}
+.ad-bc__list {
+  list-style: none;
+  margin: var(--sp-md) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+}
+.ad-bc__item {
+  padding: var(--sp-md);
+  background: var(--bg-elevated);
+  border-radius: var(--r-sm);
+}
+.ad-bc__item .ad-opening__stats div {
+  background: var(--bg-base, transparent);
+}
+.ad-bc__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-sm, 8px);
+}
+.ad-bc__status {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-base, rgba(127, 127, 127, 0.15));
+}
+.ad-bc__status--sending {
+  color: var(--brand-primary);
+}
+.ad-bc__preview {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ad-hint--error {
+  color: var(--status-error, #e5484d);
+}

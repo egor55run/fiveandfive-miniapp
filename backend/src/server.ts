@@ -17,6 +17,8 @@ import { adminParticipantsRoutes } from './routes/admin/participants';
 import { adminResultsRoutes } from './routes/admin/results';
 import { adminOpeningBroadcastRoutes } from './routes/admin/openingBroadcast';
 import { adminRaceAnnouncementsRoutes } from './routes/admin/raceAnnouncements';
+import { adminBroadcastsRoutes } from './routes/admin/broadcasts';
+import { processQueue as processBroadcasts } from './lib/broadcasts';
 import { adminPromosRoutes } from './routes/admin/promos';
 import { promoRoutes } from './routes/promo';
 import { ratingRoutes } from './routes/rating';
@@ -140,6 +142,13 @@ async function main() {
   await app.register(adminOpeningBroadcastRoutes);
   await app.register(adminRaceAnnouncementsRoutes);
   await app.register(adminPromosRoutes);
+  await app.register(adminBroadcastsRoutes);
+
+  // Очередь рассылок из админки: сразу после старта сервера (продолжить
+  // прерванную перезапуском) и раз в 30 с — повторы после сбоев.
+  const broadcastTimer = setInterval(() => void processBroadcasts(app.log, { retries: true }), 30_000);
+  broadcastTimer.unref();
+  setTimeout(() => void processBroadcasts(app.log, { retries: true }), 5_000).unref();
 
   // Фоновая сверка оплат: раз в минуту освобождаем места по просроченным
   // счетам и перепроверяем те, по которым не пришёл вебхук. Процесс бэкенда
@@ -205,6 +214,7 @@ async function main() {
 
   app.addHook('onClose', async () => {
     if (sweepTimer) clearInterval(sweepTimer);
+    clearInterval(broadcastTimer);
     if (emailTimer) clearInterval(emailTimer);
     await prisma.$disconnect();
   });

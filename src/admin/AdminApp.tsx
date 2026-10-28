@@ -14,10 +14,11 @@ import ParticipantsSection from './ParticipantsSection';
 import ResultsSection from './ResultsSection';
 import OpeningSection from './OpeningSection';
 import PromoSection from './PromoSection';
+import BroadcastsSection from './BroadcastsSection';
 import TelegramLoginButton from './TelegramLoginButton';
 import './admin.css';
 
-type Tab = 'events' | 'participants' | 'results' | 'promo' | 'opening';
+type Tab = 'events' | 'participants' | 'results' | 'promo' | 'broadcasts' | 'opening';
 type Phase = 'checking' | 'anonymous' | 'authed';
 
 const TABS: { id: Tab; label: string }[] = [
@@ -25,7 +26,8 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'participants', label: 'Участники' },
   { id: 'results', label: 'Результаты' },
   { id: 'promo', label: 'Промокоды' },
-  { id: 'opening', label: 'Рассылка' },
+  { id: 'broadcasts', label: 'Рассылки' },
+  { id: 'opening', label: 'Об открытии' },
 ];
 
 export default function AdminApp() {
@@ -155,6 +157,7 @@ export default function AdminApp() {
       {tab === 'participants' && <ParticipantsSection />}
       {tab === 'results' && <ResultsSection />}
       {tab === 'promo' && <PromoSection />}
+      {tab === 'broadcasts' && <BroadcastsSection />}
       {tab === 'opening' && <OpeningSection />}
     </main>
   );

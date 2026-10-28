@@ -666,3 +666,88 @@ export const startOpeningBroadcast = (text: string) =>
     method: 'POST',
     body: { text },
   });
+
+// ---------- Рассылки ----------
+
+export type BroadcastAudience = 'ALL' | 'EVENT' | 'PASS' | 'NO_REG';
+
+export type BroadcastStats = {
+  total: number;
+  pending: number;
+  sent: number;
+  blocked: number;
+  unreachable: number;
+  failed: number;
+  skipped: number;
+};
+
+export type Broadcast = {
+  id: number;
+  /** HTML Telegram, уже очищенный сервером. */
+  text: string;
+  length: number;
+  photoUrl: string | null;
+  buttonKind: 'url' | 'app' | null;
+  buttonText: string | null;
+  buttonUrl: string | null;
+  audience: BroadcastAudience;
+  eventId: number | null;
+  status: 'DRAFT' | 'SENDING' | 'DONE' | 'CANCELLED';
+  testedAt: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  /** Что мешает отправить черновик (null — всё в порядке). */
+  problem: string | null;
+  stats: BroadcastStats | null;
+};
+
+export type BroadcastDraft = {
+  text: string;
+  buttonKind: 'url' | 'app' | null;
+  buttonText: string | null;
+  buttonUrl: string | null;
+  audience: BroadcastAudience;
+  eventId: number | null;
+};
+
+export const getBroadcasts = () =>
+  request<{ broadcasts: Broadcast[]; events: { id: number; title: string; date: string }[] }>('/admin/broadcasts');
+
+export const getBroadcastAudience = (audience: BroadcastAudience, eventId: number | null) =>
+  request<{ count: number }>(`/admin/broadcasts/audience?audience=${audience}${eventId ? `&eventId=${eventId}` : ''}`);
+
+export const createBroadcast = (draft: BroadcastDraft) =>
+  request<Broadcast>('/admin/broadcasts', { method: 'POST', body: draft });
+
+export const updateBroadcast = (id: number, draft: BroadcastDraft) =>
+  request<Broadcast>(`/admin/broadcasts/${id}`, { method: 'PATCH', body: draft });
+
+export const deleteBroadcast = (id: number) => request<{ ok: true }>(`/admin/broadcasts/${id}`, { method: 'DELETE' });
+
+export const deleteBroadcastPhoto = (id: number) =>
+  request<Broadcast>(`/admin/broadcasts/${id}/photo`, { method: 'DELETE' });
+
+export const testBroadcast = (id: number) => request<Broadcast>(`/admin/broadcasts/${id}/test`, { method: 'POST' });
+
+export const sendBroadcast = (id: number) => request<Broadcast>(`/admin/broadcasts/${id}/send`, { method: 'POST' });
+
+export const cancelBroadcast = (id: number) => request<Broadcast>(`/admin/broadcasts/${id}/cancel`, { method: 'POST' });
+
+/** Картинка рассылки (JPG/PNG/WebP до 5 МБ) — multipart, как карты трасс. */
+export async function uploadBroadcastPhoto(id: number, file: File): Promise<Broadcast> {
+  const body = new FormData();
+  body.append('file', file);
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/admin/broadcasts/${id}/photo`, { method: 'POST', credentials: 'same-origin', body });
+  } catch {
+    throw new AdminApiError(0, 'Не удалось связаться с сервером');
+  }
+  const data: unknown = await res.json().catch(() => null);
+  if (!res.ok) {
+    const obj = (data ?? {}) as { error?: string; reason?: string };
+    throw new AdminApiError(res.status, obj.error ?? `Ошибка ${res.status}`, obj.reason);
+  }
+  return data as Broadcast;
+}

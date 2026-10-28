@@ -16,7 +16,8 @@ export type AuditAction =
   | 'result.import'
   | 'result.publish'
   | 'user.merge'
-  | 'season.update';
+  | 'season.update'
+  | 'broadcast.send';
 
 /** { поле: [было, стало] } — только то, что действительно изменилось. */
 export type AuditChanges = Record<string, [string | null, string | null]>;
