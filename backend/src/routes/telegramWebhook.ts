@@ -5,6 +5,8 @@ import { appUrl, subscribe, unsubscribe } from '../lib/openingSubscribers';
 import { registrationOpen } from '../lib/registrationWindow';
 import { answerCallbackQuery, sendMessage, type InlineButton } from '../lib/telegramBot';
 import { stopBotContact, touchBotContact } from '../lib/raceAnnouncements';
+import { statsText } from '../lib/botStats';
+import { isAdminTelegramId } from '../lib/telegramLogin';
 import {
   ASK_BUTTON,
   PARTNER_BUTTON,
@@ -22,7 +24,8 @@ import {
  * «Узнать об открытии в Telegram» и /start ask — «Задать вопрос» с сайта и из
  * Mini App), кнопку «Сообщить об открытии регистрации», /stop и поддержку
  * (lib/support: частые вопросы, вопрос команде, заявка партнёра, ответы
- * админов реплаем). На остальное отвечает кнопками приложения и вопросов.
+ * админов реплаем), /stats — сводка только для админов (остальным бот на неё
+ * молчит). На остальное отвечает кнопками приложения и вопросов.
  *
  * Снаружи: https://<домен>/api/telegram/webhook. Адрес и секрет сообщает
  * Telegram скрипт dist/jobs/setWebhook.js (см. backend/README.md).
@@ -145,6 +148,10 @@ async function handleUpdate(update: Update, log: FastifyBaseLogger) {
     await unsubscribe(msg.from.id);
     await stopBotContact(msg.from.id);
     await sendMessage(String(msg.chat.id), UNSUBSCRIBED_TEXT);
+    return;
+  }
+  if (command === '/stats') {
+    if (isAdminTelegramId(msg.from.id)) await sendMessage(String(msg.chat.id), await statsText());
     return;
   }
   if (command.startsWith('/') && (await handleSupportCommand(command, msg.chat.id, msg.from))) return;
