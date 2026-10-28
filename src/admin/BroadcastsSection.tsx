@@ -46,8 +46,16 @@ const EMPTY: BroadcastDraft = { text: '', buttonKind: null, buttonText: null, bu
 const dateFmt = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Almaty' });
 const eventDateFmt = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', timeZone: 'Asia/Almaty' });
 
+/**
+ * Сервер хранит текст уже экранированным (5&amp;5). В редакторе — как набрано:
+ * теги остаются тегами, сущности раскрываются; при сохранении сервер снова
+ * экранирует, так что повторное сохранение текст не портит.
+ */
+const decodeEntities = (html: string) =>
+  html.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+
 const draftOf = (b: Broadcast): BroadcastDraft => ({
-  text: b.text,
+  text: decodeEntities(b.text),
   buttonKind: b.buttonKind,
   buttonText: b.buttonText,
   buttonUrl: b.buttonUrl,
@@ -63,8 +71,8 @@ const sameDraft = (a: BroadcastDraft, b: BroadcastDraft) =>
   a.audience === b.audience &&
   a.eventId === b.eventId;
 
-/** Видимая длина: как считает Telegram, без тегов. */
-const visibleLength = (html: string) => html.replace(/<[^>]*>/g, '').replace(/&(amp|lt|gt|quot);/g, '_').length;
+/** Видимая длина: как считает Telegram, без тегов (текст редактора — уже раскрытый). */
+const visibleLength = (source: string) => source.replace(/<[^>]*>/g, '').length;
 
 function StatsLine({ s }: { s: BroadcastStats }) {
   return (
@@ -444,7 +452,7 @@ export default function BroadcastsSection() {
                   {dateFmt.format(new Date(b.startedAt ?? b.createdAt))}
                 </span>
               </div>
-              <p className="ad-bc__preview">{b.text.replace(/<[^>]*>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&').slice(0, 160)}</p>
+              <p className="ad-bc__preview">{decodeEntities(b.text.replace(/<[^>]*>/g, '')).slice(0, 160)}</p>
               {b.stats && <StatsLine s={b.stats} />}
               <div className="ad-actions">
                 {b.status === 'DRAFT' && (
