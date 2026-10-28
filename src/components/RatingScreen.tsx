@@ -96,7 +96,7 @@ function RatingScreen({ myGender }: Props) {
               setQuery(e.target.value);
               setNotice(null);
             }}
-            placeholder="Фамилия, имя или номер"
+            placeholder="Фамилия или номер"
             aria-label="Поиск по фамилии, имени или номеру"
             autoComplete="off"
             enterKeyHint="search"
