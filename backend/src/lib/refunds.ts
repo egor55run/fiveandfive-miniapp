@@ -3,7 +3,7 @@ import { prisma } from '../prisma';
 import { getInvoiceRefunds } from './apipay';
 import { personLabel, writeAudit } from './audit';
 import { distanceIdOf, releaseDistanceSlot } from './distances';
-import { pickupStarted, releasePassBib, releaseRegistrationBib } from './bibs';
+import { pickupStarted, releaseRegistrationBib } from './bibs';
 import { startOfDayInTz } from './notify';
 import { sendMessage } from './telegramBot';
 import { adminTelegramIds } from './telegramLogin';
@@ -256,7 +256,6 @@ export async function applyAdminRefund(input: {
         where: { id: preview.seasonPassId },
         data: { paymentStatus: 'CANCELLED', refundedAt: new Date() },
       });
-      await releasePassBib(tx, preview.seasonPassId);
     }
   });
   return { total, stages: rows.length };

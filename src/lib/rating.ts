@@ -23,6 +23,19 @@ export function pointsCaption(n: number): string {
   return 'Баллов';
 }
 
+/**
+ * Поиск себя в протоколе и рейтинге: по фамилии/имени (без регистра, «ё» = «е»,
+ * в любом порядке слов) или по стартовому номеру.
+ */
+export function matchesSearch(query: string, name: string, bibs: (number | null | undefined)[]): boolean {
+  const norm = (s: string) => s.toLowerCase().replace(/ё/g, 'е').trim();
+  const q = norm(query);
+  if (!q) return true;
+  if (/^\d+$/.test(q)) return bibs.some((b) => b !== null && b !== undefined && String(b).startsWith(q));
+  const words = norm(name).split(/\s+/);
+  return q.split(/\s+/).every((part) => words.some((w) => w.startsWith(part)));
+}
+
 export function pointsFor(seconds: number, gender: RatingGender): number {
   if (seconds > CUTOFF_SECONDS) return MIN_POINTS;
   return Math.max(MIN_POINTS, Math.round(1000 + 4340 * ((T0[gender] / seconds) ** 0.164 - 1)));
@@ -54,6 +67,8 @@ export type SeasonRow = {
   total: number;
   stages: (number | null)[];
   bestTime: number | null;
+  /** Стартовые номера на этапах сезона — для поиска. */
+  bibs?: number[];
   me: boolean;
 };
 

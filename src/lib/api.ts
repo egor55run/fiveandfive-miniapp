@@ -425,8 +425,6 @@ export type SeasonPassDto = {
   seasonId: number;
   price: number;
   paymentStatus: string;
-  /** Номер на весь сезон. */
-  bibNumber?: number | null;
   /** Цена, скидка, итог по оплате. */
   paid?: PriceDto | null;
   createdAt: string;

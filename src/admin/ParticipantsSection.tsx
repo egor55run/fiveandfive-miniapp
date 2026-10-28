@@ -152,11 +152,10 @@ export default function ParticipantsSection() {
     setEvents(await getEvents());
   };
 
-  // Ручная смена номера: у абонемента — на весь сезон.
+  // Ручная смена номера — на этом старте (у абонемента номера на каждом старте свои).
   const editBib = async (p: Participant) => {
-    const scope = p.seasonPassId !== null ? ' (абонемент — номер сменится на всех стартах сезона)' : '';
     const answer = window.prompt(
-      `Стартовый номер: ${fullName(p.lastName, p.firstName)}${scope}.\nПусто — снять номер.`,
+      `Стартовый номер: ${fullName(p.lastName, p.firstName)}.\nПусто — снять номер.`,
       p.bibNumber === null ? '' : String(p.bibNumber),
     );
     if (answer === null) return;
@@ -169,12 +168,10 @@ export default function ParticipantsSection() {
     setError(null);
     setNotice(null);
     try {
-      const res = await setBib(p.registrationId, bib);
+      await setBib(p.registrationId, bib);
       setParticipants((prev) => prev.map((x) => (x.registrationId === p.registrationId ? { ...x, bibNumber: bib } : x)));
       setNotice(
-        `${fullName(p.lastName, p.firstName)}: ${bib === null ? 'номер снят' : `номер ${bib}`}` +
-          (res.seasonWide ? ` на всех стартах абонемента (${res.registrations})` : '') +
-          '. Записано в журнал.',
+        `${fullName(p.lastName, p.firstName)}: ${bib === null ? 'номер снят' : `номер ${bib}`}. Записано в журнал.`,
       );
       setAuditKey((k) => k + 1);
     } catch (err) {
@@ -389,7 +386,7 @@ export default function ParticipantsSection() {
                       type="button"
                       className="ad-link ad-bib"
                       disabled={busyId === p.registrationId}
-                      title={p.seasonPassId !== null ? 'Номер абонемента — на весь сезон. Нажмите, чтобы сменить' : 'Нажмите, чтобы сменить номер'}
+                      title="Нажмите, чтобы сменить номер на этом старте"
                       onClick={() => void editBib(p)}
                     >
                       {p.bibNumber ?? '—'}

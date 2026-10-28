@@ -13,31 +13,31 @@ enum Gender {
 }
 
 model User {
-  id             Int       @id @default(autoincrement())
+  id         Int       @id @default(autoincrement())
   // Личность из подписанного Telegram initData — основной идентификатор.
   // Nullable только ради legacy-строк, созданных до Mini App: весь новый код
   // (plugins/telegramAuth.ts) заводит пользователя исключительно по нему.
-  telegramId     BigInt?   @unique @map("telegram_id")
-  username       String?
-  firstName      String    @map("first_name")
-  lastName       String?   @map("last_name")
+  telegramId BigInt?   @unique @map("telegram_id")
+  username   String?
+  firstName  String    @map("first_name")
+  lastName   String?   @map("last_name")
   // email/age/phone заполняются не при входе, а при регистрации на старт,
   // поэтому опциональны. @unique с email снят: идентификатор теперь telegram_id,
   // и два Telegram-аккаунта вправе указать один и тот же email.
-  email          String?
+  email      String?
   // Возраст держим рядом с датой рождения, а не вместо неё: он нужен протоколам
   // и возрастным группам, но сам по себе устаревает. Когда известна дата,
   // сервер пересчитывает age из неё, чтобы эти два поля не разошлись.
-  age            Int?
+  age        Int?
   // Только дата, без времени и часового пояса: @db.Date. DateTime здесь сдвинул
   // бы день на границе TZ — 14.12.1999 в Алматы стало бы 13-м в UTC.
-  birthDate      DateTime? @map("birth_date") @db.Date
-  phone          String?
+  birthDate  DateTime? @map("birth_date") @db.Date
+  phone      String?
   // Пол из формы регистрации — подставляется в следующую, как дата рождения.
   // Пригодится и для зачёта «среди мужчин/женщин». Nullable: у записей,
   // сделанных до этого поля, пола нет.
-  gender         Gender?
-  createdAt      DateTime  @default(now()) @map("created_at")
+  gender     Gender?
+  createdAt  DateTime  @default(now()) @map("created_at")
 
   registrations    Registration[]
   results          Result[]
@@ -61,10 +61,6 @@ model Season {
   /// Когда закрывается продажа абонемента. null — вместе с регистрацией на
   /// первый старт сезона (lib/seasonPass). Задаётся в админке.
   salesClosesAt DateTime? @map("sales_closes_at")
-  /// Стартовые номера абонементов: один номер на весь сезон, из этого
-  /// диапазона. Диапазоны дистанций стартов с ним не пересекаются (админка).
-  passBibFrom   Int?      @map("pass_bib_from")
-  passBibTo     Int?      @map("pass_bib_to")
   createdAt     DateTime  @default(now()) @map("created_at")
 
   events       Event[]
@@ -154,7 +150,7 @@ model Registration {
   manualNote    String?       @map("manual_note")
   paymentStatus PaymentStatus @default(PENDING) @map("payment_status")
   /// Стартовый номер. Выдаётся при оплате (lib/bibs), уникален в пределах
-  /// старта. У абонемента — номер абонемента. После начала выдачи пакетов
+  /// старта; у абонемента — свой на каждом старте. После начала выдачи пакетов
   /// отмена и возврат номер не освобождают.
   bibNumber     Int?          @map("bib_number")
   /// Оформлен возврат (из админки или по вебхуку ApiPay): запись CANCELLED,
@@ -235,8 +231,6 @@ model SeasonPass {
   paymentStatus PaymentStatus @default(PENDING) @map("payment_status")
   /// Возврат за весь абонемент (все оставшиеся этапы): абонемент CANCELLED.
   refundedAt    DateTime?     @map("refunded_at")
-  /// Один стартовый номер на весь сезон (Season.passBibFrom..passBibTo).
-  bibNumber     Int?          @map("bib_number")
   createdAt     DateTime      @default(now()) @map("created_at")
 
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -248,7 +242,6 @@ model SeasonPass {
 
   // Один абонемент на сезон на пользователя
   @@unique([userId, seasonId])
-  @@unique([seasonId, bibNumber])
   @@map("season_passes")
 }
 

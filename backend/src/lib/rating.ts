@@ -163,6 +163,8 @@ export type SeasonRow = {
   /** Баллы по этапам в порядке календаря; null — не участвовал. */
   stages: (number | null)[];
   bestTime: number | null;
+  /** Стартовые номера участника на этапах сезона — для поиска по номеру. */
+  bibs: number[];
   me: boolean;
 };
 
@@ -200,6 +202,7 @@ export async function seasonStandings(
         total: 0,
         stages: events.map(() => null),
         bestTime: null,
+        bibs: [],
         me,
       } satisfies SeasonRow);
     const pts = resultPoints(r, g);
@@ -210,6 +213,13 @@ export async function seasonStandings(
     }
     byUser.set(r.userId, row);
   }
+  // Номера на стартах сезона — чтобы найти себя в рейтинге по номеру.
+  const regs = await prisma.registration.findMany({
+    where: { eventId: { in: events.map((e) => e.id) }, userId: { in: [...byUser.keys()] }, bibNumber: { not: null } },
+    select: { userId: true, bibNumber: true },
+  });
+  for (const r of regs) byUser.get(r.userId)?.bibs.push(r.bibNumber!);
+
   const table = (g: Gender) => {
     // В таблице — только те, у кого есть хотя бы один финиш: не стартовавший
     // на всех этапах с нулём баллов в рейтинге не нужен.

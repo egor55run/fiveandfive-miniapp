@@ -7,13 +7,14 @@ import { shiftDays, startOfDayInTz } from './notify';
  *  - Номер выдаётся при оплате: наименьший свободный в диапазоне дистанции
  *    (event_distances.bib_from..bib_to), минуя резерв старта (bib_reserves)
  *    и уже занятые номера этого старта.
- *  - Абонемент — один номер на весь сезон из seasons.pass_bib_from..to; этот
- *    номер стоит на всех регистрациях абонемента.
+ *  - Абонемент — так же, как все: на каждом старте свой номер из диапазона
+ *    дистанции, по порядку регистрации (отдельный диапазон абонементов убран
+ *    решением пользователя 2026-10-28).
  *  - Отмена и возврат возвращают номер в пул — но после начала выдачи пакетов
  *    (первый pickup_slot старта; нет слотов — за 2 дня до старта) номер
  *    остаётся за записью: пакет с ним мог быть уже выдан.
  *  - Номер уникален в пределах старта (индекс в базе); выбор — под
- *    advisory-блокировкой старта/сезона, чтобы двое не получили один номер.
+ *    advisory-блокировкой старта, чтобы двое не получили один номер.
  *
  * Все функции работают внутри транзакции вызывающей стороны.
  */
@@ -54,51 +55,19 @@ async function freeEventBib(tx: Tx, eventId: number, from: number, to: number): 
 }
 
 /**
- * Номер для оплаченной регистрации. Уже есть — оставляем. Абонемент — номер
- * абонемента (выдаётся при необходимости). Возвращает номер или null (у
- * дистанции не задан диапазон или он закончился — админка это покажет).
+ * Номер для оплаченной регистрации (и разовой, и из абонемента). Уже есть —
+ * оставляем. Возвращает номер или null (у дистанции не задан диапазон или он
+ * закончился — админка это покажет).
  */
 export async function assignRegistrationBib(tx: Tx, registrationId: number): Promise<number | null> {
   const reg = await tx.registration.findUniqueOrThrow({ where: { id: registrationId }, include: { distance: true } });
   if (reg.bibNumber !== null) return reg.bibNumber;
-  if (reg.seasonPassId) {
-    const passBib = await assignPassBib(tx, reg.seasonPassId);
-    if (passBib === null) return null;
-    // Номер абонемента на этом старте мог занять кто-то вручную — тогда не ставим.
-    const taken = await tx.registration.findFirst({ where: { eventId: reg.eventId, bibNumber: passBib, id: { not: reg.id } } });
-    if (taken) return null;
-    await tx.registration.update({ where: { id: reg.id }, data: { bibNumber: passBib } });
-    return passBib;
-  }
   const d = reg.distance;
   if (!d || d.bibFrom === null || d.bibTo === null) return null;
   await lock(tx, 'event', reg.eventId);
   const n = await freeEventBib(tx, reg.eventId, d.bibFrom, d.bibTo);
   if (n === null) return null;
   await tx.registration.update({ where: { id: reg.id }, data: { bibNumber: n } });
-  return n;
-}
-
-/**
- * Номер абонемента — один на сезон. Свободен, если его нет ни у другого
- * абонемента сезона, ни у какой регистрации на старты сезона.
- */
-export async function assignPassBib(tx: Tx, seasonPassId: number): Promise<number | null> {
-  const pass = await tx.seasonPass.findUniqueOrThrow({ where: { id: seasonPassId }, include: { season: true } });
-  if (pass.bibNumber !== null) return pass.bibNumber;
-  const { passBibFrom: from, passBibTo: to } = pass.season;
-  if (from === null || to === null) return null;
-  await lock(tx, 'season', pass.seasonId);
-  const rows = await tx.$queryRaw<{ n: number }[]>`
-    SELECT n::int AS n FROM generate_series(${from}::int, ${to}::int) AS n
-    WHERE NOT EXISTS (SELECT 1 FROM "season_passes" p WHERE p."season_id" = ${pass.seasonId} AND p."bib_number" = n)
-      AND NOT EXISTS (
-        SELECT 1 FROM "registrations" r JOIN "events" e ON e."id" = r."event_id"
-        WHERE e."season_id" = ${pass.seasonId} AND r."bib_number" = n)
-    ORDER BY n LIMIT 1`;
-  const n = rows[0]?.n ?? null;
-  if (n === null) return null;
-  await tx.seasonPass.update({ where: { id: pass.id }, data: { bibNumber: n } });
   return n;
 }
 
@@ -118,17 +87,6 @@ export async function releaseRegistrationBib(
   return 'released';
 }
 
-/**
- * Абонемент возвращён целиком: его номер освобождается, если ни одна из его
- * регистраций номер не удержала (выдача пакетов на том старте уже шла).
- */
-export async function releasePassBib(tx: Tx, seasonPassId: number): Promise<void> {
-  const pass = await tx.seasonPass.findUniqueOrThrow({ where: { id: seasonPassId } });
-  if (pass.bibNumber === null) return;
-  const holding = await tx.registration.count({ where: { seasonPassId, bibNumber: pass.bibNumber } });
-  if (holding === 0) await tx.seasonPass.update({ where: { id: seasonPassId }, data: { bibNumber: null } });
-}
-
 export class BibError extends Error {
   constructor(message: string) {
     super(message);
@@ -136,39 +94,25 @@ export class BibError extends Error {
 }
 
 /**
- * Ручная смена номера из админки. У абонемента номер общий на сезон — меняется
- * у абонемента и у всех его регистраций (на каждом старте должен быть свободен).
- * null — снять номер.
+ * Ручная смена номера из админки — только на этом старте (у абонемента номера
+ * на каждом старте свои). null — снять номер.
  */
 export async function setBibManually(tx: Tx, registrationId: number, bib: number | null): Promise<{ changed: number[] }> {
   const reg = await tx.registration.findUniqueOrThrow({ where: { id: registrationId } });
-  const targets = reg.seasonPassId
-    ? await tx.registration.findMany({ where: { seasonPassId: reg.seasonPassId, paymentStatus: { not: 'CANCELLED' } } })
-    : [reg];
-  if (!targets.some((t) => t.id === reg.id)) targets.push(reg);
   if (bib !== null) {
-    for (const t of targets) {
-      await lock(tx, 'event', t.eventId);
-      const taken = await tx.registration.findFirst({
-        where: { eventId: t.eventId, bibNumber: bib, id: { notIn: targets.map((x) => x.id) } },
-        include: { user: true, event: true },
-      });
-      if (taken) {
-        throw new BibError(
-          `Номер ${bib} на старте «${taken.event.title}» уже у ${[taken.user.lastName, taken.user.firstName].filter(Boolean).join(' ')}`,
-        );
-      }
-    }
-    if (reg.seasonPassId) {
-      const other = await tx.seasonPass.findFirst({
-        where: { seasonId: (await tx.seasonPass.findUniqueOrThrow({ where: { id: reg.seasonPassId } })).seasonId, bibNumber: bib, id: { not: reg.seasonPassId } },
-      });
-      if (other) throw new BibError(`Номер ${bib} уже у другого абонемента этого сезона`);
+    await lock(tx, 'event', reg.eventId);
+    const taken = await tx.registration.findFirst({
+      where: { eventId: reg.eventId, bibNumber: bib, id: { not: reg.id } },
+      include: { user: true, event: true },
+    });
+    if (taken) {
+      throw new BibError(
+        `Номер ${bib} на старте «${taken.event.title}» уже у ${[taken.user.lastName, taken.user.firstName].filter(Boolean).join(' ')}`,
+      );
     }
   }
-  if (reg.seasonPassId) await tx.seasonPass.update({ where: { id: reg.seasonPassId }, data: { bibNumber: bib } });
-  for (const t of targets) await tx.registration.update({ where: { id: t.id }, data: { bibNumber: bib } });
-  return { changed: targets.map((t) => t.id) };
+  await tx.registration.update({ where: { id: reg.id }, data: { bibNumber: bib } });
+  return { changed: [reg.id] };
 }
 
 /**

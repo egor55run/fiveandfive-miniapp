@@ -2108,3 +2108,39 @@ select.rfield__input {
   font-size: 15px;
   color: var(--text-primary);
 }
+
+/* Рейтинг: поиск и «Найти меня». */
+.rt-search {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.rt-search__input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  font-size: 15px;
+  color: var(--text-primary);
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-full);
+}
+.rt-search__input::placeholder {
+  color: var(--text-muted);
+}
+.rt-search__me {
+  flex: none;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-on-brand);
+  background: var(--brand-primary);
+  border: 0;
+  border-radius: var(--r-full);
+  cursor: pointer;
+}
+.rt-row--found {
+  border-color: var(--brand-highlight);
+  box-shadow: 0 0 0 2px var(--brand-highlight);
+  transition: box-shadow 0.3s ease;
+}

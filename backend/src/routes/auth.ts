@@ -225,7 +225,6 @@ export async function authRoutes(app: FastifyInstance) {
         seasonId: p.seasonId,
         price: Number(p.price),
         paymentStatus: p.paymentStatus,
-        bibNumber: p.bibNumber,
         paid: priceFor({ seasonPassId: p.id }),
         createdAt: p.createdAt,
       })),

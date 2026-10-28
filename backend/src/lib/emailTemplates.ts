@@ -190,17 +190,17 @@ export function seasonPassEmail(p: {
   events: Event[];
   distance?: string | null;
   paidAmount?: number | null;
-  /** Один номер на весь сезон. */
-  bib?: number | null;
+  /** Номер на каждом старте (по id старта); нет — ещё не выдан. */
+  bibs?: Record<number, number | null>;
   price?: PriceBreakdown | null;
 }): EmailMessage {
   const total = p.price ? p.price.total : p.paidAmount ?? 0;
   const paid = total > 0 ? `Оплата ${money(total)} получена — чек в Kaspi.kz.` : null;
-  const races = p.events.map((e) => `${dayMonth(e.date)}, ${timeOfDay(e.date)} — ${e.title}`);
-  const rows: [string, string][] = [
-    ...(p.bib ? ([['Стартовый номер на сезон', String(p.bib)]] as [string, string][]) : []),
-    ...priceRows(p.price),
-  ];
+  const races = p.events.map((e) => {
+    const bib = p.bibs?.[e.id];
+    return `${dayMonth(e.date)}, ${timeOfDay(e.date)} — ${e.title}${bib ? `, номер ${bib}` : ''}`;
+  });
+  const rows: [string, string][] = [...priceRows(p.price)];
   return {
     subject: `Абонемент 5&5: вы зарегистрированы на все ${p.events.length} стартов`,
     html: layout({

@@ -103,14 +103,11 @@ export type SeasonOption = {
   salesClosesAt: string | null;
   salesOpen: boolean;
   firstEventDate: string | null;
-  /** Номера абонементов: один на сезон из этого диапазона. */
-  passBibFrom: number | null;
-  passBibTo: number | null;
 };
 
 export const updateSeason = (
   id: number,
-  body: { price?: number; salesClosesAt?: string | null; passBibFrom?: number | null; passBibTo?: number | null },
+  body: { price?: number; salesClosesAt?: string | null },
 ) =>
   request<SeasonOption>(`/admin/seasons/${id}`, { method: 'PATCH', body });
 
@@ -175,7 +172,7 @@ export type AdminEvent = {
   /** Как задано в админке; null — по умолчанию. */
   registrationClosesAtCustom: string | null;
   createdAt: string;
-  season: { id: number; title: string; year: number; passBibFrom: number | null; passBibTo: number | null } | null;
+  season: { id: number; title: string; year: number } | null;
   /** manual — добавленные вручную без оплаты, в paid не входят. */
   registrations: { total: number; pending: number; paid: number; manual: number; cancelled: number };
   resultsCount: number;
@@ -502,9 +499,9 @@ export const applyRefund = (
     body,
   });
 
-/** Ручная смена номера; у абонемента — на весь сезон. */
+/** Ручная смена номера — на этом старте. */
 export const setBib = (registrationId: number, bib: number | null) =>
-  request<{ bibNumber: number | null; registrations: number; seasonWide: boolean }>(`/admin/registrations/${registrationId}/bib`, {
+  request<{ bibNumber: number | null; registrations: number }>(`/admin/registrations/${registrationId}/bib`, {
     method: 'PATCH',
     body: { bib },
   });

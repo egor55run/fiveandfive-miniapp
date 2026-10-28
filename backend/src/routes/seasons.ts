@@ -406,7 +406,9 @@ export async function seasonsRoutes(app: FastifyInstance) {
           message: seasonPassEmail({
             firstName: result.user.firstName,
             events: result.events,
-            bib: (await prisma.seasonPass.findUnique({ where: { id: pass.id } }))?.bibNumber ?? null,
+            bibs: Object.fromEntries(
+              (await prisma.registration.findMany({ where: { seasonPassId: pass.id } })).map((r) => [r.eventId, r.bibNumber]),
+            ),
             price: quote && total === 0 ? priceInfo : null,
           }),
           log: req.log,

@@ -1664,3 +1664,15 @@ html.site-fonts body {
   font-size: 15px;
   color: var(--muted);
 }
+
+/* Поиск себя в протоколе этапа. */
+.rating-search input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  font: inherit;
+  font-size: 16px;
+  border: 1px solid rgba(21, 19, 15, 0.2);
+  border-radius: 12px;
+  background: #fff;
+}

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { fetchStageRating } from '../../../../site/data';
 import { fitDescription, pageMeta } from '../../../../site/seo';
-import { formatRunTime, STATUS_SHORT, type StageRow } from '../../../../lib/rating';
+import StageProtocol from '../../../../components/site/StageProtocol';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,42 +32,6 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   });
 }
 
-function Protocol({ title, rows }: { title: string; rows: StageRow[] }) {
-  return (
-    <section className="rating-block">
-      <h2 className="rating-block__title">{title}</h2>
-      {rows.length === 0 ? (
-        <p className="rating-empty">Нет результатов.</p>
-      ) : (
-        <div className="rating-table-wrap">
-          <table className="rating-table">
-            <thead>
-              <tr>
-                <th className="num">Место</th>
-                <th className="num">Номер</th>
-                <th>Участник</th>
-                <th className="num">Время</th>
-                <th className="num">Баллы</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.userId}>
-                  <td className="num">{r.place ?? '—'}</td>
-                  <td className="num">{r.bib ?? '—'}</td>
-                  <td>{r.name}</td>
-                  <td className="num">{r.status === 'FINISHED' && r.time !== null ? formatRunTime(r.time) : STATUS_SHORT[r.status]}</td>
-                  <td className="num">{r.points}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
-  );
-}
-
 export default async function StageResultsPage({ params }: Params) {
   const { slug } = await params;
   const data = await fetchStageRating(slug);
@@ -91,8 +55,7 @@ export default async function StageResultsPage({ params }: Params) {
               ? 'Результаты итоговые.'
               : `Результаты предварительные: протесты принимаем до ${dateTimeFmt.format(new Date(data.protestUntil!))} — напишите в Telegram-бот.`}
           </p>
-          <Protocol title="Мужчины" rows={data.men} />
-          <Protocol title="Женщины" rows={data.women} />
+          <StageProtocol men={data.men} women={data.women} />
           <p className="rating-lead">
             Время — от выстрела. <Link href="/reiting#formula">Как считаются баллы</Link>
           </p>

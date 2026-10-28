@@ -129,18 +129,6 @@ class DistanceConflict extends Error {
  */
 async function saveDistances(tx: Prisma.TransactionClient, eventId: number, list: DistanceInput[]) {
   const current = await tx.eventDistance.findMany({ where: { eventId } });
-  // Номера абонементов сезона идут на все его старты — диапазоны дистанций
-  // с ними пересекаться не должны.
-  const event = await tx.event.findUniqueOrThrow({ where: { id: eventId }, include: { season: true } });
-  const pass = event.season?.passBibFrom && event.season.passBibTo ? ([event.season.passBibFrom, event.season.passBibTo] as const) : null;
-  for (const d of list) {
-    if (pass && d.bibFrom !== null && rangesOverlap([d.bibFrom, d.bibTo!], pass)) {
-      throw new DistanceConflict({
-        error: `Номера «${d.label}» (${d.bibFrom}–${d.bibTo}) пересекаются с номерами абонементов сезона (${pass[0]}–${pass[1]})`,
-        reason: 'bib_overlap',
-      });
-    }
-  }
   const keepIds = new Set(list.filter((d) => d.id).map((d) => d.id!));
 
   for (const d of list) {
@@ -230,9 +218,6 @@ export async function adminEventsRoutes(app: FastifyInstance) {
     // Итоговая дата закрытия продажи и открыта ли она сейчас.
     salesClosesAt: seasonSalesClosesAt(s, s.events),
     salesOpen: seasonSalesOpen(s, s.events),
-    // Номера абонементов: один на сезон из этого диапазона (lib/bibs).
-    passBibFrom: s.passBibFrom,
-    passBibTo: s.passBibTo,
     firstEventDate: s.events.length
       ? s.events.map((e) => e.date).sort((a, b) => a.getTime() - b.getTime())[0]
       : null,
@@ -257,8 +242,6 @@ export async function adminEventsRoutes(app: FastifyInstance) {
     .object({
       price: z.number().min(0).max(10_000_000),
       salesClosesAt: z.coerce.date().nullable(),
-      passBibFrom: z.number().int().min(1).max(999_999).nullable(),
-      passBibTo: z.number().int().min(1).max(999_999).nullable(),
     })
     .partial()
     .refine((v) => Object.keys(v).length > 0, { message: 'Нужно передать хотя бы одно поле' });
@@ -276,38 +259,15 @@ export async function adminEventsRoutes(app: FastifyInstance) {
         reason: 'closes_after_start',
       });
     }
-    // Диапазон номеров абонементов: оба поля или ни одного, без пересечения
-    // с диапазонами дистанций стартов сезона.
-    if (parsed.data.passBibFrom !== undefined || parsed.data.passBibTo !== undefined) {
-      const from = parsed.data.passBibFrom !== undefined ? parsed.data.passBibFrom : season.passBibFrom;
-      const to = parsed.data.passBibTo !== undefined ? parsed.data.passBibTo : season.passBibTo;
-      if ((from === null) !== (to === null) || (from !== null && to !== null && from > to)) {
-        return reply.code(400).send({ error: 'Номера абонементов: укажите «с» и «по», «с» не больше «по»', reason: 'bad_range' });
-      }
-      if (from !== null && to !== null) {
-        const clash = await prisma.eventDistance.findFirst({
-          where: { event: { seasonId: id }, bibFrom: { not: null, lte: to }, bibTo: { gte: from } },
-          include: { event: true },
-        });
-        if (clash) {
-          return reply.code(409).send({
-            error: `Пересекается с номерами «${clash.label}» старта «${clash.event.title}» (${clash.bibFrom}–${clash.bibTo})`,
-            reason: 'bib_overlap',
-          });
-        }
-      }
-    }
     const updated = await prisma.$transaction(async (tx) => {
       const before = {
         price: String(Number(season.price)),
         salesClosesAt: season.salesClosesAt?.toISOString() ?? null,
-        passBibs: season.passBibFrom ? `${season.passBibFrom}–${season.passBibTo}` : null,
       };
       const next = await tx.season.update({ where: { id }, data: parsed.data, include: SEASON_EVENTS });
       const changes = diffFields(before, {
         price: String(Number(next.price)),
         salesClosesAt: next.salesClosesAt?.toISOString() ?? null,
-        passBibs: next.passBibFrom ? `${next.passBibFrom}–${next.passBibTo}` : null,
       });
       if (Object.keys(changes).length > 0) {
         await writeAudit(tx, {
@@ -328,7 +288,7 @@ export async function adminEventsRoutes(app: FastifyInstance) {
     const events = await prisma.event.findMany({
       orderBy: { date: 'asc' },
       include: {
-        season: { select: { id: true, title: true, year: true, passBibFrom: true, passBibTo: true } },
+        season: { select: { id: true, title: true, year: true } },
         bibReserves: { orderBy: { bibFrom: 'asc' } },
         ...EVENT_DETAILS,
       },
@@ -388,9 +348,6 @@ export async function adminEventsRoutes(app: FastifyInstance) {
           ...e.distances
             .filter((d) => d.bibFrom === null)
             .map((d) => `У «${d.label}» не задан диапазон номеров — номера не выдаются`),
-          ...(e.season && e.season.passBibFrom === null && e.distances.some((d) => d.seasonPass)
-            ? ['У сезона не задан диапазон номеров абонементов']
-            : []),
           ...(noBibByEvent.get(e.id) ? [`Оплачено без номера: ${noBibByEvent.get(e.id)}`] : []),
         ],
         paidWithoutBib: noBibByEvent.get(e.id) ?? 0,

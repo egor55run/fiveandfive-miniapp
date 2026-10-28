@@ -495,7 +495,7 @@ async function notifyPaid(payment: Payment, log: Logger): Promise<void> {
       firstName: user.firstName,
       events: regs.map((r) => r.event),
       distance: regs[0]?.distance?.label,
-      bib: (await prisma.seasonPass.findUnique({ where: { id: payment.seasonPassId! } }))?.bibNumber ?? null,
+      bibs: Object.fromEntries(regs.map((r) => [r.eventId, r.bibNumber])),
       price: await priceOfPayment(payment),
     }),
     log,

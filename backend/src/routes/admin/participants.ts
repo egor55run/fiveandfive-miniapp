@@ -122,7 +122,7 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
             telegramId: r.user.telegramId?.toString() ?? null,
             username: r.user.username,
             paymentStatus: r.paymentStatus,
-            // Стартовый номер (lib/bibs); у абонемента — номер на весь сезон.
+            // Стартовый номер (lib/bibs) — на этом старте.
             bibNumber: r.bibNumber,
             // Цена, скидка, итог (у абонемента — за весь абонемент, pass: true).
             price: priceOf(r),
@@ -459,7 +459,7 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
 
   /**
    * PATCH /admin/registrations/:id/bib — ручная смена номера { bib: число | null }.
-   * У абонемента — на весь сезон (все его старты). В журнал изменений.
+   * Только на этом старте (у абонемента номера на каждом старте свои). В журнал изменений.
    */
   const bibSchema = z.object({ bib: z.number().int().min(1).max(999_999).nullable() });
   app.patch<{ Params: { id: string } }>('/admin/registrations/:id/bib', async (req, reply) => {
@@ -488,7 +488,7 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
         }
         return out;
       });
-      return { bibNumber: parsed.data.bib, registrations: res.changed.length, seasonWide: reg.seasonPassId !== null };
+      return { bibNumber: parsed.data.bib, registrations: res.changed.length };
     } catch (err) {
       if (err instanceof BibError) return reply.code(409).send({ error: err.message, reason: 'bib_taken' });
       throw err;
