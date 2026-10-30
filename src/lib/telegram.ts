@@ -145,6 +145,18 @@ export function askWriteAccess(): Promise<boolean> {
 }
 
 /**
+ * Можно ли спросить разрешение по-настоящему: внутри Telegram, клиент с Bot API
+ * 6.9+. Иначе окно с просьбой не показываем — askWriteAccess ответил бы «да»,
+ * ничего не спросив, и в базе оказалась бы неправда.
+ */
+export function canAskWriteAccess(): boolean {
+  const app = webApp();
+  if (!app?.requestWriteAccess || !app.initData) return false;
+  const [major = 0, minor = 0] = (app.version ?? '0').split('.').map(Number);
+  return major > 6 || (major === 6 && minor >= 9);
+}
+
+/**
  * Показать нативную кнопку «Назад» в шапке Telegram. Возвращает функцию,
  * которая её убирает, — или null, если кнопки нет (не Telegram, старый клиент):
  * тогда экран рисует свою.

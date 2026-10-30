@@ -2144,3 +2144,40 @@ select.rfield__input {
   box-shadow: 0 0 0 2px var(--brand-highlight);
   transition: box-shadow 0.3s ease;
 }
+
+/* Просьба разрешить боту писать (WriteAccessPrompt). */
+.wa-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+}
+.wa-sheet {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 16px calc(16px + env(safe-area-inset-bottom));
+  background: var(--bg-surface);
+  border-radius: var(--r-lg, 20px) var(--r-lg, 20px) 0 0;
+}
+.wa-sheet__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.wa-sheet__text {
+  margin: 0 0 4px;
+  font-size: 16px;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+.wa-sheet__text--muted {
+  color: var(--text-muted);
+  font-size: 14px;
+}

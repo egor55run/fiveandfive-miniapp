@@ -103,9 +103,13 @@ export async function authRoutes(app: FastifyInstance) {
         update: { username: tg.username ?? null },
       });
 
+      // Может ли бот писать человеку: писал боту или разрешил из приложения
+      // (и не заблокировал). Нет — Mini App попросит разрешение.
+      const contact = await prisma.botContact.findUnique({ where: { telegramId } });
       return {
         user: serializeUser(user),
         isNew: existing === null,
+        canMessage: contact !== null && contact.blockedAt === null,
         // Открыта ли регистрация именно для этого человека: при закрытой
         // регистрации администраторы всё равно могут записаться (тестовый
         // платёж до открытия) — приложение покажет им форму.
@@ -113,6 +117,25 @@ export async function authRoutes(app: FastifyInstance) {
       };
     },
   );
+
+  /**
+   * POST /me/write-access — человек разрешил боту писать (requestWriteAccess в
+   * Mini App). Отмечаем в bot_contacts: теперь он в аудитории рассылок и
+   * получает напоминания. «Не присылать новости» (stopped_at) не трогаем —
+   * разрешение писать не значит согласие снова получать рассылки.
+   */
+  app.post('/me/write-access', { preHandler: requireTelegramAuth }, async (req) => {
+    const tg = tgUserOf(req);
+    const telegramId = BigInt(tg.id);
+    const now = new Date();
+    await prisma.botContact.upsert({
+      where: { telegramId },
+      create: { telegramId, firstName: tg.first_name ?? null, username: tg.username ?? null, writeAccessAt: now },
+      update: { writeAccessAt: now, blockedAt: null, lastSeenAt: now },
+    });
+    req.log.info({ telegramId: tg.id }, 'Разрешил боту писать (Mini App)');
+    return { canMessage: true };
+  });
 
   /** GET /me — профиль, всё, на что пользователь записан, и его результаты. */
   app.get('/me', { preHandler: requireTelegramAuth }, async (req, reply) => {

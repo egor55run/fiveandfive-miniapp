@@ -14,6 +14,7 @@ import RegistrationScreen, {
 } from './components/RegistrationScreen';
 import RegistrationSuccessScreen from './components/RegistrationSuccessScreen';
 import PaymentScreen from './components/PaymentScreen';
+import WriteAccessPrompt from './components/WriteAccessPrompt';
 import TabBar, { type TabId } from './components/TabBar';
 import {
   ApiError,
@@ -25,7 +26,7 @@ import {
 import { toRaceResults } from './data/results';
 import { useTelegramAuth } from './hooks/useTelegramAuth';
 import { firstValidName, splitLegacyName } from './lib/personName';
-import { getUnsafeTelegramUser, requestedRaceSlug } from './lib/telegram';
+import { canAskWriteAccess, getUnsafeTelegramUser, requestedRaceSlug } from './lib/telegram';
 
 type Screen = 'analytics' | 'home' | 'rating' | 'profile' | 'registration' | 'payment' | 'success';
 
@@ -39,6 +40,9 @@ function pickNearest(events: EventDto[]): EventDto | null {
   const upcoming = byDateAsc.find((e) => new Date(e.date).getTime() >= now);
   return upcoming ?? byDateAsc[byDateAsc.length - 1];
 }
+
+/** Спрашивали ли уже разрешение при первом входе (на этом устройстве). */
+const WRITE_ACCESS_ASKED_KEY = 'fivefive.writeAccessAsked';
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
@@ -54,7 +58,39 @@ function App() {
     retry: retryAuth,
     refreshMe,
     registrationOpenForMe,
+    canMessage,
+    setCanMessage,
   } = useTelegramAuth();
+
+  // Разрешение боту писать: спрашиваем при первом входе (один раз на
+  // устройстве) и после каждой регистрации, пока бот не может написать.
+  const [firstAskDone, setFirstAskDone] = useState(() => {
+    try {
+      return window.localStorage.getItem(WRITE_ACCESS_ASKED_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const [askAfterRegistration, setAskAfterRegistration] = useState(false);
+  const showWriteAccess =
+    authState === 'ready' &&
+    canMessage === false &&
+    canAskWriteAccess() &&
+    (!firstAskDone || askAfterRegistration);
+  const writeAccessPrompt = showWriteAccess ? (
+    <WriteAccessPrompt
+      onDone={(granted) => {
+        if (granted) setCanMessage(true);
+        setAskAfterRegistration(false);
+        setFirstAskDone(true);
+        try {
+          window.localStorage.setItem(WRITE_ACCESS_ASKED_KEY, '1');
+        } catch {
+          // Нет хранилища — спросим снова при следующем входе, не страшно.
+        }
+      }}
+    />
+  ) : null;
 
   // Кто пользователь — известно сразу после входа, без всякой формы.
   // Override появляется после регистрации: оттуда приходит дополненный профиль.
@@ -130,6 +166,7 @@ function App() {
     setParticipantOverride(result.user);
     setOutcome(result);
     setCurrentScreen('success');
+    setAskAfterRegistration(true);
     // Обновить слоты на главной после успешной регистрации.
     loadEvents();
     // И перечитать профиль — в нём появилась новая регистрация.
@@ -208,12 +245,15 @@ function App() {
 
   if (currentScreen === 'success' && outcome) {
     return (
-      <RegistrationSuccessScreen
-        user={outcome.user}
-        events={outcome.events}
-        seasonPass={outcome.seasonPass}
-        onBackHome={() => setCurrentScreen('home')}
-      />
+      <>
+        <RegistrationSuccessScreen
+          user={outcome.user}
+          events={outcome.events}
+          seasonPass={outcome.seasonPass}
+          onBackHome={() => setCurrentScreen('home')}
+        />
+        {writeAccessPrompt}
+      </>
     );
   }
 
@@ -262,6 +302,7 @@ function App() {
       )}
 
       <TabBar active={activeTab} onNavigate={(tab) => setCurrentScreen(tab)} />
+      {writeAccessPrompt}
     </>
   );
 }

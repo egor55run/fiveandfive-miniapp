@@ -518,14 +518,16 @@ model OpeningSubscriber {
 /// повторный /start возвращает. blockedAt — бот заблокирован (узнали при
 /// отправке): больше не пишем, пока человек сам не напишет боту.
 model BotContact {
-  id          Int       @id @default(autoincrement())
-  telegramId  BigInt    @unique @map("telegram_id")
-  firstName   String?   @map("first_name")
-  username    String?
-  firstSeenAt DateTime  @default(now()) @map("first_seen_at")
-  lastSeenAt  DateTime  @default(now()) @map("last_seen_at")
-  stoppedAt   DateTime? @map("stopped_at")
-  blockedAt   DateTime? @map("blocked_at")
+  id            Int       @id @default(autoincrement())
+  telegramId    BigInt    @unique @map("telegram_id")
+  firstName     String?   @map("first_name")
+  username      String?
+  firstSeenAt   DateTime  @default(now()) @map("first_seen_at")
+  lastSeenAt    DateTime  @default(now()) @map("last_seen_at")
+  stoppedAt     DateTime? @map("stopped_at")
+  blockedAt     DateTime? @map("blocked_at")
+  /// Разрешил боту писать из Mini App (requestWriteAccess) — 2026-10-30.
+  writeAccessAt DateTime? @map("write_access_at")
 
   @@map("bot_contacts")
 }

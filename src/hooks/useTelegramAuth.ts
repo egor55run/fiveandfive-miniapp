@@ -31,6 +31,8 @@ export function useTelegramAuth() {
   const [error, setError] = useState<string | null>(null);
   // Может ли записаться даже при закрытой регистрации (администратор).
   const [registrationOpenForMe, setRegistrationOpenForMe] = useState(false);
+  // Может ли бот писать человеку; null — неизвестно (старый сервер, вне Telegram).
+  const [canMessage, setCanMessage] = useState<boolean | null>(null);
 
   const signIn = useCallback(async () => {
     setState('loading');
@@ -48,6 +50,7 @@ export function useTelegramAuth() {
       const auth = await authTelegram();
       setUser(auth.user);
       setRegistrationOpenForMe(auth.registrationOpen === true);
+      setCanMessage(auth.canMessage ?? null);
       // Профиль не критичен для входа: если он не загрузился, пользователь
       // всё равно опознан, просто форма не предзаполнится.
       setMe(await getMe().catch(() => null));
@@ -81,5 +84,5 @@ export function useTelegramAuth() {
     }
   }, []);
 
-  return { state, user, me, error, registrationOpenForMe, retry: signIn, setUser, refreshMe };
+  return { state, user, me, error, registrationOpenForMe, canMessage, setCanMessage, retry: signIn, setUser, refreshMe };
 }

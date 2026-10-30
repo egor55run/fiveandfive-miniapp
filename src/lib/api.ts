@@ -281,6 +281,8 @@ export type AuthResult = {
    * администраторов (тестовый платёж до открытия). Нет поля — старый сервер.
    */
   registrationOpen?: boolean;
+  /** Может ли бот писать человеку (писал боту или разрешил). Нет поля — старый сервер. */
+  canMessage?: boolean;
 };
 
 export type MeRegistrationDto = {
@@ -515,6 +517,14 @@ export async function getOpeningSubscription(): Promise<boolean> {
 }
 
 /** Подписаться на сообщение об открытии регистрации (то же, что кнопка в боте). */
+/** Человек разрешил боту писать (requestWriteAccess) — отметить на сервере. */
+export async function markWriteAccess(): Promise<void> {
+  await request<{ canMessage: boolean }>('/me/write-access', {
+    method: 'POST',
+    fallback: (s) => `Не удалось сохранить разрешение (${s})`,
+  });
+}
+
 export async function subscribeOpening(): Promise<void> {
   await request<{ subscribed: boolean }>('/opening-subscription', {
     method: 'POST',
