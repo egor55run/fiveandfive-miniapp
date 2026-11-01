@@ -5,3 +5,4 @@
 legal/*.md text eol=lf
 # Файлы подтверждения сайта (Яндекс, Google…) — байт в байт, с переводами строк LF.
 public/*.html text eol=lf
+public/*.txt eol=lf

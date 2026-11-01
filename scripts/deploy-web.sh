@@ -113,3 +113,10 @@ tar -C "$release" -czf - . | ssh "$HOST" "set -e
   pm2 save --force >/dev/null
   sleep 3
   echo \"==> $APP: \$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:$PORT/app) (\$(cat REVISION))\""
+
+# IndexNow (2026-11-01): изменённые адреса из sitemap — в Bing и Яндекс.
+# Только прод; сбой отправки не отменяет выкладку — повторится в следующий раз.
+if [ "$TARGET" = prod ]; then
+  ssh "$HOST" "node --input-type=module -" < "$(dirname "$0")/indexnow.mjs" ||
+    echo "!! IndexNow не отправлен — сайт выложен, адреса уйдут при следующей выкладке"
+fi
