@@ -9,7 +9,7 @@ import { jsonLdString, pageMeta } from '../../../site/seo';
 const lang: Lang = 'ru';
 
 export const metadata: Metadata = pageMeta({
-  title: 'Вопросы',
+  title: 'Вопросы о забегах 5 км в Астане',
   description:
     'Частые вопросы о забегах 5&5: возраст, регистрация и оплата через Kaspi, возврат, передача слота, перенос из-за погоды, что взять с собой.',
   path: '/voprosy',

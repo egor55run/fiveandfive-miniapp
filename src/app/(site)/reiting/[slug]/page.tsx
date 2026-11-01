@@ -15,7 +15,9 @@ const dateTimeFmt = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'l
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
   const data = await fetchStageRating(slug);
-  const title = data ? `Результаты: ${data.event.title}` : 'Результаты этапа';
+  const title = data
+    ? `Результаты забега 5 км: ${data.event.title}, ${dateFmt.format(new Date(data.event.date)).replace(/\s*г\.$/, '')}`
+    : 'Результаты этапа';
   return pageMeta({
     title,
     // 120–160 знаков при любом названии старта (fitDescription).
@@ -42,7 +44,7 @@ export default async function StageResultsPage({ params }: Params) {
       <p className="rating-back">
         <Link href="/reiting">← Рейтинг серии</Link> · <a href={`/starty/${slug}`}>Страница старта</a>
       </p>
-      <h1 className="h-title">{data.event.title}</h1>
+      <h1 className="h-title">Результаты забега: {data.event.title}</h1>
       <p className="rating-lead">
         {dateFmt.format(new Date(data.event.date))} · {data.event.location} · 5 км
       </p>

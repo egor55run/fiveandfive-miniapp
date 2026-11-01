@@ -3,6 +3,7 @@ import { docPath } from '../../lib/legal';
 import { botChatLink, SEASON_YEAR } from '../../site/links';
 import { sitePath, siteText } from '../../site/i18n';
 import SiteLogo from './SiteLogo';
+import { HUB_PATH } from '../../site/seo';
 
 export default function SiteFooter({ lang }: { lang: Lang }) {
   const t = siteText(lang);
@@ -15,6 +16,7 @@ export default function SiteFooter({ lang }: { lang: Lang }) {
         <nav className="site-footer__links" aria-label={t.footer.documents}>
           <a href={botChatLink('ask')}>{t.footer.telegram}</a>
           <a href={sitePath('/voprosy', lang)}>{t.footer.faq}</a>
+          {lang === 'ru' && <a href={HUB_PATH}>Забеги в Астане 2027</a>}
           {/* Документы — через docPath: у них уже есть казахские версии на staging. */}
           <a href={docPath('oferta', lang)}>{t.footer.oferta}</a>
           <a href={docPath('privacy', lang)}>{t.footer.privacy}</a>

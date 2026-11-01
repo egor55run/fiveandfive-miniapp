@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import type { EventDto } from '../lib/api';
-import { docPath, LEGAL_DOCS, type Lang, type LegalDocKey } from '../lib/legal';
-import { PRICES_PUBLIC } from './links';
+import { docPath, KK_ENABLED, LEGAL_DOCS, type Lang, type LegalDocKey } from '../lib/legal';
+import { botRaceLink, PRICES_PUBLIC } from './links';
 
 /**
  * Поиск и превью: адрес сайта, метаданные страниц, разметка schema.org.
@@ -29,6 +29,10 @@ type PageMetaInput = {
   path: string;
   image?: string;
   imageAlt?: string;
+  /** Язык страницы (og:locale). */
+  lang?: Lang;
+  /** Языковые версии страницы для hreflang: { ru: '/oferta', kk: '/kk/oferta' }. */
+  languages?: Partial<Record<Lang, string>>;
 };
 
 /**
@@ -37,7 +41,7 @@ type PageMetaInput = {
  * задаётся целиком на каждой странице: Next склеивает его с layout
  * поверхностно, и без картинки здесь превью осталось бы без неё.
  */
-export function pageMeta({ title, absoluteTitle, description, path, image = DEFAULT_OG, imageAlt }: PageMetaInput): Metadata {
+export function pageMeta({ title, absoluteTitle, description, path, image = DEFAULT_OG, imageAlt, lang = 'ru', languages }: PageMetaInput): Metadata {
   const fullTitle = absoluteTitle ?? `${title} — ${SITE_NAME}`;
   // Корень — «https://fiveandfive.kz/», как в sitemap.xml: из пути «/» Next
   // собирает адрес без слеша, и canonical главной расходился с sitemap
@@ -46,10 +50,18 @@ export function pageMeta({ title, absoluteTitle, description, path, image = DEFA
   return {
     title: absoluteTitle ? { absolute: absoluteTitle } : title,
     description,
-    alternates: { canonical: url },
+    alternates: {
+      canonical: url,
+      // hreflang: каждая языковая версия ссылается на все, включая себя;
+      // x-default — русская (2026-11-01).
+      ...(languages ? { languages: { ...languages, 'x-default': languages.ru ?? path } } : {}),
+    },
     openGraph: {
       type: 'website',
-      locale: 'ru_RU',
+      locale: lang === 'kk' ? 'kk_KZ' : 'ru_RU',
+      ...(languages && Object.keys(languages).length > 1
+        ? { alternateLocale: lang === 'kk' ? ['ru_RU'] : ['kk_KZ'] }
+        : {}),
       siteName: SITE_NAME,
       url,
       title: fullTitle,
@@ -98,7 +110,14 @@ const DOC_DESCRIPTIONS: Record<LegalDocKey, Record<Lang, string>> = {
 
 export function legalMeta(doc: LegalDocKey, lang: Lang): Metadata {
   const title = LEGAL_DOCS[doc].title[lang];
-  return pageMeta({ title, description: DOC_DESCRIPTIONS[doc][lang], path: docPath(doc, lang) });
+  return pageMeta({
+    title,
+    description: DOC_DESCRIPTIONS[doc][lang],
+    path: docPath(doc, lang),
+    lang,
+    // Казахская версия есть только там, где она включена (KK_ENABLED).
+    languages: KK_ENABLED ? { ru: docPath(doc, 'ru'), kk: docPath(doc, 'kk') } : undefined,
+  });
 }
 
 /** Время старта по Астане в ISO с поясом: «2027-05-23T09:00:00+05:00». */
@@ -107,6 +126,8 @@ export function astanaIso(date: string | number, plusMinutes = 0): string {
   return new Date(ms).toISOString().slice(0, 19) + '+05:00';
 }
 
+const BOT_URL = `https://t.me/${process.env.NEXT_PUBLIC_BOT_USERNAME || 'fiveandfive_run_bot'}`;
+
 const organizer = () => ({
   '@type': 'Organization',
   name: SITE_NAME,
@@ -114,10 +135,33 @@ const organizer = () => ({
   logo: `${SITE_URL}/brand/logo.png`,
 });
 
+/** Место старта: парк в Астане. Улицы в базе нет — только парк и город. */
+const placeOf = (event: EventDto) => ({
+  '@type': 'Place',
+  name: event.location,
+  address: {
+    '@type': 'PostalAddress',
+    addressLocality: 'Астана',
+    addressRegion: 'Астана',
+    addressCountry: 'KZ',
+  },
+});
+
+/** Парк без города: «Триатлон Парк, Астана» → «Триатлон Парк». */
+export const parkName = (event: EventDto) => event.location.replace(/,\s*Астана\s*$/i, '');
+
 /** Организатор и сайт — на главной. */
 export function siteJsonLd() {
   return [
-    { '@context': 'https://schema.org', ...organizer(), sameAs: [`https://t.me/${process.env.NEXT_PUBLIC_BOT_USERNAME || 'fiveandfive_run_bot'}`] },
+    {
+      '@context': 'https://schema.org',
+      ...organizer(),
+      description: 'Серия из пяти забегов на 5 км в парках Астаны: этапы с мая по сентябрь, медаль за каждый этап и рейтинг сезона.',
+      areaServed: { '@type': 'City', name: 'Астана' },
+      address: { '@type': 'PostalAddress', addressLocality: 'Астана', addressCountry: 'KZ' },
+      contactPoint: { '@type': 'ContactPoint', contactType: 'customer support', url: BOT_URL, availableLanguage: ['ru', 'kk'] },
+      sameAs: [BOT_URL],
+    },
     { '@context': 'https://schema.org', '@type': 'WebSite', name: SITE_NAME, url: SITE_URL, inLanguage: 'ru' },
   ];
 }
@@ -149,26 +193,56 @@ export function raceJsonLd(event: EventDto, description: string, path: string, o
               : {}),
         }))
     : [];
-  const offers = offerList.length === 0 ? undefined : offerList.length === 1 ? offerList[0] : offerList;
+  // Цены не объявлены — предложение без цены: только ссылка на регистрацию
+  // (в Mini App на этом старте) и, если запись идёт, «в продаже».
+  const registration = event.slug ? botRaceLink(event.slug) : url;
+  if (offerList.length === 0) {
+    offerList.push({
+      '@type': 'Offer',
+      name: 'Регистрация',
+      url: registration,
+      ...(open ? { availability: 'https://schema.org/InStock' } : {}),
+    } as (typeof offerList)[number]);
+  } else {
+    for (const o of offerList) o.url = registration;
+  }
+  const offers = offerList.length === 1 ? offerList[0] : offerList;
   return {
     '@context': 'https://schema.org',
     '@type': 'SportsEvent',
-    name: event.title,
+    name: `Забег 5 км в Астане — ${event.title}`,
     description,
     sport: 'Running',
     startDate: astanaIso(event.date),
     endDate: astanaIso(event.date, 120),
     eventStatus: 'https://schema.org/EventScheduled',
     eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
-    location: {
-      '@type': 'Place',
-      name: event.location,
-      address: { '@type': 'PostalAddress', addressLocality: 'Астана', addressCountry: 'KZ' },
-    },
+    location: placeOf(event),
     image: [`${SITE_URL}${event.slug ? raceOg(event.slug) : DEFAULT_OG}`],
     url,
     organizer: organizer(),
-    ...(offers ? { offers } : {}),
+    superEvent: { '@type': 'EventSeries', name: 'Серия забегов 5&5 2027', url: `${SITE_URL}${HUB_PATH}` },
+    offers,
+  };
+}
+
+/** Хаб «Забеги в Астане 2027». */
+export const HUB_PATH = '/zabegi-v-astane-2027';
+
+/** Список этапов для хаба: ссылки на страницы стартов по порядку. */
+export function hubJsonLd(events: EventDto[]) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Забеги в Астане 2027',
+    itemListOrder: 'https://schema.org/ItemListOrderAscending',
+    numberOfItems: events.length,
+    itemListElement: events.map((e, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: `${SITE_URL}/starty/${e.slug}`,
+      name: `${parkName(e)} — забег 5 км`,
+    })),
   };
 }
 

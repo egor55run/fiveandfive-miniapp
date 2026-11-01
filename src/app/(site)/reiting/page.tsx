@@ -7,7 +7,7 @@ import type { SeasonRow } from '../../../lib/rating';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = pageMeta({
-  title: 'Рейтинг серии',
+  title: 'Рейтинг серии забегов 2027 в Астане',
   description:
     'Рейтинг серии забегов 5&5: баллы за каждый этап по времени на 5 км, сумма за сезон, отдельно мужчины и женщины. Калькулятор баллов.',
   path: '/reiting',
@@ -63,7 +63,7 @@ export default async function RatingPage() {
   const data = await fetchSeasonRating();
   return (
     <main className="site-wrap rating">
-      <h1 className="h-title">Рейтинг серии</h1>
+      <h1 className="h-title">Рейтинг серии забегов 2027</h1>
       {data && (
         <p className="rating-lead">
           {data.season.title}. Этапы:{' '}

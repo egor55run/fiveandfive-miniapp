@@ -47,7 +47,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const event = await fetchEventBySlug((await params).slug);
   if (!event?.slug) return {};
   return pageMeta({
-    title: `${event.title}: забег 5 км, ${dayLong(event)}`,
+    title: `Забег 5 км в Астане: ${parkOf(event)}, ${dayLong(event)}`,
     description: raceDescription(event),
     path: `/starty/${event.slug}`,
     image: raceOg(event.slug),
@@ -132,7 +132,10 @@ export default async function RacePage({ params }: Props) {
 
       <header className="race__head">
         {label && <span className="race__label">{label}</span>}
-        <h1 className="h-title race__title">{event.title}</h1>
+        <h1 className="h-title race__title">
+          {event.title}
+          <span className="race__title-sub">Забег 5 км в Астане · {dayLong(event)}</span>
+        </h1>
         {event.resultsPublished && event.slug && (
           <p className="race__results">
             <a href={`/reiting/${event.slug}`}>Результаты и баллы рейтинга →</a>

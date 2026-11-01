@@ -11,7 +11,7 @@ export default function SiteLogo({ variant = 'dark' }: { variant?: 'dark' | 'lig
   return (
     <picture>
       <source srcSet={`/brand/${name}.webp`} type="image/webp" />
-      <img src={`/brand/${name}.png`} width={w} height={h} alt="5&5 Run" />
+      <img src={`/brand/${name}.png`} width={w} height={h} alt="5&5 — серия забегов в Астане" />
     </picture>
   );
 }

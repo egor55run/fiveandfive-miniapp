@@ -7,7 +7,7 @@ import type { Lang } from '../../lib/legal';
 import { anyRegistrationOpen, botChatLink, fetchEvents, fetchSeasonPrice } from '../../site/data';
 import { PRICES_PUBLIC } from '../../site/links';
 import { sitePath, siteText } from '../../site/i18n';
-import { jsonLdString, pageMeta, siteJsonLd } from '../../site/seo';
+import { HUB_PATH, jsonLdString, pageMeta, siteJsonLd } from '../../site/seo';
 
 /**
  * Главная сайта — по утверждённому макету (glavnaya-maket-D, 2026-10-09).
@@ -18,7 +18,8 @@ import { jsonLdString, pageMeta, siteJsonLd } from '../../site/seo';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = pageMeta({
-  absoluteTitle: '5&5 — беговой сезон в Астане: пять забегов по 5 км в парках',
+  // Ключевые слова впереди, бренд в конце (SEO-аудит 2026-11-01).
+  absoluteTitle: 'Забег 5 км в Астане: серия забегов 2027 в пяти парках — 5&5',
   // 120–160 знаков (Bing Webmaster Tools); текст — пользователя, 2026-10-24.
   description: '5&5 — серия из 5 забегов на 5 км в парках Астаны в 2027 году. Медаль-пазл, рейтинг сезона, регистрация онлайн. Беги с нами!',
   path: '/',
@@ -155,6 +156,10 @@ export default async function HomePage() {
           }}
         />
       )}
+
+      <p className="site-wrap h-hub-link">
+        <a href={HUB_PATH}>{t.home.hubLink}</a>
+      </p>
 
       <section className="site-wrap h-price" id="cena">
         <div className="h-price__intro">

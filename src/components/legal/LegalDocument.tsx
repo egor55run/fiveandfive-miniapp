@@ -28,7 +28,7 @@ export default async function LegalDocument({
   const printable = 'printable' in info && info.printable;
 
   return (
-    <main className={`legal${printable ? ' legal--printable' : ''}`}>
+    <main className={`legal${printable ? ' legal--printable' : ''}`} lang={lang}>
       {/* Логотип и навигация — в шапке сайта; здесь только переключатель языка. */}
       {KK_ENABLED && (
         <header className="legal__top">

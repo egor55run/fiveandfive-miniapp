@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { docPath, KK_ENABLED } from '../../lib/legal';
 import { fetchEvents } from '../../site/data';
-import { SITE_URL } from '../../site/seo';
+import { HUB_PATH, SITE_URL } from '../../site/seo';
 
 /**
  * /sitemap.xml — страницы сайта для поисковиков. Старты — из базы при запросе
@@ -28,6 +28,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   return [
     page('/', 1, 'weekly'),
+    page(HUB_PATH, 0.9, 'weekly'),
     ...events.filter((e) => e.slug).map((e) => page(`/starty/${e.slug}`, 0.9, 'weekly')),
     page('/reiting', 0.7, 'weekly'),
     page('/voprosy', 0.6, 'monthly'),
