@@ -36,3 +36,7 @@ backend/uploads/
 # Next.js
 .next
 next-env.d.ts
+
+# Локальные файлы Claude Code (настройки просмотра, превью, скриншоты) и кэш tsc
+.claude/
+tsconfig.tsbuildinfo
