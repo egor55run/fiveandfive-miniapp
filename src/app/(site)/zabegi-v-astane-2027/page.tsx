@@ -58,7 +58,7 @@ export default async function HubPage() {
                 <a href={`/starty/${e.slug}`}>{parkName(e)}</a>
               </h2>
               <p className="hub-stage__when">
-                {dayFmt.format(new Date(e.date))}, старт в {timeFmt.format(new Date(e.date))} · {e.distance}
+                {dayFmt.format(new Date(e.date)).replace(/^./, (c) => c.toUpperCase())}, старт в {timeFmt.format(new Date(e.date))} · {e.distance}
               </p>
               <p className="hub-stage__text">{stageText(e, i, events.length)}</p>
               <a className="hub-stage__more" href={`/starty/${e.slug}`}>
