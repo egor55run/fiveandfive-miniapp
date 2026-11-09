@@ -5,10 +5,10 @@ import type { NextConfig } from 'next';
  * встроенные скрипты, а nonce сделал бы все страницы динамическими. Внешнее —
  * только SDK и виджет входа Telegram. В разработке CSP нет: Next там нужен eval.
  */
-const csp = (frameAncestors: string) =>
+const csp = (frameAncestors: string, evalAllowed = false) =>
   [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' https://telegram.org",
+    `script-src 'self' 'unsafe-inline'${evalAllowed ? " 'unsafe-eval'" : ''} https://telegram.org`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://t.me https://*.telegram.org",
     "font-src 'self' data:",
@@ -23,8 +23,10 @@ const csp = (frameAncestors: string) =>
 // Mini App встраивается в Telegram Web; остальное — ни в какие фреймы. Корень
 // тоже разрешён: старая кнопка меню открывает его и он сам уводит в /app.
 const TELEGRAM_FRAME = "'self' https://web.telegram.org https://*.telegram.org";
-const cspHeader = (frameAncestors: string) =>
-  process.env.NODE_ENV === 'production' ? [{ key: 'Content-Security-Policy', value: csp(frameAncestors) }] : [];
+const cspHeader = (frameAncestors: string, evalAllowed = false) =>
+  process.env.NODE_ENV === 'production'
+    ? [{ key: 'Content-Security-Policy', value: csp(frameAncestors, evalAllowed) }]
+    : [];
 
 const nextConfig: NextConfig = {
   // Версию Next наружу не показываем.
@@ -66,6 +68,8 @@ const nextConfig: NextConfig = {
           { key: 'Cache-Control', value: 'no-store' },
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+          // Виджет входа Telegram (data-onauth) вызывает обработчик через eval.
+          ...cspHeader("'none'", true),
         ],
       },
       {
