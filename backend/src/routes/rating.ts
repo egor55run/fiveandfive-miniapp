@@ -20,6 +20,12 @@ async function meOf(req: FastifyRequest): Promise<number | null> {
   return user?.id ?? null;
 }
 
+/** Внутренний id участника наружу не отдаём (2026-11-09). */
+function withoutUserId<T extends { men: { userId: number }[]; women: { userId: number }[] }>(table: T) {
+  const strip = <R extends { userId: number }>(rows: R[]) => rows.map(({ userId: _userId, ...row }) => row);
+  return { ...table, men: strip(table.men), women: strip(table.women) };
+}
+
 const FORMULA = {
   text: 'Баллы = 1000 + 4340 × ((T0 / T)^0,164 − 1), T — время от выстрела на 5 км',
   t0: { MALE: T0.MALE, FEMALE: T0.FEMALE },
@@ -38,7 +44,7 @@ export async function ratingRoutes(app: FastifyInstance) {
       : await prisma.season.findFirst({ where: { isActive: true } });
     if (!season) return reply.code(404).send({ error: 'Сезон не найден' });
     const table = await seasonStandings(season.id, { publicOnly: true, meUserId: await meOf(req) });
-    return { season: { id: season.id, title: season.title, year: season.year }, formula: FORMULA, ...table };
+    return { season: { id: season.id, title: season.title, year: season.year }, formula: FORMULA, ...withoutUserId(table) };
   });
 
   /** GET /rating/stage/:slug — протокол этапа (М и Ж) с баллами. */
@@ -49,7 +55,7 @@ export async function ratingRoutes(app: FastifyInstance) {
     return {
       event: { id: event.id, title: event.title, slug: event.slug, date: event.date, location: event.location },
       formula: FORMULA,
-      ...protocol,
+      ...(protocol && withoutUserId(protocol)),
       protestUntil: protestUntil(event.resultsPublishedAt),
     };
   });

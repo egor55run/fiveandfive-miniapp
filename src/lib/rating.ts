@@ -62,7 +62,6 @@ export function formatRunTime(seconds: number): string {
 export type SeasonRow = {
   place: number;
   name: string;
-  userId: number;
   gender: RatingGender;
   total: number;
   stages: (number | null)[];
@@ -82,7 +81,6 @@ export type SeasonRating = {
 export type StageRow = {
   place: number | null;
   name: string;
-  userId: number;
   bib: number | null;
   gender: RatingGender;
   time: number | null;

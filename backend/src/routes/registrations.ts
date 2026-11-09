@@ -12,7 +12,9 @@ import {
 import { KASPI_PHONE_ERROR, normalizeKzPhone } from '../lib/apipay';
 import { recordConsents } from '../lib/legal';
 import { assignRegistrationBib } from '../lib/bibs';
-import { PromoError, holdPromo, linkPromoPayment, quotePromo, releaseHeldFor, type PromoQuote } from '../lib/promo';
+import { PromoError, holdPromo, linkPromoPayment, releaseHeldFor, type PromoQuote } from '../lib/promo';
+import { quotePromoGuarded } from '../lib/promoGuard';
+import { WRITE_LIMIT } from '../lib/rateLimit';
 import { INVOICE_LIMIT_MESSAGE, hasActiveInvoice, invoiceLimitReached } from '../lib/invoiceLimit';
 import {
   checkAge,
@@ -92,7 +94,7 @@ export async function registrationsRoutes(app: FastifyInstance) {
    */
   app.post(
     '/registrations',
-    { preHandler: requireTelegramAuth },
+    { preHandler: requireTelegramAuth, config: { rateLimit: WRITE_LIMIT } },
     async (req, reply) => {
       if (!registrationOpenFor(tgUserOf(req).id)) {
         return reply
@@ -154,13 +156,13 @@ export async function registrationsRoutes(app: FastifyInstance) {
           ? await prisma.registration.findUnique({ where: { userId_eventId: { userId: known.id, eventId: event.id } }, select: { id: true } })
           : null;
         try {
-          quote = await quotePromo(prisma, {
+          quote = await quotePromoGuarded({
             code: data.promoCode,
             target: { kind: 'race', eventId: event.id },
             base: price,
             userId: known?.id ?? null,
             reuseFor: { registrationId: mine?.id },
-          });
+          }, { telegramId: tg.id, ip: req.ip });
         } catch (err) {
           if (err instanceof PromoError) return reply.code(400).send({ error: err.message, reason: 'promo', fields: { promoCode: err.message } });
           throw err;

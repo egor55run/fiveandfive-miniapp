@@ -63,7 +63,7 @@ export async function paymentsRoutes(app: FastifyInstance) {
       done(null, body);
     });
 
-    scope.post('/payments/apipay/webhook', async (req, reply) => {
+    scope.post('/payments/apipay/webhook', { config: { rateLimit: false } }, async (req, reply) => {
       const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
       const signature = req.headers['x-webhook-signature'];
 

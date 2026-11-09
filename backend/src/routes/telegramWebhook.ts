@@ -175,7 +175,7 @@ async function handleUpdate(update: Update, log: FastifyBaseLogger) {
 }
 
 export async function telegramWebhookRoutes(app: FastifyInstance) {
-  app.post('/telegram/webhook', async (req, reply) => {
+  app.post('/telegram/webhook', { config: { rateLimit: false } }, async (req, reply) => {
     if (!secretOk(req.headers['x-telegram-bot-api-secret-token'])) {
       req.log.warn({ ip: req.ip }, 'Вебхук Telegram без верного секрета отклонён');
       return reply.code(401).send({ error: 'unauthorized' });

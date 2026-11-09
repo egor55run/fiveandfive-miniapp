@@ -38,7 +38,7 @@ function Table({ title, rows, events }: { title: string; rows: SeasonRow[]; even
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.userId}>
+                <tr key={`${r.place}:${r.name}`}>
                   <td className="num">{r.place}</td>
                   <td>{r.name}</td>
                   {r.stages.map((p, i) => (

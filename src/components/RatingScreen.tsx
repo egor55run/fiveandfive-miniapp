@@ -12,15 +12,18 @@ import { openExternalPage } from '../lib/telegram';
  */
 type Props = { myGender?: RatingGender | null };
 
+/** Ключ строки: внутренний id участника в публичный ответ не входит. */
+const rowKey = (r: { place: number | null; name: string; gender?: string }) => `${r.gender ?? ''}${r.place}:${r.name}`;
+
 function RatingScreen({ myGender }: Props) {
   const reduceMotion = useReducedMotion();
   const [data, setData] = useState<SeasonRating | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [gender, setGender] = useState<RatingGender>(myGender ?? 'MALE');
-  const [open, setOpen] = useState<number | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   // Строка, к которой прокрутили «Найти меня», — подсвечивается на пару секунд.
-  const [found, setFound] = useState<number | null>(null);
+  const [found, setFound] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const listRef = useRef<HTMLOListElement>(null);
 
@@ -46,13 +49,13 @@ function RatingScreen({ myGender }: Props) {
     }
     setQuery('');
     setGender(mine.gender);
-    setFound(mine.userId);
+    setFound(rowKey(mine));
     // После перерисовки — прокрутить к своей строке.
     requestAnimationFrame(() => {
-      const el = listRef.current?.querySelector<HTMLElement>(`[data-user="${mine.userId}"]`);
+      const el = listRef.current?.querySelector<HTMLElement>('[data-me]');
       el?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
     });
-    window.setTimeout(() => setFound((v) => (v === mine.userId ? null : v)), 2500);
+    window.setTimeout(() => setFound((v) => (v === rowKey(mine) ? null : v)), 2500);
   };
   const published = data?.events.filter((e) => e.published).length ?? 0;
 
@@ -120,11 +123,11 @@ function RatingScreen({ myGender }: Props) {
         <ol className="rt-list" ref={listRef}>
           {rows.map((r) => (
             <li
-              key={r.userId}
-              data-user={r.userId}
-              className={`rt-row${r.me ? ' rt-row--me' : ''}${found === r.userId ? ' rt-row--found' : ''}`}
+              key={rowKey(r)}
+              data-me={r.me ? '' : undefined}
+              className={`rt-row${r.me ? ' rt-row--me' : ''}${found === rowKey(r) ? ' rt-row--found' : ''}`}
             >
-              <button type="button" className="rt-row__main" onClick={() => setOpen(open === r.userId ? null : r.userId)}>
+              <button type="button" className="rt-row__main" onClick={() => setOpen(open === rowKey(r) ? null : rowKey(r))}>
                 <span className="rt-row__place">{r.place}</span>
                 <span className="rt-row__name">
                   {r.name}
@@ -132,7 +135,7 @@ function RatingScreen({ myGender }: Props) {
                 </span>
                 <span className="rt-row__total">{r.total}</span>
               </button>
-              {open === r.userId && data && (
+              {open === rowKey(r) && data && (
                 <div className="rt-row__stages">
                   {data.events.map((e, i) => (
                     <span key={e.id}>

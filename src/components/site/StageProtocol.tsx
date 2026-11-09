@@ -27,7 +27,7 @@ function Protocol({ title, rows }: { title: string; rows: StageRow[] }) {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.userId}>
+                <tr key={`${r.place ?? r.status}:${r.name}:${r.bib ?? ''}`}>
                   <td className="num">{r.place ?? '—'}</td>
                   <td className="num">{r.bib ?? '—'}</td>
                   <td>{r.name}</td>

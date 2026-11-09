@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
+import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import { prisma } from './prisma';
 import {
@@ -78,6 +79,22 @@ async function main() {
 
   await app.register(cors, { origin: corsOrigins() });
   await app.register(cookie);
+
+  // Общий лимит запросов с одного адреса (2026-11-09). Запись, абонемент и
+  // промокоды — свои лимиты на роутах (lib/rateLimit). Next ходит к API с
+  // 127.0.0.1 за всех посетителей, поэтому петля — без лимита; снаружи этот адрес
+  // не подделать: trustProxy берёт IP только от nginx.
+  await app.register(rateLimit, {
+    global: true,
+    max: 600,
+    timeWindow: '1 minute',
+    allowList: ['127.0.0.1', '::1'],
+    errorResponseBuilder: (_req, ctx) => ({
+      statusCode: ctx.statusCode,
+      error: 'Слишком много запросов. Подождите немного',
+      reason: 'rate_limited',
+    }),
+  });
 
   // Загрузка файлов из админки: карта трассы (до 5 МБ) и Положение (PDF, до
   // 7 МБ). Лимит плагина — больший из двух, свой лимит каждый проверяет сам.

@@ -47,7 +47,7 @@ export function personNameField(kind: PersonNameKind) {
 
 /** Пол. Значения enum Gender из схемы Prisma. */
 export const genderField = z.enum(['MALE', 'FEMALE'], {
-  errorMap: () => ({ message: 'Выберите пол' }),
+  error: 'Выберите пол',
 });
 
 /**
@@ -58,16 +58,16 @@ export const genderField = z.enum(['MALE', 'FEMALE'], {
 export const consentsField = z.object(
   {
     oferta: z.literal(true, {
-      errorMap: () => ({ message: 'Нужно принять правила участия и оферту' }),
+      error: 'Нужно принять правила участия и оферту',
     }),
     privacy: z.literal(true, {
-      errorMap: () => ({ message: 'Нужно согласие на обработку персональных данных' }),
+      error: 'Нужно согласие на обработку персональных данных',
     }),
     // Обещание родителя: обязательно только для 16–17 лет — это решает роут
     // по возрасту на день старта (lib/eligibility), не схема.
     parent: z.literal(true).optional(),
   },
-  { errorMap: () => ({ message: 'Подтвердите оба согласия' }) },
+  { error: 'Подтвердите оба согласия' },
 );
 
 /** Дата рождения в формате input[type=date]. Разбор и границы — в lib/birthDate. */
@@ -82,7 +82,7 @@ export const birthDateField = z
  * подсветить именно его.
  */
 export function sendValidationError(reply: FastifyReply, error: z.ZodError) {
-  const flat = error.flatten();
+  const flat = error.flatten() as { formErrors: string[]; fieldErrors: Record<string, string[] | undefined> };
 
   const fields: Record<string, string> = {};
   for (const [name, messages] of Object.entries(flat.fieldErrors)) {

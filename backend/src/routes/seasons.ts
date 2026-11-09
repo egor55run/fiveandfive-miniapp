@@ -14,7 +14,9 @@ import { ageProfileFields, parseBirthDate } from '../lib/birthDate';
 import { KASPI_PHONE_ERROR, normalizeKzPhone } from '../lib/apipay';
 import { recordConsents } from '../lib/legal';
 import { assignRegistrationBib } from '../lib/bibs';
-import { PromoError, holdPromo, linkPromoPayment, quotePromo, releaseHeldFor, type PromoQuote } from '../lib/promo';
+import { PromoError, holdPromo, linkPromoPayment, releaseHeldFor, type PromoQuote } from '../lib/promo';
+import { quotePromoGuarded } from '../lib/promoGuard';
+import { WRITE_LIMIT } from '../lib/rateLimit';
 import { INVOICE_LIMIT_MESSAGE, hasActiveInvoice, invoiceLimitReached } from '../lib/invoiceLimit';
 import { checkAge, registrationDeadlinePassed } from '../lib/eligibility';
 import { deliver, seasonPassText } from '../lib/notify';
@@ -144,7 +146,7 @@ export async function seasonsRoutes(app: FastifyInstance) {
   // Места держатся, пока счёт не оплачен или не истёк (см. lib/payments.ts).
   // Без APIPAY_API_KEY регистрация закрыта — кроме администраторов: у них
   // абонемент оформляется без счёта (PENDING).
-  app.post('/season-passes', { preHandler: requireTelegramAuth }, async (req, reply) => {
+  app.post('/season-passes', { preHandler: requireTelegramAuth, config: { rateLimit: WRITE_LIMIT } }, async (req, reply) => {
     if (!registrationOpenFor(tgUserOf(req).id)) {
       return reply
         .code(403)
@@ -175,13 +177,13 @@ export async function seasonsRoutes(app: FastifyInstance) {
         ? await prisma.seasonPass.findUnique({ where: { userId_seasonId: { userId: me.id, seasonId: season.id } }, select: { id: true } })
         : null;
       try {
-        quote = await quotePromo(prisma, {
+        quote = await quotePromoGuarded({
           code: data.promoCode,
           target: { kind: 'pass', seasonId: season.id },
           base: price,
           userId: me?.id ?? null,
           reuseFor: { seasonPassId: myPass?.id },
-        });
+        }, { telegramId: tg.id, ip: req.ip });
       } catch (err) {
         if (err instanceof PromoError) return reply.code(400).send({ error: err.message, reason: 'promo', fields: { promoCode: err.message } });
         throw err;

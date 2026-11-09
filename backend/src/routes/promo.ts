@@ -1,7 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../prisma';
-import { PromoError, quotePromo } from '../lib/promo';
+import { PromoError } from '../lib/promo';
+import { quotePromoGuarded } from '../lib/promoGuard';
+import { PROMO_CHECK_LIMIT } from '../lib/rateLimit';
 import { pickDistance } from '../lib/distances';
 import { sendValidationError } from '../lib/validation';
 import { requireTelegramAuth, tgUserOf } from '../plugins/telegramAuth';
@@ -18,7 +20,7 @@ const checkSchema = z.union([
 ]);
 
 export async function promoRoutes(app: FastifyInstance) {
-  app.post('/promo/check', { preHandler: requireTelegramAuth }, async (req, reply) => {
+  app.post('/promo/check', { preHandler: requireTelegramAuth, config: { rateLimit: PROMO_CHECK_LIMIT } }, async (req, reply) => {
     const parsed = checkSchema.safeParse(req.body);
     if (!parsed.success) return sendValidationError(reply, parsed.error);
     const data = parsed.data;
@@ -47,7 +49,7 @@ export async function promoRoutes(app: FastifyInstance) {
       }
     }
     try {
-      const q = await quotePromo(prisma, { code: data.code, target, base, userId: me?.id ?? null, reuseFor });
+      const q = await quotePromoGuarded({ code: data.code, target, base, userId: me?.id ?? null, reuseFor }, { telegramId: tgUserOf(req).id, ip: req.ip });
       return {
         code: q.promo.code,
         kind: q.promo.kind,

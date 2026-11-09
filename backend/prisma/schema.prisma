@@ -828,3 +828,17 @@ model BroadcastDelivery {
   @@index([broadcastId, status])
   @@map("broadcast_deliveries")
 }
+
+/// Неверные промокоды — счётчики защиты от перебора (lib/promoGuard, 2026-11-09).
+/// Адрес — только хешем; строки старше двух суток удаляются.
+model PromoFailure {
+  id         Int      @id @default(autoincrement())
+  telegramId BigInt   @map("telegram_id")
+  ipHash     String   @map("ip_hash")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([telegramId, createdAt])
+  @@index([ipHash, createdAt])
+  @@index([createdAt])
+  @@map("promo_failures")
+}
