@@ -17,6 +17,8 @@ TARGET="${1:-}"
 
 case "$TARGET" in
   staging)
+    # У staging свой пользователь ОС: доступа к .env прода у него нет (2026-11-09).
+    HOST="fivestaging@94.131.93.217"
     REMOTE_DIR="staging-web"; APP="fiveandfive-staging-web"; PORT=3101
     # Бэкенд staging — для страниц сайта, которые берут данные на сервере.
     API_INTERNAL="http://127.0.0.1:3100"
