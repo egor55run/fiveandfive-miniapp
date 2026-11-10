@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowRight, ChevronRight, LineChart, TrendingDown, TrendingUp } from 'lucide-react';
 import Header from './Header';
 import { mmss, personalBestOf, type RaceResult } from '../data/results';
-import type { Compare, CompareByGroup, DistanceStatDto } from '../lib/api';
+import type { Compare, CompareByGroup, DistanceStatDto, MeRatingDto } from '../lib/api';
 import { useSeasonProgress } from '../hooks/useSeasonProgress';
 import FitTitle from './FitTitle';
 
@@ -20,6 +20,8 @@ type Props = {
   results: RaceResult[];
   /** По каждой дистанции: рекорд и сравнение за всё время (GET /me). */
   distanceStats: DistanceStatDto[];
+  /** Рейтинг сезона с местом после каждого этапа. */
+  rating: MeRatingDto | null;
   onBack: () => void;
   onViewRaces: () => void;
 };
@@ -49,6 +51,8 @@ function percent(c: Compare): number | null {
 function CompareLine({ c, what, whom }: { c: Compare; what: string; whom: string }) {
   const p = percent(c);
   if (p === null) return <p className="an-cmp__none">Пока сравнить не с кем{whom ? ` среди ${whom}` : ''}.</p>;
+  // Медленнее всех в группе — не «быстрее 0%», а поддержка (2026-11-11).
+  if (p === 0) return <p className="an-cmp__line">Медаль твоя. На следующем этапе — обгоняй себя</p>;
   return (
     <p className="an-cmp__line">
       Быстрее <b className="num">{p}%</b> {what} <span className="an-cmp__of">из {nf.format(c.others)}</span>
@@ -56,7 +60,57 @@ function CompareLine({ c, what, whom }: { c: Compare; what: string; whom: string
   );
 }
 
-function AnalyticsScreen({ results, distanceStats, onBack, onViewRaces }: Props) {
+/** «Среднее время забега — 28:40 · ты на 2:10 быстрее»; медленнее среднего — без второй части. */
+function AverageLine({ avg, mine }: { avg?: number; mine: number }) {
+  if (avg === undefined) return null;
+  return (
+    <p className="an-cmp__avg">
+      Среднее время забега — <span className="num">{mmss(avg)}</span>
+      {mine < avg && (
+        <>
+          {' '}· ты на <span className="num">{mmss(avg - mine)}</span> быстрее
+        </>
+      )}
+    </p>
+  );
+}
+
+type History = NonNullable<MeRatingDto['history']>;
+
+/** «После этапа 2 ты поднялся с 84-го на 51-е место» — как в сообщении бота. */
+function placeLine(h: History, i: number, female: boolean): string | null {
+  const now = h[i].place;
+  if (now === null) return null;
+  const before = h.slice(0, i).reverse().find((x) => x.place !== null)?.place ?? null;
+  if (before === null) return `Твоё место в рейтинге сезона — ${now}`;
+  if (now < before) return `После этапа ${h[i].stage} ты ${female ? 'поднялась' : 'поднялся'} с ${before}-го на ${now}-е место`;
+  if (now > before) return `После этапа ${h[i].stage} ты ${female ? 'опустилась' : 'опустился'} с ${before}-го на ${now}-е место`;
+  return `После этапа ${h[i].stage} ты ${female ? 'удержала' : 'удержал'} ${now}-е место`;
+}
+
+/** Небольшой график места по этапам: 1-е место — вверху. */
+function PlaceChart({ h }: { h: History }) {
+  const pts = h.filter((x) => x.place !== null) as (History[number] & { place: number })[];
+  if (pts.length < 2) return null;
+  const W = 300, H = 110, pad = 22;
+  const max = Math.max(...pts.map((p) => p.place)), min = Math.min(...pts.map((p) => p.place));
+  const x = (i: number) => pad + (i * (W - 2 * pad)) / (pts.length - 1);
+  const y = (place: number) => (max === min ? H / 2 : pad + ((place - min) * (H - 2 * pad)) / (max - min));
+  return (
+    <svg className="an-place" viewBox={`0 0 ${W} ${H + 18}`} role="img" aria-label="Место в рейтинге сезона по этапам">
+      <polyline points={pts.map((p, i) => `${x(i)},${y(p.place)}`).join(' ')} fill="none" stroke="currentColor" strokeWidth="2.5" />
+      {pts.map((p, i) => (
+        <g key={p.eventId}>
+          <circle cx={x(i)} cy={y(p.place)} r="4" fill="currentColor" />
+          <text x={x(i)} y={y(p.place) - 9} textAnchor="middle" className="an-place__num">{p.place}</text>
+          <text x={x(i)} y={H + 14} textAnchor="middle" className="an-place__stage">этап {p.stage}</text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+function AnalyticsScreen({ results, distanceStats, rating, onBack, onViewRaces }: Props) {
   const reduceMotion = useReducedMotion();
   const [view, setView] = useState<'mine' | 'compare'>('mine');
   const [pickedKey, setPickedKey] = useState<string | null>(null);
@@ -294,6 +348,24 @@ function AnalyticsScreen({ results, distanceStats, onBack, onViewRaces }: Props)
             ))}
           </div>
 
+          {/* Рейтинг сезона: место после каждого опубликованного этапа серии. */}
+          {rating?.history && rating.history.some((h) => h.place !== null) && (
+            <>
+              <p className="an-section-label">Рейтинг сезона</p>
+              <article className="glass-card an-cmp">
+                {rating.history.map((_, i) => {
+                  const line = placeLine(rating.history!, i, rating.gender === 'FEMALE');
+                  return line ? (
+                    <p key={i} className={i === rating.history!.length - 1 ? 'an-cmp__line' : 'an-cmp__avg'}>
+                      {line}
+                    </p>
+                  ) : null;
+                })}
+                <PlaceChart h={rating.history} />
+              </article>
+            </>
+          )}
+
           <p className="an-section-label">За всё время на стартах 5&amp;5</p>
           {distanceStats.map((d) => (
             <article key={d.key} className="glass-card an-cmp">
@@ -315,11 +387,14 @@ function AnalyticsScreen({ results, distanceStats, onBack, onViewRaces }: Props)
                 {r.title} <span className="an-cmp__best">{r.date} · {r.distance} · {r.time}</span>
               </h3>
               {r.compare ? (
-                <CompareLine
-                  c={r.compare[group]}
-                  what={whom ? `${whom} на ${r.distance} в этом забеге` : `участников этого забега на ${r.distance}`}
-                  whom={whom}
-                />
+                <>
+                  <CompareLine
+                    c={r.compare[group]}
+                    what={whom ? `${whom} на ${r.distance} в этом забеге` : `участников этого забега на ${r.distance}`}
+                    whom={whom}
+                  />
+                  <AverageLine avg={r.compare[group].avg} mine={r.timeSeconds} />
+                </>
               ) : (
                 <p className="an-cmp__none">Сравнение появится после обновления данных.</p>
               )}

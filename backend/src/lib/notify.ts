@@ -213,7 +213,7 @@ export function seasonPassText(events: Event[]): string {
 
 export function resultText(
   event: Event,
-  result: { finishTime: string; place: number; finishersTotal: number; points?: number; gender?: 'MALE' | 'FEMALE' | null },
+  result: { finishTime: string; place: number; finishersTotal: number; points?: number; gender?: 'MALE' | 'FEMALE' | null; seasonLine?: string | null },
 ): string {
   // «1 из 1» выглядит издевательски — когда финишёр один, показываем только место.
   const place =
@@ -230,6 +230,7 @@ export function resultText(
     `Время: <b>${escapeHtml(result.finishTime)}</b>`,
     `Место${among}: ${place}`,
     ...(result.points !== undefined ? [`Баллы рейтинга серии: <b>${result.points}</b>`] : []),
+    ...(result.seasonLine ? [escapeHtml(result.seasonLine)] : []),
     '',
     'Результаты предварительные 48 часов — если заметили ошибку, напишите в бот «Задать вопрос».',
     'Подробнее — в приложении, кнопка ниже.',

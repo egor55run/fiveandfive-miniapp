@@ -338,7 +338,7 @@ export type MeRaceResultDto = {
 };
 
 /** Сколько человек в сравнении (без самого участника) и сколько из них медленнее. */
-export type Compare = { others: number; slower: number };
+export type Compare = { others: number; slower: number; avg?: number };
 export type CompareByGroup = { all: Compare; MALE: Compare; FEMALE: Compare };
 
 /** Дистанция за всё время: личный рекорд и сравнение с лучшими временами всех на стартах 5&5. */
@@ -352,6 +352,8 @@ export type MeRatingDto = {
   place: number | null;
   of: number;
   stages: (number | null)[];
+  /** Место после каждого опубликованного этапа (null — ещё не в зачёте). */
+  history?: { eventId: number; stage: number; title: string; place: number | null; of: number }[];
 };
 
 export type MeResult = {

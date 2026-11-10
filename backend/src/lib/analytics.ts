@@ -8,8 +8,12 @@ import { prisma } from '../prisma';
  * сравнении и сколько из них медленнее; имён нет.
  */
 
-/** Сколько человек в сравнении (без самого участника) и сколько из них медленнее. */
-export type Compare = { others: number; slower: number };
+/**
+ * Сколько человек в сравнении (без самого участника), сколько из них медленнее и
+ * среднее время финишёров этой группы на этом забеге (с участником, если он в
+ * группе); avg — только у сравнения по забегу.
+ */
+export type Compare = { others: number; slower: number; avg?: number };
 export type CompareByGroup = { all: Compare; MALE: Compare; FEMALE: Compare };
 
 export type MyResult = {
@@ -55,8 +59,17 @@ export async function myAnalytics(userId: number, gender: Gender | null, results
     const peers = sameRace.filter((x) => x.eventId === r.eventId && x.eventDistanceId === r.eventDistanceId && x.userId !== userId);
     const rows = peers.map((x) => ({ time: x.finishTime!, gender: x.user.gender }));
     const own = gender ? rows.filter((x) => x.gender === gender) : rows;
+    // Среднее время на этой дистанции этого старта — по группе (все / мужчины / женщины).
+    const avgOf = (list: typeof rows, includeMe: boolean) => {
+      const times = [...list.map((x) => x.time), ...(includeMe ? [r.finishTime!] : [])];
+      return times.length ? Math.round(times.reduce((a, b) => a + b, 0) / times.length) : undefined;
+    };
+    const cmp = compare(r.finishTime!, rows);
+    cmp.all.avg = avgOf(rows, true);
+    cmp.MALE.avg = avgOf(rows.filter((x) => x.gender === 'MALE'), gender === 'MALE');
+    cmp.FEMALE.avg = avgOf(rows.filter((x) => x.gender === 'FEMALE'), gender === 'FEMALE');
     perResult.set(r.id, {
-      compare: compare(r.finishTime!, rows),
+      compare: cmp,
       // Место на своей дистанции среди своего пола (пол не указан — среди всех).
       place: 1 + own.filter((x) => x.time < r.finishTime!).length,
       of: own.length + 1,

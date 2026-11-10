@@ -2265,3 +2265,23 @@ select.rfield__input {
 .an-cmp__note {
   margin: 0;
 }
+.an-cmp__avg {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.an-place {
+  width: 100%;
+  height: auto;
+  margin-top: 6px;
+  color: var(--brand-highlight);
+}
+.an-place__num {
+  font-size: 12px;
+  font-weight: 700;
+  fill: var(--text-primary);
+}
+.an-place__stage {
+  font-size: 11px;
+  fill: var(--text-muted);
+}

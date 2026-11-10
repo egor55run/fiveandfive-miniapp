@@ -174,10 +174,12 @@ export type SeasonRow = {
  */
 export async function seasonStandings(
   seasonId: number,
-  opts: { publicOnly: boolean; meUserId?: number | null },
+  opts: { publicOnly: boolean; meUserId?: number | null; upToEventId?: number },
 ): Promise<{ events: { id: number; title: string; slug: string | null; date: Date; published: boolean }[]; men: SeasonRow[]; women: SeasonRow[] }> {
   const events = await prisma.event.findMany({ where: { seasonId }, orderBy: { date: 'asc' } });
-  const counted = events.filter((e) => !opts.publicOnly || e.resultsPublishedAt !== null);
+  // upToEventId — рейтинг «после этого этапа»: только этапы не позже него.
+  const upTo = opts.upToEventId ? events.find((e) => e.id === opts.upToEventId)?.date : undefined;
+  const counted = events.filter((e) => (!opts.publicOnly || e.resultsPublishedAt !== null) && (!upTo || e.date <= upTo));
   const dist = await ratingDistanceIds(counted.map((e) => e.id));
   const results = await prisma.result.findMany({
     where: {
@@ -237,4 +239,39 @@ export async function seasonStandings(
     men: table('MALE'),
     women: table('FEMALE'),
   };
+}
+
+/** Место в рейтинге сезона и сколько человек в зачёте своего пола. */
+export type SeasonPlace = { place: number; of: number };
+
+/**
+ * Места после этапа (2026-11-11): рейтинг сезона, посчитанный только по
+ * опубликованным этапам не позже этого. userId → место среди своего пола.
+ */
+export async function placesAfterStage(seasonId: number, eventId: number): Promise<Map<number, SeasonPlace>> {
+  const table = await seasonStandings(seasonId, { publicOnly: true, upToEventId: eventId });
+  const out = new Map<number, SeasonPlace>();
+  for (const list of [table.men, table.women]) for (const r of list) out.set(r.userId, { place: r.place, of: list.length });
+  return out;
+}
+
+/** Опубликованные этапы сезона по дате, с номером этапа. */
+export async function publishedStages(seasonId: number) {
+  const events = await prisma.event.findMany({ where: { seasonId }, orderBy: { date: 'asc' } });
+  return events
+    .map((e, i) => ({ id: e.id, title: e.title, stage: e.stageNumber ?? i + 1, published: e.resultsPublishedAt !== null }))
+    .filter((e) => e.published);
+}
+
+/**
+ * Строка о месте в рейтинге сезона после этапа: «После этапа 2 ты поднялся с
+ * 84-го на 51-е место», «опустился…», «удержал 51-е место»; на первом своём
+ * этапе — «Твоё место в рейтинге сезона — 84».
+ */
+export function seasonPlaceLine(stage: number, before: number | null, after: number, gender: Gender | null): string {
+  const f = gender === 'FEMALE';
+  if (before === null) return `Твоё место в рейтинге сезона — ${after}`;
+  if (after < before) return `После этапа ${stage} ты ${f ? 'поднялась' : 'поднялся'} с ${before}-го на ${after}-е место в рейтинге сезона`;
+  if (after > before) return `После этапа ${stage} ты ${f ? 'опустилась' : 'опустился'} с ${before}-го на ${after}-е место в рейтинге сезона`;
+  return `После этапа ${stage} ты ${f ? 'удержала' : 'удержал'} ${after}-е место в рейтинге сезона`;
 }

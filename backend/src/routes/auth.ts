@@ -16,7 +16,7 @@ import {
 } from '../lib/validation';
 import { requireTelegramAuth, tgUserOf } from '../plugins/telegramAuth';
 import { serializeEvent } from './events';
-import { resultPoints, seasonStandings } from '../lib/rating';
+import { placesAfterStage, publishedStages, resultPoints, seasonStandings } from '../lib/rating';
 import { distanceKey, myAnalytics } from '../lib/analytics';
 
 /**
@@ -62,6 +62,15 @@ async function myRating(userId: number, gender: Gender | null) {
   const table = await seasonStandings(season.id, { publicOnly: true, meUserId: userId });
   const list = gender === 'MALE' ? table.men : table.women;
   const mine = list.find((r) => r.userId === userId);
+  // Место после каждого опубликованного этапа — динамика в аналитике (2026-11-11).
+  const history: { eventId: number; stage: number; title: string; place: number | null; of: number }[] = [];
+  if (mine) {
+    for (const s of await publishedStages(season.id)) {
+      const places = await placesAfterStage(season.id, s.id);
+      const p = places.get(userId);
+      history.push({ eventId: s.id, stage: s.stage, title: s.title, place: p?.place ?? null, of: p?.of ?? 0 });
+    }
+  }
   return {
     seasonId: season.id,
     gender,
@@ -69,6 +78,7 @@ async function myRating(userId: number, gender: Gender | null) {
     place: mine?.place ?? null,
     of: list.length,
     stages: mine?.stages ?? table.events.map(() => null),
+    history,
   };
 }
 

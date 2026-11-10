@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../../prisma';
 import { deliver, formatFinishTime, resultText } from '../../lib/notify';
 import { personLabel, writeAudit } from '../../lib/audit';
-import { protestUntil, recomputePlaces, resultPoints } from '../../lib/rating';
+import { protestUntil, recomputePlaces, resultPoints, placesAfterStage, publishedStages, seasonPlaceLine, type SeasonPlace } from '../../lib/rating';
 import { parseTimingCsv } from '../../lib/timingImport';
 import { requireAdmin } from '../../plugins/adminAuth';
 
@@ -109,9 +109,23 @@ async function notifyResults(eventId: number, log: Logger): Promise<{ sent: numb
   );
   const finishersByGender = new Map<string, number>();
   for (const r of results) finishersByGender.set(r.user.gender ?? '', (finishersByGender.get(r.user.gender ?? '') ?? 0) + 1);
+  // Место в рейтинге сезона до и после этого этапа — строка в сообщении (только этапы серии).
+  let after = new Map<number, SeasonPlace>();
+  let before = new Map<number, SeasonPlace>();
+  let stageNo = 0;
+  if (event.seasonId !== null) {
+    const stages = await publishedStages(event.seasonId);
+    const at = stages.findIndex((s) => s.id === eventId);
+    if (at >= 0) {
+      stageNo = stages[at].stage;
+      after = await placesAfterStage(event.seasonId, eventId);
+      if (at > 0) before = await placesAfterStage(event.seasonId, stages[at - 1].id);
+    }
+  }
   let sent = 0;
   for (const r of results) {
     if (done.has(r.userId) || r.finishTime === null) continue;
+    const now = after.get(r.userId);
     const gender = r.user.gender;
     const status = await deliver({
       userId: r.userId,
@@ -124,6 +138,7 @@ async function notifyResults(eventId: number, log: Logger): Promise<{ sent: numb
         finishersTotal: gender ? finishersByGender.get(gender) ?? 1 : results.length,
         points: gender ? resultPoints(r, gender) : undefined,
         gender,
+        seasonLine: now ? seasonPlaceLine(stageNo, before.get(r.userId)?.place ?? null, now.place, gender) : null,
       }),
       log,
     });
