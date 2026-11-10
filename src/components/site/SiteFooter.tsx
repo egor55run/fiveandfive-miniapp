@@ -22,9 +22,10 @@ export default function SiteFooter({ lang }: { lang: Lang }) {
           <a href={docPath('privacy', lang)}>{t.footer.privacy}</a>
           <a href={docPath('parentConsent', lang)}>{t.footer.parentConsent}</a>
         </nav>
-        <span className="site-footer__org">
-          {t.footer.organizer(SEASON_YEAR)}
-        </span>
+        <p className="site-footer__org">
+          <span>{t.footer.brandLine}</span>
+          <span>{t.footer.organizer(SEASON_YEAR)}</span>
+        </p>
       </div>
     </footer>
   );

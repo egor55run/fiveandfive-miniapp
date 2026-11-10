@@ -156,6 +156,8 @@ export function siteJsonLd() {
     {
       '@context': 'https://schema.org',
       ...organizer(),
+      // Как бренд пишут и ищут (2026-11-10).
+      alternateName: ['FIVE&FIVE', '5&5 RUN', '5и5', 'Файв энд файв'],
       description: 'Серия из пяти забегов на 5 км в парках Астаны: этапы с мая по сентябрь, медаль за каждый этап и рейтинг сезона.',
       areaServed: { '@type': 'City', name: 'Астана' },
       address: { '@type': 'PostalAddress', addressLocality: 'Астана', addressCountry: 'KZ' },

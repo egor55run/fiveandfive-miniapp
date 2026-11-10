@@ -163,6 +163,13 @@ html.site-fonts body {
   padding-bottom: 40px;
 }
 
+.site-footer__org {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+}
+
 .site-footer__links {
   display: flex;
   flex-wrap: wrap;
