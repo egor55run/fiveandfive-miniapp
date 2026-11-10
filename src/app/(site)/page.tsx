@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = pageMeta({
   // Ключевые слова впереди, бренд в конце (SEO-аудит 2026-11-01).
-  absoluteTitle: 'Забег 5 км в Астане: серия забегов 2027 в пяти парках — 5&5 (FIVE&FIVE)',
+  absoluteTitle: 'Забег 5 км в Астане: серия забегов 2027 — 5&5 (FIVE&FIVE)',
   // 120–160 знаков (Bing Webmaster Tools); текст — пользователя, 2026-10-24.
   description: '5&5 (FIVE&FIVE) — серия из 5 забегов на 5 км в парках Астаны в 2027 году. Медаль-пазл, рейтинг сезона, регистрация онлайн. Беги с нами!',
   path: '/',
