@@ -2200,3 +2200,68 @@ select.rfield__input {
   font-size: 14px;
   color: var(--text-muted);
 }
+
+/* Аналитика по дистанциям и сравнение (2026-11-11). */
+.an-chips--two {
+  grid-template-columns: repeat(2, 1fr);
+}
+.an-dist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.an-dist__btn {
+  padding: 8px 14px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-full);
+  cursor: pointer;
+}
+.an-dist__btn--on {
+  color: var(--text-primary);
+  border-color: var(--brand-primary);
+}
+.an-cmp {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px var(--sp-lg);
+}
+.an-cmp__title {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.an-cmp__best {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+.an-cmp__line {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+.an-cmp__line b {
+  font-size: 20px;
+  color: var(--brand-highlight);
+}
+.an-cmp__of,
+.an-cmp__none,
+.an-cmp__note {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.an-cmp__none,
+.an-cmp__note {
+  margin: 0;
+}

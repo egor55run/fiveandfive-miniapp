@@ -17,6 +17,7 @@ import {
 import { requireTelegramAuth, tgUserOf } from '../plugins/telegramAuth';
 import { serializeEvent } from './events';
 import { resultPoints, seasonStandings } from '../lib/rating';
+import { distanceKey, myAnalytics } from '../lib/analytics';
 
 /**
  * Явная сериализация вместо отдачи модели Prisma напрямую: telegram_id — BigInt
@@ -153,7 +154,7 @@ export async function authRoutes(app: FastifyInstance) {
         // не видит, сошедшие и не стартовавшие в аналитику не идут.
         results: {
           where: { status: 'FINISHED', finishTime: { not: null }, event: { resultsPublishedAt: { not: null } } },
-          include: { event: true },
+          include: { event: true, eventDistance: { include: { catalog: true } } },
           orderBy: { event: { date: 'asc' } },
         },
         seasonPasses: { orderBy: { createdAt: 'desc' } },
@@ -188,6 +189,8 @@ export async function authRoutes(app: FastifyInstance) {
         finishersByEvent.set(row.eventId, row._count._all);
       }
     }
+
+    const analytics = await myAnalytics(user.id, user.gender, user.results);
 
     type Price = { base: number; discount: number; total: number; promoCode: string | null };
     const priceFor = (where: { registrationId?: number | null; seasonPassId?: number | null }): Price | null => {
@@ -232,15 +235,25 @@ export async function authRoutes(app: FastifyInstance) {
         id: r.id,
         eventId: r.eventId,
         finishTime: r.finishTime,
-        // Место среди своего пола (зачёт рейтинга); пол не указан — общее.
-        place: (user.gender ? r.genderPlace : r.place) ?? r.place,
-        // Считается на лету, в модели Result этого поля нет.
-        finishersTotal: finishersByEvent.get(r.eventId) ?? 1,
+        // Место на своей дистанции среди своего пола (пол не указан — среди всех).
+        place: analytics.perResult.get(r.id)?.place ?? ((user.gender ? r.genderPlace : r.place) ?? r.place),
+        finishersTotal: analytics.perResult.get(r.id)?.of ?? finishersByEvent.get(r.eventId) ?? 1,
+        // Дистанция, которую бежал человек (не главная дистанция старта), и
+        // сравнение с бежавшими её на том же старте — только числа (2026-11-11).
+        distance: {
+          key: distanceKey(r),
+          label: r.eventDistance?.catalog.label ?? r.eventDistance?.label ?? r.event.distance,
+          meters: r.eventDistance?.catalog.meters ?? null,
+        },
+        compare: analytics.perResult.get(r.id)?.compare ?? null,
         status: r.status,
         points: resultPoints(r, user.gender),
         recordedAt: r.recordedAt,
         event: serializeEvent(r.event),
       })),
+      // По каждой дистанции: личный рекорд и сравнение с лучшими временами всех,
+      // кто бежал её на стартах 5&5 за всё время.
+      distanceStats: analytics.distances,
       // Рейтинг сезона: свои баллы и место среди своего пола.
       rating: await myRating(user.id, user.gender),
       seasonPasses: user.seasonPasses.map((p) => ({

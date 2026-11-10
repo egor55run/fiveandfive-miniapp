@@ -331,7 +331,18 @@ export type MeRaceResultDto = {
   points?: number;
   recordedAt: string;
   event: EventDto;
+  /** Дистанция, которую бежал человек: key — одна на всех стартах («5 км»). */
+  distance?: { key: string; label: string; meters: number | null };
+  /** Сравнение с бежавшими ту же дистанцию на том же старте; только числа. */
+  compare?: CompareByGroup | null;
 };
+
+/** Сколько человек в сравнении (без самого участника) и сколько из них медленнее. */
+export type Compare = { others: number; slower: number };
+export type CompareByGroup = { all: Compare; MALE: Compare; FEMALE: Compare };
+
+/** Дистанция за всё время: личный рекорд и сравнение с лучшими временами всех на стартах 5&5. */
+export type DistanceStatDto = { key: string; label: string; meters: number | null; best: number; runs: number; compare: CompareByGroup };
 
 /** Свои баллы и место в рейтинге активного сезона (среди своего пола). */
 export type MeRatingDto = {
@@ -347,6 +358,7 @@ export type MeResult = {
   user: UserDto;
   registrations: MeRegistrationDto[];
   results: MeRaceResultDto[];
+  distanceStats?: DistanceStatDto[];
   seasonPasses: SeasonPassDto[];
   rating?: MeRatingDto | null;
 };

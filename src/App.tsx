@@ -276,6 +276,7 @@ function App() {
       {currentScreen === 'analytics' ? (
         <AnalyticsScreen
           results={raceResults}
+          distanceStats={me?.distanceStats ?? []}
           onBack={() => setCurrentScreen('home')}
           onViewRaces={() => setCurrentScreen('home')}
         />

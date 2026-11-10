@@ -11,7 +11,7 @@
 //   bibNumber   — номер участника: см. src/data/profile.ts.
 // Общее число финишёров бэкенд уже отдаёт (finishersTotal), темп и скорость
 // считаются здесь из времени и дистанции.
-import type { MeRaceResultDto } from '../lib/api';
+import type { CompareByGroup, MeRaceResultDto } from '../lib/api';
 
 export type RaceResult = {
   eventId: number;
@@ -23,8 +23,13 @@ export type RaceResult = {
   distanceKm: number | null;
   time: string; // финишное время, формат M:SS
   timeSeconds: number; // то же в секундах — для вычислений
-  place: number; // место в общем зачёте
-  placeTotal: number; // сколько всего финишировало
+  place: number; // место на своей дистанции среди своего пола
+  placeTotal: number; // сколько финишировало там же
+  /** Дистанция, которую бежал человек: ключ (одна на всех стартах) и подпись. */
+  distanceKey: string;
+  location: string;
+  /** Сравнение с бежавшими ту же дистанцию на том же старте. */
+  compare: CompareByGroup | null;
 };
 
 const TZ = 'Asia/Almaty';
@@ -76,8 +81,12 @@ export function toRaceResults(dtos: MeRaceResultDto[]): RaceResult[] {
     title: r.event.title,
     date: tidyDate(dateFmt.format(new Date(r.event.date))),
     shortDate: tidyDate(shortDateFmt.format(new Date(r.event.date))),
-    distance: r.event.distance,
-    distanceKm: parseDistanceKm(r.event.distance),
+    // Дистанция человека (а не главная дистанция старта); старый сервер — старта.
+    distance: r.distance?.label ?? r.event.distance,
+    distanceKm: r.distance?.meters ? r.distance.meters / 1000 : parseDistanceKm(r.distance?.label ?? r.event.distance),
+    distanceKey: r.distance?.key ?? r.event.distance,
+    location: r.event.location,
+    compare: r.compare ?? null,
     time: mmss(r.finishTime),
     timeSeconds: r.finishTime,
     place: r.place,
