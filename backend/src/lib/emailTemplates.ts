@@ -244,17 +244,26 @@ const at = (e: Event, minutes: number) => timeOfDay(new Date(e.date.getTime() + 
 export function dayBeforeEmail(p: { firstName: string | null; event: Event; distance?: string | null }): EmailMessage {
   const e = p.event;
   const rows = facts(e, p.distance);
-  const plan = [
-    // Камера хранения — до окончания мероприятия (решение пользователя 2026-10-26).
-    `${at(e, -120)}–${at(e, -60)} — выдача стартовых пакетов иногородним участникам. Камера хранения работает до окончания мероприятия`,
-    `${at(e, -20)}–${at(e, -5)} — общая разминка`,
-    `${at(e, 0)} — старт`,
-    `${at(e, 60)} — закрытие финиша (контрольное время 1 час)`,
-  ];
+  // Этап серии — старт с сезоном. Программа серии, выдача иногородним в день
+  // старта и согласие родителя — только у этапов; у отдельного старта — его
+  // программа из админки или ничего (2026-11-11).
+  const stage = e.seasonId !== null;
+  const own = (e.program ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
+  const plan = own.length > 0
+    ? own
+    : stage
+      ? [
+          // Камера хранения — до окончания мероприятия (решение пользователя 2026-10-26).
+          `${at(e, -120)}–${at(e, -60)} — выдача стартовых пакетов иногородним участникам. Камера хранения работает до окончания мероприятия`,
+          `${at(e, -20)}–${at(e, -5)} — общая разминка`,
+          `${at(e, 0)} — старт`,
+          `${at(e, 60)} — закрытие финиша (контрольное время 1 час)`,
+        ]
+      : [];
   const bring = [
     'документ, удостоверяющий личность — по нему выдаём стартовый пакет',
     'удобную беговую одежду и обувь по погоде',
-    'участникам 16–17 лет — заполненное согласие родителя',
+    ...(stage ? ['участникам 16–17 лет — заполненное согласие родителя'] : []),
   ];
   return {
     subject: `Завтра старт: «${e.title}» в ${timeOfDay(e.date)}`,
@@ -267,10 +276,11 @@ export function dayBeforeEmail(p: { firstName: string | null; event: Event; dist
         { kind: 'facts', rows },
         {
           kind: 'p',
-          html: `<b>Стартовый пакет:</b> ${esc(pickupWhenText(e))} — ${esc(pickupPlace(e))}. Иногородним — завтра ${esc(raceDayPickupText(e.date))}.`,
+          html: `<b>Стартовый пакет:</b> ${esc(pickupWhenText(e))} — ${esc(pickupPlace(e))}.${stage ? ` Иногородним — завтра ${esc(raceDayPickupText(e.date))}.` : ''}`,
         },
-        { kind: 'p', html: '<b>Программа</b>' },
-        { kind: 'list', items: plan.map(esc) },
+        ...(plan.length > 0
+          ? [{ kind: 'p' as const, html: '<b>Программа</b>' }, { kind: 'list' as const, items: plan.map(esc) }]
+          : []),
         { kind: 'p', html: '<b>Что взять</b>' },
         { kind: 'list', items: bring.map(esc) },
         { kind: 'p', html: 'Не обязательно быть самым быстрым. Главное — продолжать. До встречи на старте!' },

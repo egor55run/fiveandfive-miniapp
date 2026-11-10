@@ -38,6 +38,13 @@ export function serializeEvent(e: Event & { distances?: EventDistance[]; routeMa
     slug: e.slug,
     // Программа дня и Положение (путь к PDF относительно корня API, как карта).
     program: e.program,
+    // Тексты блоков страницы старта из админки (null — шаблон серии или скрыт).
+    cutoffText: e.cutoffText,
+    venueText: e.venueText,
+    packText: e.packText,
+    storageText: e.storageText,
+    awardsText: e.awardsText,
+    ageText: e.ageText,
     regulationsUrl: e.regulationsUrl,
     // Комментарий к выдаче пакетов (старое поле «время и место»).
     packetPickupInfo: e.packetPickupInfo,

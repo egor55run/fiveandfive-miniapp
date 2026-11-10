@@ -41,6 +41,18 @@ type SlotRow = { date: string; from: string; to: string };
 /** Резерв номеров. */
 type ReserveRow = { from: string; to: string; note: string };
 
+/** Тексты блоков страницы старта (2026-11-11). */
+type PageTextKey = 'cutoffText' | 'venueText' | 'packText' | 'storageText' | 'awardsText' | 'ageText';
+const PAGE_TEXTS: { key: PageTextKey; label: string; hint: string; rows: number }[] = [
+  { key: 'cutoffText', label: 'Контрольное время', hint: 'Например: «2,5 часа на 21 км». У этапа пусто — «1 час».', rows: 1 },
+  { key: 'venueText', label: 'Место старта и парковка', hint: 'Где старт, как добраться, где оставить машину.', rows: 3 },
+  { key: 'packText', label: 'Стартовый пакет', hint: 'Что в пакете и что взять на выдачу. Дни и место выдачи — в «Выдаче стартовых пакетов».', rows: 3 },
+  { key: 'storageText', label: 'Камера хранения и раздевалка', hint: '', rows: 2 },
+  { key: 'awardsText', label: 'Награды', hint: 'По строке на пункт. У этапа пусто — медаль-луч и топ-3 серии.', rows: 3 },
+  { key: 'ageText', label: 'Возраст', hint: 'У этапа пусто — «с 16 лет» и согласие родителя для 16–17.', rows: 2 },
+];
+const EMPTY_TEXTS = Object.fromEntries(PAGE_TEXTS.map((t) => [t.key, ''])) as Record<PageTextKey, string>;
+
 type FormState = {
   title: string;
   date: string; // datetime-local
@@ -50,6 +62,7 @@ type FormState = {
   stageNumber: string; // номер этапа серии; '' — по дате
   registrationEnabled: boolean;
   visible: boolean;
+  texts: Record<PageTextKey, string>;
   closesAt: string; // datetime-local; '' = за 7 дней до старта
   slug: string; // '' = составит сервер
   program: string;
@@ -69,6 +82,7 @@ const EMPTY_FORM: FormState = {
   stageNumber: '',
   registrationEnabled: false,
   visible: true,
+  texts: EMPTY_TEXTS,
   closesAt: '',
   slug: '',
   program: '',
@@ -153,6 +167,7 @@ function toInput(form: FormState): EventInput | string {
     stageNumber: form.seasonId === '' || form.stageNumber.trim() === '' ? null : Number(form.stageNumber),
     registrationEnabled: form.registrationEnabled,
     visible: form.visible,
+    ...(Object.fromEntries(PAGE_TEXTS.map((t) => [t.key, form.texts[t.key].trim() || null])) as Record<PageTextKey, string | null>),
     registrationClosesAt: form.closesAt ? new Date(form.closesAt).toISOString() : null,
     slug: form.slug.trim().toLowerCase() || null,
     program: form.program.trim() || null,
@@ -277,6 +292,7 @@ export default function EventsSection() {
       stageNumber: event.stageNumber ? String(event.stageNumber) : '',
       registrationEnabled: event.registrationEnabled,
       visible: event.visible,
+      texts: Object.fromEntries(PAGE_TEXTS.map((t) => [t.key, event[t.key] ?? ''])) as Record<PageTextKey, string>,
       closesAt: event.registrationClosesAtCustom
         ? toDateTimeLocal(event.registrationClosesAtCustom)
         : '',
@@ -658,6 +674,26 @@ export default function EventsSection() {
                 <span className="ad-hint ad-hint--dim">«ЭТАП 2» на сайте; у последнего этапа — «ФИНАЛ».</span>
               </label>
             )}
+            <fieldset className="ad-form__wide ad-dist">
+              <legend>Тексты страницы старта</legend>
+              <p className="ad-hint ad-hint--dim">
+                {form.seasonId !== ''
+                  ? 'Этап серии: пустое поле — стандартный текст серии.'
+                  : 'Отдельный старт: пустое поле — блок на странице не показывается. Тексты серии сюда не подставляются.'}{' '}
+                Программа дня, выдача пакетов, карты трасс и Положение — в своих полях выше и ниже.
+              </p>
+              {PAGE_TEXTS.map((t) => (
+                <label key={t.key}>
+                  <span>{t.label}</span>
+                  <textarea
+                    rows={t.rows}
+                    value={form.texts[t.key]}
+                    onChange={(e) => setForm((prev) => ({ ...prev, texts: { ...prev.texts, [t.key]: e.target.value } }))}
+                  />
+                  {t.hint && <span className="ad-hint ad-hint--dim">{t.hint}</span>}
+                </label>
+              ))}
+            </fieldset>
             <label className="ad-check">
               <input
                 type="checkbox"

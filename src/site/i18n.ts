@@ -80,6 +80,7 @@ const ru = {
       distance: 'Дистанция',
       distances: 'Дистанции',
       cutoff: 'Контрольное время',
+      place: 'Место',
       cutoffValue: '1 час',
       cost: 'Стоимость',
     },

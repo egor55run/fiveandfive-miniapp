@@ -193,6 +193,12 @@ export type EventInput = {
   stageNumber?: number | null;
   registrationEnabled?: boolean;
   visible?: boolean;
+  cutoffText?: string | null;
+  venueText?: string | null;
+  packText?: string | null;
+  storageText?: string | null;
+  awardsText?: string | null;
+  ageText?: string | null;
   /** Дистанции целиком, в нужном порядке: с id — правка, без — новая. */
   distances: {
     id?: number;

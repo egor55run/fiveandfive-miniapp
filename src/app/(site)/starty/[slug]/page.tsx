@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { isStage, stageInfo } from '../../../../lib/stages';
+import { distancePhrase, isStage, stageInfo, titleWithYear } from '../../../../lib/stages';
 import RouteCarousel from '../../../../components/RouteCarousel';
 import { routeMapsOf } from '../../../../lib/routeMaps';
 import { pickupWhen, pickupWhere } from '../../../../lib/pickup';
@@ -35,9 +35,32 @@ const dayLong = (e: EventDto) =>
     .format(new Date(e.date))
     .replace(/\s*г\.$/, '');
 
-/** «5 · 10 · 21 км» — дистанции старта. */
-const distancesOf = (e: EventDto) =>
-  (e.distances?.length ? e.distances.map((d) => d.label) : [e.distance]).join(' · ');
+/**
+ * Текст блока из админки: строки — абзацы, строки с «- » подряд — список.
+ * Пустой — null (у отдельного старта такой блок не показывается).
+ */
+function PageText({ text }: { text: string | null | undefined }) {
+  const lines = (text ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
+  if (lines.length === 0) return null;
+  const out: ReactNode[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].startsWith('- ')) {
+      const items: string[] = [];
+      while (i < lines.length && lines[i].startsWith('- ')) items.push(lines[i++].slice(2));
+      i--;
+      out.push(
+        <ul key={i} className="race-list">
+          {items.map((it) => <li key={it}>{it}</li>)}
+        </ul>,
+      );
+    } else {
+      out.push(<p key={i}>{lines[i]}</p>);
+    }
+  }
+  return <>{out}</>;
+}
+
+const filled = (text: string | null | undefined) => Boolean(text?.trim());
 
 /** Описание для поиска и превью — одно и то же в meta и в разметке события. */
 function raceDescription(e: EventDto): string {
@@ -45,8 +68,8 @@ function raceDescription(e: EventDto): string {
   // Отдельный старт — не этап серии в парках Астаны: своё место и дистанции.
   if (!isStage(e)) {
     return fitDescription([
-      `${e.title}: забег ${distancesOf(e)}, ${dayLong(e)}, старт в ${time}, ${e.location}. Программа дня, трасса и регистрация через Telegram.`,
-      'Организатор — серия забегов 5&5.',
+      `${titleWithYear(e)}: забег ${distancePhrase(e)} — ${dayLong(e)}, старт в ${time}, ${e.location}. Программа дня и регистрация через Telegram.`,
+      'Организатор — 5&5.',
     ]);
   }
   // 120–160 знаков при любом названии парка (fitDescription).
@@ -61,7 +84,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return pageMeta({
     title: isStage(event)
       ? `Забег 5 км в Астане: ${parkOf(event)}, ${dayLong(event)}`
-      : `${event.title}: забег ${distancesOf(event)}, ${dayLong(event)}`,
+      : `${titleWithYear(event)}: забег ${distancePhrase(event)}, ${event.location}`,
     description: raceDescription(event),
     path: `/starty/${event.slug}`,
     image: raceOg(event.slug),
@@ -102,18 +125,22 @@ export default async function RacePage({ params }: Props) {
       : `${dayMonthFmt.format(d1)} и ${dayMonthFmt.format(d2)}`;
 
   // «ЭТАП 2» / «ФИНАЛ» — только у этапов серии (lib/stages); отдельный старт — своя метка.
-  const stage = stageInfo(event, events ?? []);
-  const label = stage ? (stage.final ? t.home.finalLabel : t.home.stageLabel(stage.number)) : t.home.otherLabel;
+  const stageMark = stageInfo(event, events ?? []);
+  const label = stageMark ? (stageMark.final ? t.home.finalLabel : t.home.stageLabel(stageMark.number)) : t.home.otherLabel;
 
   // Своя программа из админки (по строке на пункт) важнее общей.
   const ownProgram = (event.program ?? '')
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
+  const stage = isStage(event);
+  // Своя программа из админки; иначе у этапа — программа серии, у отдельного старта — блока нет.
   const program =
     ownProgram.length > 0
       ? ownProgram.map((line) => ({ time: null as string | null, text: line }))
-      : r.programSteps.map((s) => ({
+      : !stage
+        ? []
+        : r.programSteps.map((s) => ({
           time: s.to === undefined ? at(s.from) : `${at(s.from)}–${at(s.to)}`,
           text: s.text,
         }));
@@ -147,7 +174,7 @@ export default async function RacePage({ params }: Props) {
         <h1 className="h-title race__title">
           {event.title}
           <span className="race__title-sub">
-            {isStage(event) ? 'Забег 5 км в Астане' : `Забег ${distancesOf(event)}`} · {dayLong(event)}
+            {isStage(event) ? `Забег 5 км в Астане · ${dayLong(event)}` : `Забег ${distancePhrase(event)} · ${event.location} · ${dayLong(event)}`}
           </span>
         </h1>
         {event.resultsPublished && event.slug && (
@@ -167,17 +194,20 @@ export default async function RacePage({ params }: Props) {
           <dd>{at(0)}</dd>
         </div>
         <div>
-          <dt>{r.facts.park}</dt>
-          <dd>{parkOf(event)}</dd>
+          <dt>{stage ? r.facts.park : r.facts.place}</dt>
+          <dd>{stage ? parkOf(event) : event.location}</dd>
         </div>
         <div>
           <dt>{distances.length > 1 ? r.facts.distances : r.facts.distance}</dt>
           <dd>{distanceText}</dd>
         </div>
-        <div>
-          <dt>{r.facts.cutoff}</dt>
-          <dd>{r.facts.cutoffValue}</dd>
-        </div>
+        {/* Контрольное время: у этапа пусто — «1 час» серии; у отдельного — только если задано. */}
+        {(stage || filled(event.cutoffText)) && (
+          <div>
+            <dt>{r.facts.cutoff}</dt>
+            <dd>{event.cutoffText?.trim() || r.facts.cutoffValue}</dd>
+          </div>
+        )}
         <div>
           <dt>{r.facts.cost}</dt>
           <dd>{price}</dd>
@@ -186,70 +216,97 @@ export default async function RacePage({ params }: Props) {
 
       <RegistrationCta event={event} lang={lang} />
 
+      {/* Блоки: поле из админки; пусто — у этапа текст серии, у отдельного старта блок скрыт (2026-11-11). */}
       <div className="race__blocks">
-        <Block title={r.program} wide>
-          <ol className="race-program">
-            {program.map((step) => (
-              <li key={`${step.time}-${step.text}`}>
-                {step.time && <span className="race-program__time">{step.time}</span>}
-                <span>{step.text}</span>
-              </li>
-            ))}
-          </ol>
-        </Block>
-
-        <Block title={r.route} wide>
-          {routeMapsOf(event).length > 0 ? (
-            // Карты — файлы из админки; несколько («5 км», «3 км») листаются свайпом.
-            <RouteCarousel maps={routeMapsOf(event)} title={event.title} />
-          ) : (
-            <p className="race-tbd">{r.routeLater}</p>
-          )}
-        </Block>
-
-        <Block title={r.venue}>{tbd}</Block>
-
-        <Block title={r.pack}>
-          {/* Основная выдача — за 2 и за 1 день; в день старта — иногородним. */}
-          <p>{r.packMain(pickupDays, pickupWhere(event))}</p>
-          <p>{r.packRaceDay(at(-120), at(-60))}</p>
-          <p>{r.packDocument}</p>
-          <p className="race-tbd">{r.packText}</p>
-        </Block>
-
-        <Block title={r.storage}>
-          <p>{r.storageText}</p>
-        </Block>
-
-        <Block title={r.awards}>
-          {/* Медаль-луч и зачёт серии — только у этапов; у отдельного старта — свои награды. */}
-          {isStage(event) ? (
-            <ul className="race-list">
-              {r.awardsList.map((line) => (
-                <li key={line}>{line}</li>
+        {program.length > 0 && (
+          <Block title={r.program} wide>
+            <ol className="race-program">
+              {program.map((step) => (
+                <li key={`${step.time}-${step.text}`}>
+                  {step.time && <span className="race-program__time">{step.time}</span>}
+                  <span>{step.text}</span>
+                </li>
               ))}
-            </ul>
-          ) : (
-            tbd
-          )}
-        </Block>
+            </ol>
+          </Block>
+        )}
 
-        <Block title={r.age}>
-          <p>{r.ageText}</p>
-          <p>
-            {r.ageMinor} <a href={docPath('parentConsent', lang)}>{r.ageMinorLink}</a>.
-          </p>
-        </Block>
+        {(stage || routeMapsOf(event).length > 0) && (
+          <Block title={r.route} wide>
+            {routeMapsOf(event).length > 0 ? (
+              // Карты — файлы из админки; несколько («5 км», «3 км») листаются свайпом.
+              <RouteCarousel maps={routeMapsOf(event)} title={event.title} />
+            ) : (
+              <p className="race-tbd">{r.routeLater}</p>
+            )}
+          </Block>
+        )}
 
-        <Block title={r.regulations}>
-          {event.regulationsUrl ? (
-            <a className="race__doc" href={apiAsset(event.regulationsUrl)}>
-              {r.regulationsLink}
-            </a>
-          ) : (
-            <p className="race-tbd">{r.regulationsLater}</p>
-          )}
-        </Block>
+        {(stage || filled(event.venueText)) && (
+          <Block title={r.venue}>{filled(event.venueText) ? <PageText text={event.venueText} /> : tbd}</Block>
+        )}
+
+        {stage ? (
+          <Block title={r.pack}>
+            {/* Основная выдача — за 2 и за 1 день; в день старта — иногородним. */}
+            <p>{r.packMain(pickupDays, pickupWhere(event))}</p>
+            <p>{r.packRaceDay(at(-120), at(-60))}</p>
+            <p>{r.packDocument}</p>
+            {filled(event.packText) ? <PageText text={event.packText} /> : <p className="race-tbd">{r.packText}</p>}
+          </Block>
+        ) : (
+          (event.pickup?.configured || filled(event.packText)) && (
+            <Block title={r.pack}>
+              {event.pickup?.configured && <p>{r.packMain(pickupWhen(event), pickupWhere(event))}</p>}
+              <PageText text={event.packText} />
+            </Block>
+          )
+        )}
+
+        {(stage || filled(event.storageText)) && (
+          <Block title={r.storage}>{filled(event.storageText) ? <PageText text={event.storageText} /> : <p>{r.storageText}</p>}</Block>
+        )}
+
+        {(stage || filled(event.awardsText)) && (
+          <Block title={r.awards}>
+            {filled(event.awardsText) ? (
+              <PageText text={event.awardsText!.split('\n').map((l) => (l.trim() && !l.trim().startsWith('- ') ? `- ${l.trim()}` : l)).join('\n')} />
+            ) : (
+              <ul className="race-list">
+                {r.awardsList.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            )}
+          </Block>
+        )}
+
+        {(stage || filled(event.ageText)) && (
+          <Block title={r.age}>
+            {filled(event.ageText) ? (
+              <PageText text={event.ageText} />
+            ) : (
+              <>
+                <p>{r.ageText}</p>
+                <p>
+                  {r.ageMinor} <a href={docPath('parentConsent', lang)}>{r.ageMinorLink}</a>.
+                </p>
+              </>
+            )}
+          </Block>
+        )}
+
+        {(stage || event.regulationsUrl) && (
+          <Block title={r.regulations}>
+            {event.regulationsUrl ? (
+              <a className="race__doc" href={apiAsset(event.regulationsUrl)}>
+                {r.regulationsLink}
+              </a>
+            ) : (
+              <p className="race-tbd">{r.regulationsLater}</p>
+            )}
+          </Block>
+        )}
       </div>
     </main>
   );

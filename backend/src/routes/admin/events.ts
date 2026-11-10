@@ -30,6 +30,13 @@ const eventFields = {
   stageNumber: z.number().int().min(1).max(20).nullable().optional(),
   registrationEnabled: z.boolean().optional(),
   visible: z.boolean().optional(),
+  // Тексты блоков страницы старта; пусто — шаблон серии (этап) или блок скрыт.
+  cutoffText: z.string().trim().max(3000).nullable().optional(),
+  venueText: z.string().trim().max(3000).nullable().optional(),
+  packText: z.string().trim().max(3000).nullable().optional(),
+  storageText: z.string().trim().max(3000).nullable().optional(),
+  awardsText: z.string().trim().max(3000).nullable().optional(),
+  ageText: z.string().trim().max(3000).nullable().optional(),
   // null — по умолчанию за 7 дней до старта (lib/eligibility).
   registrationClosesAt: z.coerce.date().nullable(),
   // Адрес страницы на сайте: /starty/<slug>. Пусто — сервер составит сам из

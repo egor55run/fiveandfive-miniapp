@@ -98,6 +98,14 @@ model Event {
   /// «Показывать на сайте и в приложении». Скрытый старт пропадает из списков,
   /// sitemap и по прямой ссылке (404); в админке виден.
   visible              Boolean   @default(true)
+  /// Тексты блоков страницы старта (2026-11-11). У этапа серии пустое поле —
+  /// стандартный текст серии; у отдельного старта — блок не показывается.
+  cutoffText           String?   @map("cutoff_text")
+  venueText            String?   @map("venue_text")
+  packText             String?   @map("pack_text")
+  storageText          String?   @map("storage_text")
+  awardsText           String?   @map("awards_text")
+  ageText              String?   @map("age_text")
   /// Карта трассы: путь относительно корня API — «/uploads/routes/<файл>».
   /// Не абсолютный URL осознанно: одно и то же значение работает и локально
   /// (localhost:3000), и в проде, где nginx проксирует /api/ на бэкенд.

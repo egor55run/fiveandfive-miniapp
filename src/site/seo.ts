@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import type { EventDto } from '../lib/api';
 import { docPath, KK_ENABLED, LEGAL_DOCS, type Lang, type LegalDocKey } from '../lib/legal';
 import { botRaceLink } from './links';
+import { distancePhrase, titleWithYear } from '../lib/stages';
 
 /**
  * Поиск и превью: адрес сайта, метаданные страниц, разметка schema.org.
@@ -213,7 +214,7 @@ export function raceJsonLd(event: EventDto, description: string, path: string, o
   return {
     '@context': 'https://schema.org',
     '@type': 'SportsEvent',
-    name: event.seriesStage === false ? event.title : `Забег 5 км в Астане — ${event.title}`,
+    name: event.seriesStage === false ? `${titleWithYear(event)} — забег ${distancePhrase(event)}` : `Забег 5 км в Астане — ${event.title}`,
     description,
     sport: 'Running',
     startDate: astanaIso(event.date),

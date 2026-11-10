@@ -1,4 +1,4 @@
-import { stageInfo } from '../../../../lib/stages';
+import { distancePhrase, stageInfo } from '../../../../lib/stages';
 import { fetchEventBySlug, fetchEvents } from '../../../../site/data';
 import { siteText } from '../../../../site/i18n';
 import { ogImage } from '../../../../site/og';
@@ -28,7 +28,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
     kicker,
     title: event.title,
     lines: [`${date} · ${time}`, event.location],
-    band: `${event.distance.toUpperCase()} · КОНТРОЛЬНОЕ ВРЕМЯ 1 ЧАС · ${year}`,
+    // «Контрольное время 1 час» — правило серии; у отдельного старта — его дистанции и год.
+    band: stage
+      ? `${event.distance.toUpperCase()} · КОНТРОЛЬНОЕ ВРЕМЯ ${(event.cutoffText?.trim() || '1 час').toUpperCase()} · ${year}`
+      : `${distancePhrase(event).toUpperCase()} · ${year}`,
     maxAge: 3600,
   });
 }

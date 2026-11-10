@@ -68,6 +68,13 @@ export type EventDto = {
   seriesStage?: boolean;
   /** Номер этапа серии; null — по дате. */
   stageNumber?: number | null;
+  /** Тексты блоков страницы старта (админка). null — шаблон серии (этап) или блок скрыт. */
+  cutoffText?: string | null;
+  venueText?: string | null;
+  packText?: string | null;
+  storageText?: string | null;
+  awardsText?: string | null;
+  ageText?: string | null;
   /** Когда закрывается регистрация на этот старт (по умолчанию — за 7 дней до него). */
   registrationClosesAt?: string;
   /** Срок прошёл — запись закрыта для всех, включая администраторов. */
