@@ -6,6 +6,7 @@ import type { EventDto } from '../../lib/api';
 import type { Lang } from '../../lib/legal';
 import { anyRegistrationOpen, botChatLink, fetchEvents, fetchSeasonPrice } from '../../site/data';
 import { pricesVisible } from '../../site/links';
+import { otherRacesOf, stagesOf } from '../../lib/stages';
 import { sitePath, siteText } from '../../site/i18n';
 import { HUB_PATH, jsonLdString, pageMeta, siteJsonLd } from '../../site/seo';
 
@@ -56,7 +57,11 @@ function upcomingIndex(events: EventDto[]): number {
 export default async function HomePage() {
   const t = siteText(lang);
   const [events, seasonPrice] = await Promise.all([fetchEvents(), fetchSeasonPrice()]);
-  const list = events ?? [];
+  const all = events ?? [];
+  // Блок этапов, звезда и отсчёт — только этапы серии; отдельные старты — ниже,
+  // в «Других забегах» (2026-11-11).
+  const list = stagesOf(all);
+  const others = otherRacesOf(all);
   const open = anyRegistrationOpen(events);
 
   const dayFmt = new Intl.DateTimeFormat(t.locale, { day: 'numeric', month: 'long', timeZone: TZ });
@@ -73,7 +78,7 @@ export default async function HomePage() {
     return {
       key: e.id,
       href: e.slug ? sitePath(`/starty/${e.slug}`, lang) : '#starty',
-      label: isFinal ? t.home.finalLabel : t.home.stageLabel(i + 1),
+      label: isFinal ? t.home.finalLabel : t.home.stageLabel(e.stageNumber ?? i + 1),
       day,
       month,
       place: placeOf(e),
@@ -155,6 +160,39 @@ export default async function HomePage() {
             motto: t.home.motto,
           }}
         />
+      )}
+
+      {others.length > 0 && (
+        <section className="site-wrap h-others" id="drugie-zabegi">
+          <h2 className="h-title">{t.home.othersTitle}</h2>
+          <p className="h-price__text">{t.home.othersText}</p>
+          <ul className="hub__list">
+            {others.map((e) => {
+              const distances = e.distances?.length ? e.distances : [{ id: 0, label: e.distance, price: e.price }];
+              return (
+                <li key={e.id} className="hub-stage">
+                  <span className="race__label">{t.home.otherLabel}</span>
+                  <h3 className="hub-stage__title">
+                    <a href={e.slug ? sitePath(`/starty/${e.slug}`, lang) : '#drugie-zabegi'}>{e.title}</a>
+                  </h3>
+                  <p className="hub-stage__when">
+                    {dayFmt.format(new Date(e.date))}, {timeFmt.format(new Date(e.date))} · {e.location}
+                  </p>
+                  <p className="hub-stage__text">
+                    {distances
+                      .map((d) => (pricesVisible(all) && d.price > 0 ? `${d.label} — ${fmt(d.price)} ₸` : d.label))
+                      .join(' · ')}
+                  </p>
+                  {e.slug && (
+                    <a className="hub-stage__more" href={sitePath(`/starty/${e.slug}`, lang)}>
+                      {t.home.othersMore}
+                    </a>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       )}
 
       <p className="site-wrap h-hub-link">

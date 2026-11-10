@@ -28,5 +28,13 @@ export function registrationOpenFor(telegramId: number): boolean {
   return registrationOpen() || isAdminTelegramId(telegramId);
 }
 
+/**
+ * Открыта ли запись на конкретный старт: общий переключатель («Настройки»)
+ * и свой переключатель старта (2026-11-11). Срок и места проверяются отдельно.
+ */
+export function eventRegistrationOpen(event: { registrationEnabled: boolean; visible: boolean }): boolean {
+  return registrationOpen() && event.registrationEnabled && event.visible;
+}
+
 /** Тот же текст на кнопке в приложении. */
 export const REGISTRATION_CLOSED_MESSAGE = 'Регистрация скоро откроется';

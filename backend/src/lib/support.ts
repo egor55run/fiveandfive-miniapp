@@ -87,7 +87,7 @@ const money = (n: number) => `${new Intl.NumberFormat('ru-RU').format(n).replace
 
 function upcomingEvents() {
   return prisma.event.findMany({
-    where: { date: { gt: new Date() } },
+    where: { date: { gt: new Date() }, visible: true },
     orderBy: { date: 'asc' },
     include: { distances: { orderBy: DISTANCE_ORDER }, pickupSlots: { orderBy: { startsAt: 'asc' } } },
   });

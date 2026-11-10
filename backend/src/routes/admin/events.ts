@@ -12,6 +12,9 @@ import { rangesOverlap } from '../../lib/bibs';
 import { seasonSalesClosesAt, seasonSalesOpen } from '../../lib/seasonPass';
 import { diffFields, writeAudit } from '../../lib/audit';
 import { eventSlug, SLUG_RE, uniqueEventSlug } from '../../lib/slug';
+import { registrationDeadlinePassed } from '../../lib/eligibility';
+import { registrationOpen } from '../../lib/registrationWindow';
+import { settings } from '../../lib/settings';
 import {
   deleteRegulations,
   RegulationsError,
@@ -23,6 +26,10 @@ const eventFields = {
   date: z.coerce.date(),
   location: z.string().trim().min(1).max(200),
   seasonId: z.number().int().positive().nullable(),
+  // Номер этапа серии (только у старта с сезоном).
+  stageNumber: z.number().int().min(1).max(20).nullable().optional(),
+  registrationEnabled: z.boolean().optional(),
+  visible: z.boolean().optional(),
   // null — по умолчанию за 7 дней до старта (lib/eligibility).
   registrationClosesAt: z.coerce.date().nullable(),
   // Адрес страницы на сайте: /starty/<slug>. Пусто — сервер составит сам из
@@ -61,6 +68,40 @@ const eventFields = {
     .nullable()
     .optional(),
 };
+
+/**
+ * Что сейчас видят участники в записи на старт — для списка в админке
+ * (2026-11-11): open — идёт; иначе причина, почему закрыта.
+ */
+function registrationStatus(e: { visible: boolean; registrationEnabled: boolean; date: Date; registrationClosesAt: Date | null; slotsTotal: number; slotsTaken: number }):
+  'open' | 'hidden' | 'past' | 'deadline' | 'full' | 'event_off' | 'global_off' | 'no_payment' {
+  if (!e.visible) return 'hidden';
+  if (e.date.getTime() <= Date.now()) return 'past';
+  if (registrationDeadlinePassed(e)) return 'deadline';
+  if (e.slotsTaken >= e.slotsTotal) return 'full';
+  if (!e.registrationEnabled) return 'event_off';
+  if (!settings().registrationOpen) return 'global_off';
+  if (!registrationOpen()) return 'no_payment';
+  return 'open';
+}
+
+/**
+ * Этап серии ↔ отдельный старт (смена сезона): нельзя, пока на старт есть
+ * записи по абонементу, или если на сезон уже проданы абонементы — их
+ * владельцы на новый этап записаны не были бы. null — можно.
+ */
+async function seasonChangeProblem(eventId: number | null, from: number | null, to: number | null): Promise<string | null> {
+  if (from === to) return null;
+  if (eventId !== null && from !== null) {
+    const byPass = await prisma.registration.count({ where: { eventId, seasonPassId: { not: null }, paymentStatus: { not: 'CANCELLED' } } });
+    if (byPass > 0) return 'На этот старт уже записаны по абонементу — убрать его из серии нельзя';
+  }
+  if (to !== null) {
+    const passes = await prisma.seasonPass.count({ where: { seasonId: to, paymentStatus: { in: ['PAID', 'PENDING'] } } });
+    if (passes > 0) return 'Абонементы на сезон уже проданы — новый этап они не покрывают. Добавлять этапы можно только до продажи абонементов';
+  }
+  return null;
+}
 
 /** Слоты выдачи и резерв номеров — списком целиком (как дистанции). */
 async function saveEventLists(
@@ -327,6 +368,9 @@ export async function adminEventsRoutes(app: FastifyInstance) {
       const counts = byEvent.get(e.id) ?? {};
       return {
         ...serializeEvent(e),
+        registrationEnabled: e.registrationEnabled,
+        visible: e.visible,
+        registrationStatus: registrationStatus(e),
         // Как задано в админке; null — «по умолчанию за 7 дней до старта».
         // Итоговая дата — registrationClosesAt из serializeEvent.
         registrationClosesAtCustom: e.registrationClosesAt,
@@ -371,6 +415,9 @@ export async function adminEventsRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: 'Сезон не найден', reason: 'no_season' });
       }
     }
+    const createProblem = await seasonChangeProblem(null, null, data.seasonId);
+    if (createProblem) return reply.code(409).send({ error: createProblem, reason: 'season_change' });
+    if (data.seasonId === null) data.stageNumber = null;
 
     if (data.registrationClosesAt && data.registrationClosesAt > data.date) {
       return reply.code(400).send({ error: CLOSES_AFTER_START, reason: 'closes_after_start' });
@@ -422,6 +469,11 @@ export async function adminEventsRoutes(app: FastifyInstance) {
       if (!season) {
         return reply.code(400).send({ error: 'Сезон не найден', reason: 'no_season' });
       }
+    }
+    if (data.seasonId !== undefined) {
+      const problem = await seasonChangeProblem(id, event.seasonId, data.seasonId);
+      if (problem) return reply.code(409).send({ error: problem, reason: 'season_change' });
+      if (data.seasonId === null) data.stageNumber = null;
     }
 
     const closesAt =

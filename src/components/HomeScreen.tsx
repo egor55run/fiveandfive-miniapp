@@ -3,6 +3,7 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import Header from './Header';
 import NextRaceCard from './NextRaceCard';
 import RaceListItem from './RaceListItem';
+import { otherRacesOf, stagesOf } from '../lib/stages';
 import SeriesPromo from './SeriesPromo';
 import type { EventDto } from '../lib/api';
 
@@ -28,10 +29,10 @@ function HomeScreen({
   onRetry,
   registrationOpenForMe,
 }: Props) {
-  // Остальные старты — все, кроме показанного в hero, по дате.
-  const rest = events
-    .filter((e) => e.id !== nearest?.id)
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  // Остальные старты — все, кроме показанного в hero: сначала этапы серии,
+  // потом отдельные старты под заголовком «Другие забеги» (2026-11-11).
+  const rest = stagesOf(events.filter((e) => e.id !== nearest?.id));
+  const others = otherRacesOf(events.filter((e) => e.id !== nearest?.id));
 
   return (
     <motion.main
@@ -79,6 +80,18 @@ function HomeScreen({
                 <RaceListItem key={e.id} event={e} onSelect={() => onRegister(e)} />
               ))}
             </div>
+          )}
+
+          {others.length > 0 && (
+            <section className="races-others" aria-labelledby="races-others-title">
+              <h2 id="races-others-title" className="races-others__title">Другие забеги</h2>
+              <p className="races-others__text">Вне серии: в звезду и рейтинг сезона не входят, абонемент на них не действует.</p>
+              <div className="races-list">
+                {others.map((e) => (
+                  <RaceListItem key={e.id} event={e} onSelect={() => onRegister(e)} />
+                ))}
+              </div>
+            </section>
           )}
 
           <SeriesPromo onJoin={onJoinSeries} />

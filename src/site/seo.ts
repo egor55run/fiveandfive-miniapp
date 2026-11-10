@@ -135,16 +135,14 @@ const organizer = () => ({
   logo: `${SITE_URL}/brand/logo.png`,
 });
 
-/** Место старта: парк в Астане. Улицы в базе нет — только парк и город. */
+/** Место старта: у этапов — парк в Астане; у отдельного старта — место как задано. */
 const placeOf = (event: EventDto) => ({
   '@type': 'Place',
   name: event.location,
-  address: {
-    '@type': 'PostalAddress',
-    addressLocality: 'Астана',
-    addressRegion: 'Астана',
-    addressCountry: 'KZ',
-  },
+  address:
+    event.seriesStage === false
+      ? { '@type': 'PostalAddress', addressLocality: event.location, addressCountry: 'KZ' }
+      : { '@type': 'PostalAddress', addressLocality: 'Астана', addressRegion: 'Астана', addressCountry: 'KZ' },
 });
 
 /** Парк без города: «Триатлон Парк, Астана» → «Триатлон Парк». */
@@ -215,7 +213,7 @@ export function raceJsonLd(event: EventDto, description: string, path: string, o
   return {
     '@context': 'https://schema.org',
     '@type': 'SportsEvent',
-    name: `Забег 5 км в Астане — ${event.title}`,
+    name: event.seriesStage === false ? event.title : `Забег 5 км в Астане — ${event.title}`,
     description,
     sport: 'Running',
     startDate: astanaIso(event.date),
@@ -226,7 +224,8 @@ export function raceJsonLd(event: EventDto, description: string, path: string, o
     image: [`${SITE_URL}${event.slug ? raceOg(event.slug) : DEFAULT_OG}`],
     url,
     organizer: organizer(),
-    superEvent: { '@type': 'EventSeries', name: 'Серия забегов 5&5 2027', url: `${SITE_URL}${HUB_PATH}` },
+    // Отдельный старт в серию не входит (2026-11-11).
+    ...(event.seriesStage === false ? {} : { superEvent: { '@type': 'EventSeries', name: 'Серия забегов 5&5 2027', url: `${SITE_URL}${HUB_PATH}` } }),
     offers,
   };
 }

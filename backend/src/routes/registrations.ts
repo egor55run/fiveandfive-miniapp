@@ -10,6 +10,7 @@ import {
   registrationOpenFor,
 } from '../lib/registrationWindow';
 import { KASPI_PHONE_ERROR, normalizeKzPhone } from '../lib/apipay';
+import { isAdminTelegramId } from '../lib/telegramLogin';
 import { recordConsents } from '../lib/legal';
 import { assignRegistrationBib } from '../lib/bibs';
 import { PromoError, holdPromo, linkPromoPayment, releaseHeldFor, type PromoQuote } from '../lib/promo';
@@ -111,8 +112,13 @@ export async function registrationsRoutes(app: FastifyInstance) {
       const telegramId = BigInt(tg.id);
 
       const event = await prisma.event.findUnique({ where: { id: data.eventId }, include: { pickupSlots: { orderBy: { startsAt: 'asc' } } } });
-      if (!event) {
+      if (!event || !event.visible) {
         return reply.code(404).send({ error: 'Event not found' });
+      }
+      // Свой переключатель старта (2026-11-11). Администраторы могут и при
+      // закрытом — для тестовой записи, как при общем выключателе.
+      if (!event.registrationEnabled && !isAdminTelegramId(tg.id)) {
+        return reply.code(403).send({ error: REGISTRATION_CLOSED_MESSAGE, reason: 'registration_closed' });
       }
 
       const distance = await pickDistance(prisma, event.id, data.distanceId);

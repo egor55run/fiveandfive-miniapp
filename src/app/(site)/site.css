@@ -1777,3 +1777,15 @@ html.site-fonts body {
   align-self: flex-start;
   margin-top: 8px;
 }
+
+/* «Другие забеги» на главной (2026-11-11). */
+.h-others {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 32px;
+  padding-bottom: 16px;
+}
+.h-others .h-price__text {
+  margin: 0;
+}

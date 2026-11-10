@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { stagesOf } from '../../../lib/stages';
 import type { EventDto } from '../../../lib/api';
 import { docPath } from '../../../lib/legal';
 import { anyRegistrationOpen, botChatLink, fetchEvents } from '../../../site/data';
@@ -34,7 +35,8 @@ function stageText(e: EventDto, i: number, total: number): string {
 
 export default async function HubPage() {
   const t = siteText('ru');
-  const events = ((await fetchEvents()) ?? []).filter((e) => e.slug);
+  // Только этапы серии; отдельные старты — в «Других забегах» на главной.
+  const events = stagesOf(((await fetchEvents()) ?? []).filter((e) => e.slug));
   const open = anyRegistrationOpen(events);
 
   return (
@@ -53,7 +55,7 @@ export default async function HubPage() {
         <ol className="hub__list">
           {events.map((e, i) => (
             <li key={e.id} className="hub-stage">
-              <span className="race__label">{i === events.length - 1 && events.length > 1 ? t.home.finalLabel : t.home.stageLabel(i + 1)}</span>
+              <span className="race__label">{i === events.length - 1 && events.length > 1 ? t.home.finalLabel : t.home.stageLabel(e.stageNumber ?? i + 1)}</span>
               <h2 className="hub-stage__title">
                 <a href={`/starty/${e.slug}`}>{parkName(e)}</a>
               </h2>

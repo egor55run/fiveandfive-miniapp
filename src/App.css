@@ -2181,3 +2181,22 @@ select.rfield__input {
   color: var(--text-muted);
   font-size: 14px;
 }
+
+/* «Другие забеги» — старты вне серии (2026-11-11). */
+.races-others {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.races-others__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.races-others__text {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: var(--text-muted);
+}

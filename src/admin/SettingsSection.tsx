@@ -13,6 +13,7 @@ import {
 } from './api';
 import { priceFmt } from './helpers';
 import SeasonPassCard from './SeasonPassCard';
+import { REGISTRATION_STATUS } from './EventsSection';
 
 /**
  * «Настройки» (2026-11-10): то, что раньше включалось через код или .env.
@@ -239,6 +240,33 @@ export default function SettingsSection() {
         )}
         {error && <p className="ad-msg ad-msg--error">{error}</p>}
         {notice && <p className="ad-msg ad-msg--ok">{notice}</p>}
+      </section>
+
+      <section className="ad-card">
+        <h3>Регистрация по стартам</h3>
+        <p className="ad-hint">
+          Общий переключатель выше — главный: выключен — закрыто всё. Включён — открыты только старты со своим переключателем
+          («Старты» → «Изменить» → «Регистрация на этот старт открыта»).
+        </p>
+        <table className="ad-table">
+          <thead>
+            <tr><th>Старт</th><th>Дата</th><th>Серия</th><th>Запись</th></tr>
+          </thead>
+          <tbody>
+            {upcoming.map((e) => (
+              <tr key={e.id}>
+                <td>{e.title}</td>
+                <td>{new Date(e.date).toLocaleDateString('ru-RU', { timeZone: 'Asia/Almaty' })}</td>
+                <td>{e.season ? `Этап ${e.stageNumber ?? '?'}` : 'Отдельный'}</td>
+                <td>
+                  <span className={`ad-reg ad-reg--${e.registrationStatus === 'open' ? 'open' : 'closed'}`}>
+                    {REGISTRATION_STATUS[e.registrationStatus]}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </section>
 
       <section className="ad-card">

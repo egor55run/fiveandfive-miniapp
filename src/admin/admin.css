@@ -835,3 +835,28 @@ select:focus {
 .ad-faq__item textarea {
   width: 100%;
 }
+
+/* Регистрация по стартам (2026-11-11). */
+.ad-check {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.ad-check input {
+  margin-top: 3px;
+}
+.ad-reg {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.ad-reg--open {
+  background: rgba(48, 164, 108, 0.18);
+  color: #30a46c;
+}
+.ad-reg--closed {
+  background: rgba(127, 127, 127, 0.15);
+  color: var(--text-muted);
+}

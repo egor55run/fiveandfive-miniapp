@@ -89,6 +89,15 @@ model Event {
   slotsTaken           Int       @default(0) @map("slots_taken")
   price                Decimal   @default(0) @db.Decimal(10, 2)
   seasonId             Int?      @map("season_id")
+  /// Этап серии — старт с сезоном (seasonId). Номер этапа: «ЭТАП 2»; «ФИНАЛ» —
+  /// у последнего этапа сезона. Без сезона — отдельный старт («Другие забеги»).
+  stageNumber          Int?      @map("stage_number")
+  /// «Регистрация на этот старт открыта». Работает вместе с общим переключателем
+  /// в «Настройках»: выключен общий — закрыто всё (2026-11-11).
+  registrationEnabled  Boolean   @default(false) @map("registration_enabled")
+  /// «Показывать на сайте и в приложении». Скрытый старт пропадает из списков,
+  /// sitemap и по прямой ссылке (404); в админке виден.
+  visible              Boolean   @default(true)
   /// Карта трассы: путь относительно корня API — «/uploads/routes/<файл>».
   /// Не абсолютный URL осознанно: одно и то же значение работает и локально
   /// (localhost:3000), и в проде, где nginx проксирует /api/ на бэкенд.

@@ -3,7 +3,7 @@ import { serializeRouteMap } from '../lib/routeMaps';
 import { EVENT_DETAILS } from '../lib/eventDetails';
 import type { Event, EventDistance, PickupSlot, RouteMap } from '@prisma/client';
 import { prisma } from '../prisma';
-import { registrationOpen } from '../lib/registrationWindow';
+import { eventRegistrationOpen, registrationOpen } from '../lib/registrationWindow';
 import { settings } from '../lib/settings';
 import { faqItems } from '../lib/support';
 import { registrationClosesAt, registrationDeadlinePassed } from '../lib/eligibility';
@@ -54,7 +54,11 @@ export function serializeEvent(e: Event & { distances?: EventDistance[]; routeMa
     theme: e.themeBgUrl || e.themeLogoUrl || e.themeAccent
       ? { bgUrl: e.themeBgUrl, logoUrl: e.themeLogoUrl, accent: e.themeAccent }
       : null,
-    registrationOpen: registrationOpen(),
+    // Общий переключатель в «Настройках» и свой у старта (2026-11-11).
+    registrationOpen: eventRegistrationOpen(e),
+    // Этап серии (есть сезон) или отдельный старт — «Другие забеги» (2026-11-11).
+    seriesStage: e.seasonId !== null,
+    stageNumber: e.seasonId !== null ? e.stageNumber : null,
     // Переключатель «Показывать цены» (lib/settings): сайт, Mini App и разметка.
     pricesPublic: settings().pricesPublic,
     // Срок регистрации на этот старт (заданный в админке или за 7 дней до
@@ -79,7 +83,8 @@ export async function eventsRoutes(app: FastifyInstance) {
 
   // GET /events — list of races, soonest first
   app.get('/events', async () => {
-    const events = await prisma.event.findMany({ orderBy: { date: 'asc' }, include: EVENT_DETAILS });
+    // Скрытые в админке старты («Показывать на сайте» выключено) — не показываем.
+    const events = await prisma.event.findMany({ where: { visible: true }, orderBy: { date: 'asc' }, include: EVENT_DETAILS });
     return events.map(serializeEvent);
   });
 
@@ -89,7 +94,7 @@ export async function eventsRoutes(app: FastifyInstance) {
       where: { slug: req.params.slug },
       include: EVENT_DETAILS,
     });
-    if (!event) return reply.code(404).send({ error: 'Старт не найден' });
+    if (!event || !event.visible) return reply.code(404).send({ error: 'Старт не найден' });
     return serializeEvent(event);
   });
 

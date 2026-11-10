@@ -173,6 +173,14 @@ export type AdminEvent = {
   registrationClosesAtCustom: string | null;
   createdAt: string;
   season: { id: number; title: string; year: number } | null;
+  /** Номер этапа серии (у старта с сезоном). */
+  stageNumber: number | null;
+  /** «Регистрация на этот старт открыта». */
+  registrationEnabled: boolean;
+  /** «Показывать на сайте и в приложении». */
+  visible: boolean;
+  /** Что сейчас видят участники в записи на старт. */
+  registrationStatus: 'open' | 'hidden' | 'past' | 'deadline' | 'full' | 'event_off' | 'global_off' | 'no_payment';
   /** manual — добавленные вручную без оплаты, в paid не входят. */
   registrations: { total: number; pending: number; paid: number; manual: number; cancelled: number };
   resultsCount: number;
@@ -182,6 +190,9 @@ export type EventInput = {
   title: string;
   date: string; // ISO
   location: string;
+  stageNumber?: number | null;
+  registrationEnabled?: boolean;
+  visible?: boolean;
   /** Дистанции целиком, в нужном порядке: с id — правка, без — новая. */
   distances: {
     id?: number;

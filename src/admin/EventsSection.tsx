@@ -46,7 +46,10 @@ type FormState = {
   date: string; // datetime-local
   location: string;
   distances: DistanceRow[];
-  seasonId: string; // '' = без сезона
+  seasonId: string; // '' = отдельный старт, не этап серии
+  stageNumber: string; // номер этапа серии; '' — по дате
+  registrationEnabled: boolean;
+  visible: boolean;
   closesAt: string; // datetime-local; '' = за 7 дней до старта
   slug: string; // '' = составит сервер
   program: string;
@@ -63,6 +66,9 @@ const EMPTY_FORM: FormState = {
   location: '',
   distances: [{ label: '5 км', slotsTotal: '2000', price: '5000', seasonPass: true, slotsTaken: 0, bibFrom: '', bibTo: '' }],
   seasonId: '',
+  stageNumber: '',
+  registrationEnabled: false,
+  visible: true,
   closesAt: '',
   slug: '',
   program: '',
@@ -144,6 +150,9 @@ function toInput(form: FormState): EventInput | string {
     location: form.location.trim(),
     distances,
     seasonId: form.seasonId === '' ? null : Number(form.seasonId),
+    stageNumber: form.seasonId === '' || form.stageNumber.trim() === '' ? null : Number(form.stageNumber),
+    registrationEnabled: form.registrationEnabled,
+    visible: form.visible,
     registrationClosesAt: form.closesAt ? new Date(form.closesAt).toISOString() : null,
     slug: form.slug.trim().toLowerCase() || null,
     program: form.program.trim() || null,
@@ -154,6 +163,18 @@ function toInput(form: FormState): EventInput | string {
     bibReserves,
   };
 }
+
+/** Почему запись на старт открыта или закрыта — как видят участники. */
+export const REGISTRATION_STATUS: Record<AdminEvent['registrationStatus'], string> = {
+  open: 'Открыта',
+  event_off: 'Закрыта у старта',
+  global_off: 'Закрыта в «Настройках»',
+  no_payment: 'Нет оплаты Kaspi',
+  deadline: 'Срок прошёл',
+  full: 'Мест нет',
+  past: 'Старт прошёл',
+  hidden: 'Скрыт с сайта',
+};
 
 /** Старт ещё впереди — о нём можно сообщить в боте. */
 function isUpcoming(iso: string): boolean {
@@ -253,6 +274,9 @@ export default function EventsSection() {
         bibTo: d.bibTo === null ? '' : String(d.bibTo),
       })),
       seasonId: event.season ? String(event.season.id) : '',
+      stageNumber: event.stageNumber ? String(event.stageNumber) : '',
+      registrationEnabled: event.registrationEnabled,
+      visible: event.visible,
       closesAt: event.registrationClosesAtCustom
         ? toDateTimeLocal(event.registrationClosesAtCustom)
         : '',
@@ -603,18 +627,58 @@ export default function EventsSection() {
               <span className="ad-hint ad-hint--dim">Эти номера автоматически не выдаются — только вручную в списке участников.</span>
             </fieldset>
             <label>
-              <span>Сезон</span>
+              <span>Этап серии</span>
               <select
                 value={form.seasonId}
                 onChange={(e) => field('seasonId', e.target.value)}
               >
-                <option value="">Без сезона</option>
+                <option value="">Нет — отдельный старт («Другие забеги»)</option>
                 {seasons.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.title} ({s.year}){s.isActive ? ' — активный' : ''}
+                    Да — {s.title} ({s.year}){s.isActive ? ', активный' : ''}
                   </option>
                 ))}
               </select>
+              <span className="ad-hint ad-hint--dim">
+                Этапы — в блоке этапов, звезде, рейтинге сезона и абонементе. Отдельный старт — только в «Других забегах».
+              </span>
+            </label>
+            {form.seasonId !== '' && (
+              <label>
+                <span>Номер этапа</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  className="ad-input--num"
+                  value={form.stageNumber}
+                  placeholder="по дате"
+                  onChange={(e) => field('stageNumber', e.target.value)}
+                />
+                <span className="ad-hint ad-hint--dim">«ЭТАП 2» на сайте; у последнего этапа — «ФИНАЛ».</span>
+              </label>
+            )}
+            <label className="ad-check">
+              <input
+                type="checkbox"
+                checked={form.registrationEnabled}
+                onChange={(e) => setForm((prev) => ({ ...prev, registrationEnabled: e.target.checked }))}
+              />
+              <span>
+                Регистрация на этот старт открыта
+                <span className="ad-hint ad-hint--dim"> — действует, только когда в «Настройках» включена общая регистрация</span>
+              </span>
+            </label>
+            <label className="ad-check">
+              <input
+                type="checkbox"
+                checked={form.visible}
+                onChange={(e) => setForm((prev) => ({ ...prev, visible: e.target.checked }))}
+              />
+              <span>
+                Показывать на сайте и в приложении
+                <span className="ad-hint ad-hint--dim"> — выключено: старт виден только в админке, его страница отвечает «не найдено»</span>
+              </span>
             </label>
             <fieldset className="ad-form__wide ad-dist">
               <legend>Выдача стартовых пакетов</legend>
@@ -793,7 +857,8 @@ export default function EventsSection() {
                 <th className="num">Цена</th>
                 <th className="num">Занято</th>
                 <th>Оплаты</th>
-                <th>Сезон</th>
+                <th>Серия</th>
+                <th>Регистрация</th>
                 <th>Карта</th>
                 <th className="num">Рез-ты</th>
                 <th />
@@ -840,7 +905,12 @@ export default function EventsSection() {
                       </span>
                     )}
                   </td>
-                  <td>{e.season ? `${e.season.title}` : '—'}</td>
+                  <td>{e.season ? `Этап ${e.stageNumber ?? '?'}` : 'Отдельный'}</td>
+                  <td>
+                    <span className={`ad-reg ad-reg--${e.registrationStatus === 'open' ? 'open' : 'closed'}`}>
+                      {REGISTRATION_STATUS[e.registrationStatus]}
+                    </span>
+                  </td>
                   <td>
                     {e.routeImageUrl ? (
                       <a href={assetUrl(e.routeImageUrl)} target="_blank" rel="noreferrer">

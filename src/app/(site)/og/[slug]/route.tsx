@@ -1,3 +1,4 @@
+import { stageInfo } from '../../../../lib/stages';
 import { fetchEventBySlug, fetchEvents } from '../../../../site/data';
 import { siteText } from '../../../../site/i18n';
 import { ogImage } from '../../../../site/og';
@@ -14,10 +15,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
   if (!event) return new Response('Not found', { status: 404 });
 
   const t = siteText('ru');
-  const list = events ?? [];
-  const index = list.findIndex((e) => e.id === event.id);
-  const kicker =
-    index < 0 ? undefined : list.length > 1 && index === list.length - 1 ? t.home.finalLabel : t.home.stageLabel(index + 1);
+  // «ЭТАП 2» / «ФИНАЛ» — только у этапов серии (lib/stages).
+  const stage = stageInfo(event, events ?? []);
+  const kicker = !stage ? undefined : stage.final ? t.home.finalLabel : t.home.stageLabel(stage.number);
   const date = new Intl.DateTimeFormat(t.locale, { weekday: 'long', day: 'numeric', month: 'long', timeZone: TZ })
     .format(new Date(event.date))
     .replace(/^./, (c) => c.toUpperCase());
