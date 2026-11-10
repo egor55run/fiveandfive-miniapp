@@ -19,6 +19,9 @@ import { adminResultsRoutes } from './routes/admin/results';
 import { adminOpeningBroadcastRoutes } from './routes/admin/openingBroadcast';
 import { adminRaceAnnouncementsRoutes } from './routes/admin/raceAnnouncements';
 import { adminBroadcastsRoutes } from './routes/admin/broadcasts';
+import { adminSettingsRoutes } from './routes/admin/settings';
+import { startSettings } from './lib/settings';
+import { scheduleIndexNow } from './lib/indexnow';
 import { processQueue as processBroadcasts } from './lib/broadcasts';
 import { adminPromosRoutes } from './routes/admin/promos';
 import { promoRoutes } from './routes/promo';
@@ -71,6 +74,8 @@ function corsOrigins(): string[] | boolean {
 async function main() {
   // Оферта и политика ПДн: без них регистрацию не провести — согласие не на что
   // записать. Падаем сразу, а не на первой регистрации.
+  // Настройки из админки (цены, регистрация, лимиты, вопросы) — до роутов.
+  await startSettings(app.log);
   const legal = await loadLegalDocuments();
   app.log.info(legal, 'Юридические документы загружены');
   // Адреса страниц стартов на сайте: пустые заполняются из названия и года.
@@ -160,6 +165,15 @@ async function main() {
   await app.register(adminRaceAnnouncementsRoutes);
   await app.register(adminPromosRoutes);
   await app.register(adminBroadcastsRoutes);
+  await app.register(adminSettingsRoutes);
+
+  // Правка в админке, видимая на сайте, — через минуту изменённые страницы
+  // уходят в IndexNow (lib/indexnow). Без выкладки: страницы сайта собираются
+  // при каждом запросе.
+  app.addHook('onResponse', async (req, reply) => {
+    if (req.method === 'GET' || reply.statusCode >= 300) return;
+    if (/^\/admin\/(events|seasons|settings|faq|results)/.test(req.url)) scheduleIndexNow(app.log);
+  });
 
   // Очередь рассылок из админки: сразу после старта сервера (продолжить
   // прерванную перезапуском) и раз в 30 с — повторы после сбоев.

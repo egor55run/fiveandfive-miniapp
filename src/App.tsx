@@ -26,6 +26,7 @@ import {
 import { toRaceResults } from './data/results';
 import { useTelegramAuth } from './hooks/useTelegramAuth';
 import { firstValidName, splitLegacyName } from './lib/personName';
+import { setPricesPublic } from './lib/prices';
 import { canAskWriteAccess, getUnsafeTelegramUser, requestedRaceSlug } from './lib/telegram';
 
 type Screen = 'analytics' | 'home' | 'rating' | 'profile' | 'registration' | 'payment' | 'success';
@@ -112,7 +113,10 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      setEvents(await getEvents());
+      const list = await getEvents();
+      // «Показывать цены» из админки — до того, как старты появятся на экране.
+      setPricesPublic(list[0]?.pricesPublic === true);
+      setEvents(list);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось загрузить старты');
     } finally {

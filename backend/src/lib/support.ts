@@ -5,6 +5,7 @@ import { DISTANCE_ORDER } from './distances';
 import { registrationClosesAt } from './eligibility';
 import { dayMonth, pickupPlace, pickupWhenText, raceDayPickupText, timeOfDay } from './notify';
 import { registrationOpen } from './registrationWindow';
+import { settings, type FaqItem } from './settings';
 import { copyMessage, escapeHtml, sendMessage, type InlineButton } from './telegramBot';
 import { adminTelegramIds } from './telegramLogin';
 
@@ -41,21 +42,26 @@ export type TgMessage = {
 
 // ---------- Частые вопросы ----------
 
-type FaqBlock = string | { list: string[] };
-type FaqItem = { id: string; q: string; a: FaqBlock[] };
-
 /** content/faq.json в корне репозитория — dist/lib и src/lib на одной глубине. */
 function faqPath(): string {
   return process.env.FAQ_PATH?.trim() || path.resolve(__dirname, '../../../content/faq.json');
 }
 
-let faqCache: Map<string, FaqItem> | null = null;
+let fileFaq: FaqItem[] | null = null;
+
+/**
+ * Частые вопросы: из админки («Вопросы», lib/settings), пока там не сохраняли —
+ * исходные из content/faq.json. Те же — на сайте (/voprosy, через GET /faq).
+ */
+export function faqItems(): FaqItem[] {
+  const own = settings().faq;
+  if (own) return own;
+  if (!fileFaq) fileFaq = (JSON.parse(readFileSync(faqPath(), 'utf8')) as { ru: FaqItem[] }).ru;
+  return fileFaq;
+}
+
 function faq(id: string): FaqItem | null {
-  if (!faqCache) {
-    const data = JSON.parse(readFileSync(faqPath(), 'utf8')) as { ru: FaqItem[] };
-    faqCache = new Map(data.ru.map((item) => [item.id, item]));
-  }
-  return faqCache.get(id) ?? null;
+  return faqItems().find((item) => item.id === id) ?? null;
 }
 
 /** Абзац FAQ → HTML для Telegram: [текст](/адрес) — ссылка на сайт. */
@@ -75,7 +81,8 @@ function faqHtml(id: string): string {
 
 // ---------- Ответы по темам ----------
 
-const pricesPublic = () => process.env.PRICES_PUBLIC?.trim().toLowerCase() === 'true';
+/** Переключатель «Показывать цены» в админке — тот же, что для сайта и Mini App. */
+const pricesPublic = () => settings().pricesPublic;
 const money = (n: number) => `${new Intl.NumberFormat('ru-RU').format(n).replace(/\u00a0/g, ' ')} ₸`;
 
 function upcomingEvents() {

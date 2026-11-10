@@ -62,6 +62,8 @@ export type EventDto = {
    * (или вручную, REGISTRATION_OPEN=false). Нет поля — старый сервер, открыто.
    */
   registrationOpen?: boolean;
+  /** «Показывать цены» из админки — одно правило для сайта, Mini App и бота. */
+  pricesPublic?: boolean;
   /** Когда закрывается регистрация на этот старт (по умолчанию — за 7 дней до него). */
   registrationClosesAt?: string;
   /** Срок прошёл — запись закрыта для всех, включая администраторов. */

@@ -4,6 +4,8 @@ import { EVENT_DETAILS } from '../lib/eventDetails';
 import type { Event, EventDistance, PickupSlot, RouteMap } from '@prisma/client';
 import { prisma } from '../prisma';
 import { registrationOpen } from '../lib/registrationWindow';
+import { settings } from '../lib/settings';
+import { faqItems } from '../lib/support';
 import { registrationClosesAt, registrationDeadlinePassed } from '../lib/eligibility';
 import { serializeDistance } from '../lib/distances';
 
@@ -53,6 +55,8 @@ export function serializeEvent(e: Event & { distances?: EventDistance[]; routeMa
       ? { bgUrl: e.themeBgUrl, logoUrl: e.themeLogoUrl, accent: e.themeAccent }
       : null,
     registrationOpen: registrationOpen(),
+    // Переключатель «Показывать цены» (lib/settings): сайт, Mini App и разметка.
+    pricesPublic: settings().pricesPublic,
     // Срок регистрации на этот старт (заданный в админке или за 7 дней до
     // старта) и прошёл ли он — с ним запись закрыта для всех, включая админов.
     registrationClosesAt: registrationClosesAt(e),
@@ -64,6 +68,15 @@ export function serializeEvent(e: Event & { distances?: EventDistance[]; routeMa
 }
 
 export async function eventsRoutes(app: FastifyInstance) {
+  /** GET /settings/public — то, что сайт и Mini App показывают по настройкам из админки. */
+  app.get('/settings/public', async () => {
+    const s = settings();
+    return { pricesPublic: s.pricesPublic, registrationOpen: registrationOpen(), registrationOpenedAt: s.registrationOpenedAt };
+  });
+
+  /** GET /faq — частые вопросы для /voprosy (правятся в админке). */
+  app.get('/faq', async () => ({ items: faqItems() }));
+
   // GET /events — list of races, soonest first
   app.get('/events', async () => {
     const events = await prisma.event.findMany({ orderBy: { date: 'asc' }, include: EVENT_DETAILS });

@@ -1,4 +1,5 @@
 import { prisma } from '../prisma';
+import { settings } from './settings';
 import { ApiPayError } from './apipay';
 import { startOfDayInTz, ymdInTz } from './notify';
 import { sendMessage } from './telegramBot';
@@ -26,14 +27,13 @@ export const INVOICE_LIMIT_ERROR = 'daily_limit';
 export const INVOICE_LIMIT_MESSAGE =
   'Сейчас не можем выставить счёт в Kaspi — попробуйте позже. Место за вами не закреплено, деньги не списаны';
 
+/** Лимит и порог — из админки («Настройки», lib/settings), по умолчанию 100 и 80. */
 export function dailyInvoiceLimit(): number {
-  const n = Number(process.env.APIPAY_DAILY_LIMIT);
-  return Number.isInteger(n) && n > 0 ? n : 100;
+  return settings().invoiceDailyLimit;
 }
 
 function warnAt(): number {
-  const n = Number(process.env.APIPAY_DAILY_WARN);
-  return Number.isInteger(n) && n > 0 ? n : 80;
+  return settings().invoiceDailyWarn;
 }
 
 /**

@@ -1,23 +1,21 @@
 import { apiPayConfigured } from './apipay';
+import { settings } from './settings';
 import { isAdminTelegramId } from './telegramLogin';
 
 /**
  * Открыта ли регистрация на старты (и на абонемент).
  *
- * По умолчанию — только когда настроена оплата (APIPAY_API_KEY): без неё
- * регистрация создавалась бы бесплатно, и счёт таким участникам потом никто
- * не выставит. Решение пользователя 2026-10-08: на проде регистрацию не
- * открываем, пока не включена оплата.
- *
- * REGISTRATION_OPEN=true|false в .env перекрывает правило вручную — например,
- * закрыть регистрацию при включённой оплате или открыть её локально без ключа.
- * Читается на каждом запросе: правка .env + перезапуск, без выкладки кода.
+ * С 2026-11-10 — переключатель «Регистрация открыта» в админке (lib/settings).
+ * Но только при подключённой оплате (APIPAY_API_KEY): без неё регистрация
+ * создавалась бы бесплатно, и счёт таким участникам потом никто не выставит
+ * (решение пользователя 2026-10-08). Админка показывает, если оплата не
+ * подключена. Локально без ключа открыть можно: REGISTRATION_OPEN=true в .env
+ * и NODE_ENV не production.
  */
 export function registrationOpen(): boolean {
-  const flag = process.env.REGISTRATION_OPEN?.trim().toLowerCase();
-  if (flag === 'true') return true;
-  if (flag === 'false') return false;
-  return apiPayConfigured();
+  if (!settings().registrationOpen) return false;
+  if (apiPayConfigured()) return true;
+  return process.env.NODE_ENV !== 'production' && process.env.REGISTRATION_OPEN?.trim().toLowerCase() === 'true';
 }
 
 /**

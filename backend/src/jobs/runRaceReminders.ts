@@ -13,9 +13,12 @@
  *   pm2 restart fiveandfive-reminders            — прогон на сервере
  */
 import { prisma } from '../prisma';
+import { loadSettings } from '../lib/settings';
 import { jobLog, sendDayBeforeReminders, sendRaceReminders } from './raceReminders';
 
 async function main() {
+  // Лимит писем в сутки — из админки.
+  await loadSettings();
   const started = Date.now();
   try {
     const stats = await sendRaceReminders();

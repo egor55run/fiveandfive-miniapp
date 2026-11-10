@@ -1,5 +1,6 @@
 import type { NotificationKind } from '@prisma/client';
 import { prisma } from '../prisma';
+import { settings } from './settings';
 import { escapeHtml, sendMessage } from './telegramBot';
 import { adminTelegramIds } from './telegramLogin';
 
@@ -36,7 +37,8 @@ const BREVO_URL = 'https://api.brevo.com/v3/smtp/email';
 export const EMAIL_FROM = process.env.EMAIL_FROM?.trim() || 'noreply@fiveandfive.kz';
 export const EMAIL_FROM_NAME = process.env.EMAIL_FROM_NAME?.trim() || '5&5';
 export const EMAIL_REPLY_TO = process.env.EMAIL_REPLY_TO?.trim() || 'egorkadirov1@gmail.com';
-const DAILY_LIMIT = Number(process.env.EMAIL_DAILY_LIMIT) || 290;
+/** Писем в сутки — из админки («Настройки», lib/settings), по умолчанию 290. */
+const dailyLimit = () => settings().emailDailyLimit;
 const DAY_MS = 86_400_000;
 /** Сколько раз пробуем письмо, которое Brevo отклоняет не из-за лимита. */
 const MAX_ATTEMPTS = 3;
@@ -153,7 +155,7 @@ export async function deliverEmail(input: {
       else await prisma.emailNotification.create({ data: { userId, eventId, kind, ...data } });
     };
 
-    if ((await sentLastDay()) >= DAILY_LIMIT) {
+    if ((await sentLastDay()) >= dailyLimit()) {
       await save('QUEUED', null);
       log?.info({ userId, eventId, kind }, 'Письмо в очереди: дневной лимит');
       return 'QUEUED';
@@ -187,7 +189,7 @@ export async function processEmailQueue(log?: Logger): Promise<{ sent: number; l
     take: 100,
   });
   for (const item of queue) {
-    if ((await sentLastDay()) >= DAILY_LIMIT) break;
+    if ((await sentLastDay()) >= dailyLimit()) break;
     if (!item.subject || !item.html || !item.text) {
       await prisma.emailNotification.update({ where: { id: item.id }, data: { status: 'FAILED', error: 'Нет текста письма' } });
       continue;

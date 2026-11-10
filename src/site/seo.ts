@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import type { EventDto } from '../lib/api';
 import { docPath, KK_ENABLED, LEGAL_DOCS, type Lang, type LegalDocKey } from '../lib/legal';
-import { botRaceLink, PRICES_PUBLIC } from './links';
+import { botRaceLink } from './links';
 
 /**
  * Поиск и превью: адрес сайта, метаданные страниц, разметка schema.org.
@@ -172,12 +172,14 @@ export function siteJsonLd() {
  * ни «распродано» не было бы правдой. Пока цены не объявлены (PRICES_PUBLIC),
  * предложения с ценой нет вовсе.
  */
-export function raceJsonLd(event: EventDto, description: string, path: string, open: boolean) {
+export function raceJsonLd(event: EventDto, description: string, path: string, open: boolean, registrationOpenedAt: string | null = null) {
   const url = `${SITE_URL}${path}`;
   const distances = event.distances?.length
     ? event.distances
     : [{ label: event.distance, price: event.price, slotsLeft: event.slotsLeft }];
-  const offerList = PRICES_PUBLIC
+  // «Показывать цены» из админки (2026-11-10): цена, валюта, наличие мест и
+  // начало продаж — дата, когда в админке открыли регистрацию.
+  const offerList = event.pricesPublic === true
     ? distances
         .filter((d) => d.price > 0)
         .map((d) => ({
@@ -191,6 +193,7 @@ export function raceJsonLd(event: EventDto, description: string, path: string, o
             : open
               ? { availability: 'https://schema.org/InStock' }
               : {}),
+          ...(registrationOpenedAt ? { validFrom: astanaIso(registrationOpenedAt) } : {}),
         }))
     : [];
   // Цены не объявлены — предложение без цены: только ссылка на регистрацию

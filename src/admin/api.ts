@@ -751,3 +751,31 @@ export async function uploadBroadcastPhoto(id: number, file: File): Promise<Broa
   }
   return data as Broadcast;
 }
+
+// ---------- Настройки ----------
+
+export type AdminSettings = {
+  pricesPublic: boolean;
+  registrationOpen: boolean;
+  registrationOpenedAt: string | null;
+  invoiceDailyLimit: number;
+  invoiceDailyWarn: number;
+  emailDailyLimit: number;
+  /** Подключена ли оплата Kaspi (ApiPay) — без неё регистрация не откроется. */
+  paymentConfigured: boolean;
+  /** Что на самом деле видят участники. */
+  registrationEffective: boolean;
+  invoicesToday: number;
+};
+
+export const getAdminSettings = () => request<AdminSettings>('/admin/settings');
+
+export const updateAdminSettings = (
+  patch: Partial<Pick<AdminSettings, 'pricesPublic' | 'registrationOpen' | 'invoiceDailyLimit' | 'invoiceDailyWarn' | 'emailDailyLimit'>>,
+) => request<AdminSettings>('/admin/settings', { method: 'PATCH', body: patch });
+
+export type FaqItem = { id: string; q: string; a: (string | { list: string[] })[] };
+
+export const getFaq = () => request<{ items: FaqItem[]; custom: boolean }>('/admin/faq');
+
+export const saveFaq = (items: FaqItem[]) => request<{ items: FaqItem[]; custom: boolean }>('/admin/faq', { method: 'PUT', body: { items } });

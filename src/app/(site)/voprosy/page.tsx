@@ -4,6 +4,7 @@ import type { Lang } from '../../../lib/legal';
 import { faqItems, faqPlainText } from '../../../site/faq';
 import { botChatLink } from '../../../site/links';
 import { siteText } from '../../../site/i18n';
+import { fetchFaq } from '../../../site/data';
 import { jsonLdString, pageMeta } from '../../../site/seo';
 
 const lang: Lang = 'ru';
@@ -30,9 +31,13 @@ function withLinks(text: string): ReactNode {
   });
 }
 
-export default function FaqPage() {
+// Вопросы правятся в админке — страница собирается при каждом запросе.
+export const dynamic = 'force-dynamic';
+
+export default async function FaqPage() {
   const t = siteText(lang);
-  const items = faqItems(lang);
+  // Из админки («Вопросы»); бэкенд не ответил — исходные из content/faq.json.
+  const items = (await fetchFaq())?.items ?? faqItems(lang);
   // Разметка FAQPage для поисковиков — тот же текст, что на странице.
   const jsonLd = {
     '@context': 'https://schema.org',

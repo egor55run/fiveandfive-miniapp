@@ -5,7 +5,7 @@ import StagesStar, { type Stage } from '../../components/site/home/StagesStar';
 import type { EventDto } from '../../lib/api';
 import type { Lang } from '../../lib/legal';
 import { anyRegistrationOpen, botChatLink, fetchEvents, fetchSeasonPrice } from '../../site/data';
-import { PRICES_PUBLIC } from '../../site/links';
+import { pricesVisible } from '../../site/links';
 import { sitePath, siteText } from '../../site/i18n';
 import { HUB_PATH, jsonLdString, pageMeta, siteJsonLd } from '../../site/seo';
 
@@ -40,8 +40,8 @@ function singlePrice(events: EventDto[], fmt: (n: number) => string, t: ReturnTy
 }
 
 /** Сумма с «₸» или, пока цены не объявлены, — «Цена будет объявлена». */
-function PriceSum({ amount, unknown }: { amount: string | null; unknown: string }) {
-  if (!PRICES_PUBLIC || amount === null) {
+function PriceSum({ amount, unknown, visible }: { amount: string | null; unknown: string; visible: boolean }) {
+  if (!visible || amount === null) {
     return <span className="h-price__sum h-price__sum--tbd">{unknown}</span>;
   }
   return <span className="h-price__sum">{amount} ₸</span>;
@@ -168,12 +168,12 @@ export default async function HomePage() {
         </div>
         <div className="h-price__card h-lift">
           <span className="h-price__kind">{t.home.priceOne}</span>
-          <PriceSum amount={singlePrice(list, fmt, t)} unknown={t.home.priceUnknown} />
+          <PriceSum amount={singlePrice(list, fmt, t)} unknown={t.home.priceUnknown} visible={pricesVisible(list)} />
           <span className="h-price__note">{t.home.priceOneNote}</span>
         </div>
         <div className="h-price__card h-price__card--brand h-lift">
           <span className="h-price__kind">{t.home.priceSeason}</span>
-          <PriceSum amount={seasonPrice ? fmt(seasonPrice) : null} unknown={t.home.priceUnknown} />
+          <PriceSum amount={seasonPrice ? fmt(seasonPrice) : null} unknown={t.home.priceUnknown} visible={pricesVisible(list)} />
           <span className="h-price__note">{t.home.priceSeasonNote}</span>
         </div>
       </section>

@@ -38,6 +38,14 @@ async function getJson<T>(path: string): Promise<T | null> {
  */
 export const fetchEvents = cache(() => getJson<EventDto[]>('/events'));
 
+/** Настройки из админки, которые нужны сайту (дата открытия регистрации — для разметки). */
+export const fetchSiteSettings = cache(() =>
+  getJson<{ pricesPublic: boolean; registrationOpen: boolean; registrationOpenedAt: string | null }>('/settings/public'),
+);
+
+/** Частые вопросы из админки; null — бэкенд не ответил (страница возьмёт исходные). */
+export const fetchFaq = cache(() => getJson<{ items: import('./faq').FaqItem[] }>('/faq'));
+
 /** Старт по адресу страницы. null — нет такого (или бэкенд не ответил). */
 export const fetchEventBySlug = cache((slug: string) =>
   getJson<EventDto>(`/events/by-slug/${encodeURIComponent(slug)}`),

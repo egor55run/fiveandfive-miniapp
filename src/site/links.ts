@@ -28,5 +28,5 @@ export function botChatLink(payload?: string): string {
 /** Сезон в подвале сайта. Сменить к следующему сезону. */
 export const SEASON_YEAR = '2027';
 
-// Флаг цен — общий с Mini App (src/lib/prices.ts).
-export { PRICES_PUBLIC } from '../lib/prices';
+/** «Показывать цены» из админки: значение приходит с каждым стартом. */
+export const pricesVisible = (events: EventDto[] | null | undefined): boolean => (events ?? [])[0]?.pricesPublic === true;

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { PRICES_PUBLIC, priceLabel, priceShort } from '../lib/prices';
+import { isPricesPublic, priceLabel, priceShort } from '../lib/prices';
 import { motion, useReducedMotion } from 'framer-motion';
 import { AlertCircle, Check, ChevronDown } from 'lucide-react';
 import Header from './Header';
@@ -674,11 +674,11 @@ function RegistrationScreen({
               </span>
               <span className="upsell__body">
                 <span className="upsell__title u-display">
-                  Взять весь сезон 5&5{PRICES_PUBLIC ? ` за ${priceFmt.format(season.price)} ₸` : ''}
+                  Взять весь сезон 5&5{isPricesPublic() ? ` за ${priceFmt.format(season.price)} ₸` : ''}
                 </span>
                 <span className="upsell__desc">
                   Оплати все {season.events.length} стартов сезона одним платежом
-                  {PRICES_PUBLIC && season.savings > 0 ? ` и сэкономь ${priceFmt.format(season.savings)} ₸.` : '.'}
+                  {isPricesPublic() && season.savings > 0 ? ` и сэкономь ${priceFmt.format(season.savings)} ₸.` : '.'}
                 </span>
               </span>
             </button>

@@ -1,11 +1,21 @@
 /**
- * Показывать ли цены — и на сайте, и в Mini App. Пока цена не утверждена
- * (решение пользователя 2026-10-10), вместо суммы — «Цена будет объявлена»,
- * а в разметке для поисковиков цены нет вовсе. Суммы в базе остаются: на них
- * завязана оплата, и экран счёта показывает настоящую сумму всегда.
- * Включается сборкой: NEXT_PUBLIC_PRICES_PUBLIC=1 в scripts/deploy-web.sh.
+ * Показывать ли цены. Одно правило для сайта, Mini App, бота и разметки
+ * schema.org (2026-11-10): переключатель «Показывать цены» в админке, его
+ * значение приходит с каждым стартом (EventDto.pricesPublic). Пока выключен —
+ * вместо суммы «Цена будет объявлена», в разметке цены нет. Исключение одно:
+ * итог к оплате в форме записи и экран счёта показывают сумму всегда — без неё
+ * не заплатить (форма доступна, только когда регистрация открыта, или админам).
+ *
+ * Mini App: значение ставит App после загрузки стартов (setPricesPublic).
+ * Сайт: страницы берут его из своего старта и передают явно.
  */
-export const PRICES_PUBLIC = process.env.NEXT_PUBLIC_PRICES_PUBLIC === '1';
+let pricesPublic = false;
+
+export function setPricesPublic(value: boolean): void {
+  pricesPublic = value;
+}
+
+export const isPricesPublic = (): boolean => pricesPublic;
 
 export const PRICE_TBD = 'Цена будет объявлена';
 
@@ -13,10 +23,10 @@ const fmt = new Intl.NumberFormat('ru-RU');
 
 /** «5 000 ₸» или, пока цены не объявлены (или суммы нет), — «Цена будет объявлена». */
 export function priceLabel(amount: number): string {
-  return PRICES_PUBLIC && amount > 0 ? `${fmt.format(amount)} ₸` : PRICE_TBD;
+  return pricesPublic && amount > 0 ? `${fmt.format(amount)} ₸` : PRICE_TBD;
 }
 
 /** Сумма для коротких строк (список стартов): null — не показывать вовсе. */
 export function priceShort(amount: number): string | null {
-  return PRICES_PUBLIC && amount > 0 ? `${fmt.format(amount)}₸` : null;
+  return pricesPublic && amount > 0 ? `${fmt.format(amount)}₸` : null;
 }

@@ -7,8 +7,8 @@ import type { ReactNode } from 'react';
 import RegistrationCta from '../../../../components/site/RegistrationCta';
 import { apiAsset, registrationState, type EventDto } from '../../../../lib/api';
 import { docPath, type Lang } from '../../../../lib/legal';
-import { fetchEventBySlug, fetchEvents } from '../../../../site/data';
-import { PRICES_PUBLIC } from '../../../../site/links';
+import { fetchEventBySlug, fetchEvents, fetchSiteSettings } from '../../../../site/data';
+
 import { sitePath, siteText } from '../../../../site/i18n';
 import { fitDescription, jsonLdString, pageMeta, raceJsonLd, raceOg } from '../../../../site/seo';
 
@@ -65,7 +65,7 @@ function Block({ title, wide, children }: { title: string; wide?: boolean; child
 }
 
 export default async function RacePage({ params }: Props) {
-  const [event, events] = await Promise.all([fetchEventBySlug((await params).slug), fetchEvents()]);
+  const [event, events, siteSettings] = await Promise.all([fetchEventBySlug((await params).slug), fetchEvents(), fetchSiteSettings()]);
   if (!event) notFound();
 
   const t = siteText(lang);
@@ -111,7 +111,7 @@ export default async function RacePage({ params }: Props) {
   const distances = event.distances?.length
     ? event.distances
     : [{ id: 0, label: event.distance, price: event.price, slotsLeft: event.slotsLeft }];
-  const priceOf = (amount: number) => (PRICES_PUBLIC && amount > 0 ? r.price(money.format(amount)) : null);
+  const priceOf = (amount: number) => (event.pricesPublic === true && amount > 0 ? r.price(money.format(amount)) : null);
   const price =
     distances.length > 1 && distances.some((d) => priceOf(d.price))
       ? distances.map((d) => `${d.label} — ${priceOf(d.price) ?? t.home.priceUnknown}`).join(' · ')
@@ -121,7 +121,7 @@ export default async function RacePage({ params }: Props) {
     .join(' · ');
   const tbd = <p className="race-tbd">{r.tbd}</p>;
 
-  const jsonLd = raceJsonLd(event, raceDescription(event), `/starty/${event.slug}`, registrationState(event) === 'open');
+  const jsonLd = raceJsonLd(event, raceDescription(event), `/starty/${event.slug}`, registrationState(event) === 'open', siteSettings?.registrationOpenedAt ?? null);
 
   return (
     <main className="site-wrap race">

@@ -842,3 +842,14 @@ model PromoFailure {
   @@index([createdAt])
   @@map("promo_failures")
 }
+
+/// Настройки из админки («Настройки», «Вопросы», 2026-11-10): ключ — значение
+/// JSON. Читает lib/settings; по умолчанию — прежние переменные .env.
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedBy BigInt?  @map("updated_by")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}
