@@ -38,6 +38,11 @@ function fingerprint(status: number, html: string): string {
 async function submitChanged(log: Logger): Promise<void> {
   const base = site();
   const host = new URL(base).host;
+  // Staging и локальная разработка поисковикам не нужны (staging ещё и под паролем).
+  if (host !== PROD_HOST) {
+    log.info({ host }, 'IndexNow: не прод — не отправляем');
+    return;
+  }
   const statePath = path.join(homedir(), `indexnow-state-${host}.json`);
   const sitemap = await get(`${base}/sitemap.xml`);
   if (sitemap.status !== 200) throw new Error(`sitemap.xml: HTTP ${sitemap.status}`);
@@ -56,10 +61,6 @@ async function submitChanged(log: Logger): Promise<void> {
   }
   const changed = [...urls.filter((u) => prev[u] !== next[u]), ...Object.keys(prev).filter((u) => !(u in next))];
   if (changed.length === 0) return;
-  if (host !== PROD_HOST) {
-    log.info({ host, changed: changed.length }, 'IndexNow: не прод — не отправляем');
-    return;
-  }
 
   const body = JSON.stringify({ host, key: KEY, keyLocation: `${base}/${KEY}.txt`, urlList: changed });
   let ok = true;
