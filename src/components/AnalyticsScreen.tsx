@@ -51,8 +51,7 @@ function CompareLine({ c, what, whom }: { c: Compare; what: string; whom: string
   if (p === null) return <p className="an-cmp__none">Пока сравнить не с кем{whom ? ` среди ${whom}` : ''}.</p>;
   return (
     <p className="an-cmp__line">
-      Быстрее <b className="num">{p}%</b> {whom ? `${whom} ` : ''}
-      {what} <span className="an-cmp__of">из {nf.format(c.others)}</span>
+      Быстрее <b className="num">{p}%</b> {what} <span className="an-cmp__of">из {nf.format(c.others)}</span>
     </p>
   );
 }
@@ -301,7 +300,11 @@ function AnalyticsScreen({ results, distanceStats, onBack, onViewRaces }: Props)
               <h3 className="an-cmp__title">
                 {d.label} <span className="an-cmp__best num">рекорд {mmss(d.best)}</span>
               </h3>
-              <CompareLine c={d.compare[group]} what={`всех, кто бежал ${d.label} на стартах 5&5`} whom={whom} />
+              <CompareLine
+                c={d.compare[group]}
+                what={whom ? `${whom}, бежавших ${d.label} на стартах 5&5` : `всех, кто бежал ${d.label} на стартах 5&5`}
+                whom={whom}
+              />
             </article>
           ))}
 
@@ -312,7 +315,11 @@ function AnalyticsScreen({ results, distanceStats, onBack, onViewRaces }: Props)
                 {r.title} <span className="an-cmp__best">{r.date} · {r.distance} · {r.time}</span>
               </h3>
               {r.compare ? (
-                <CompareLine c={r.compare[group]} what={`участников этого забега на ${r.distance}`} whom={whom} />
+                <CompareLine
+                  c={r.compare[group]}
+                  what={whom ? `${whom} на ${r.distance} в этом забеге` : `участников этого забега на ${r.distance}`}
+                  whom={whom}
+                />
               ) : (
                 <p className="an-cmp__none">Сравнение появится после обновления данных.</p>
               )}
