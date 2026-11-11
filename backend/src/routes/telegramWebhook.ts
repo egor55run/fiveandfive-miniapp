@@ -44,7 +44,7 @@ const SUBSCRIBED_TEXT = [
   'Отписаться — /stop',
 ].join('\n');
 
-const ALREADY_OPEN_TEXT = 'Регистрация уже открыта — выбирайте старт и записывайтесь в приложении.';
+const ALREADY_OPEN_TEXT = 'Регистрация уже открыта — выбирай старт и записывайся в приложении.';
 
 const WELCOME_TEXT = [
   'Привет! Это бот серии забегов <b>5&amp;5</b> — пять забегов по 5 км в парках Астаны.',
@@ -54,7 +54,7 @@ const WELCOME_TEXT = [
 
 const UNSUBSCRIBED_TEXT =
   'Хорошо, больше не будем присылать новости 5&amp;5 — ни рассылки, ни сообщения об открытии регистрации и новых стартах. ' +
-  'Сообщения о ваших регистрациях придут как обычно. Передумаете — нажмите /start.';
+  'Сообщения о твоих регистрациях придут как обычно. Передумаешь — нажми /start.';
 
 const appButton = (slug?: string): InlineButton => ({
   text: 'Открыть приложение',
@@ -168,7 +168,7 @@ async function handleUpdate(update: Update, log: FastifyBaseLogger) {
   // Вопрос, шаг анкеты партнёра, ответ админа или продолжение переписки.
   if (!command.startsWith('/') && (await handleSupportMessage(msg, log))) return;
   // Всё остальное — приложение и вопросы.
-  await sendMessage(String(msg.chat.id), 'Всё про забеги 5&amp;5 — в приложении. Есть вопрос — нажмите «Задать вопрос».', [
+  await sendMessage(String(msg.chat.id), 'Всё про забеги 5&amp;5 — в приложении. Есть вопрос — нажми «Задать вопрос».', [
     [appButton()],
     [ASK_BUTTON],
   ]);

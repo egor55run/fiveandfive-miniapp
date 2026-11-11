@@ -58,7 +58,7 @@ function RegistrationSuccessScreen({ user, events, seasonPass, onBackHome }: Pro
         {/* Короткие заголовки — «ЗАРЕГИСТРИРОВАНЫ» одним словом не влезает
             в ширину карточки дисплейным шрифтом. */}
         <h2 className="su-hero__title u-display">
-          {seasonPass ? 'Вы в сезоне 5&5' : 'Вы на старте'}
+          {seasonPass ? 'Ты в сезоне 5&5' : 'Ты на старте'}
         </h2>
 
         <p className="su-hero__text">

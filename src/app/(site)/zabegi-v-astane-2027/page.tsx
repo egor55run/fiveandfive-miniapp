@@ -44,7 +44,7 @@ export default async function HubPage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(hubJsonLd(events)) }} />
       <h1 className="h-title">Забеги в Астане 2027</h1>
       <p className="hub__lead">
-        Серия забегов 2027 — пять стартов на 5&nbsp;км в парках Астаны, по воскресеньям с мая по сентябрь. Бегите один
+        Серия забегов 2027 — пять стартов на 5&nbsp;км в парках Астаны, по воскресеньям с мая по сентябрь. Беги один
         этап или весь сезон: за каждый финиш — медаль-луч, после пятого лучи складываются в звезду. Баллы за время идут в{' '}
         <Link href="/reiting">рейтинг серии</Link>.
       </p>
@@ -78,7 +78,7 @@ export default async function HubPage() {
           <li>{t.race.ageText} Участникам 16–17 лет нужно <a href={docPath('parentConsent', 'ru')}>согласие родителя</a>.</li>
           <li>Контрольное время — {t.race.facts.cutoffValue}: успеть можно и шагом.</li>
           <li>
-            Остались вопросы — <Link href="/voprosy">частые вопросы</Link> или <a href={botChatLink('ask')}>напишите нам в Telegram</a>.
+            Остались вопросы — <Link href="/voprosy">частые вопросы</Link> или <a href={botChatLink('ask')}>напиши нам в Telegram</a>.
           </li>
         </ul>
         <a className="site-btn site-btn--brand site-btn--lg" href={botChatLink(open ? undefined : 'notify')}>

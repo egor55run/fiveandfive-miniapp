@@ -36,11 +36,11 @@ export default function WriteAccessPrompt({ onDone }: Props) {
       <div className="wa-sheet">
         <h2 id="wa-title" className="wa-sheet__title">Сообщения от бота</h2>
         <p className="wa-sheet__text">
-          Разрешите боту присылать напоминания о старте и результаты. Писать будем только по делу.
+          Разреши боту присылать напоминания о старте и результаты. Писать будем только по делу.
         </p>
         {denied && (
           <p className="wa-sheet__text wa-sheet__text--muted">
-            Без разрешения бот не сможет напомнить о старте. Передумаете — нажмите «Разрешить» ещё раз.
+            Без разрешения бот не сможет напомнить о старте. Передумаешь — нажми «Разрешить» ещё раз.
           </p>
         )}
         <button type="button" className="btn-register" disabled={busy} onClick={() => void allow()}>

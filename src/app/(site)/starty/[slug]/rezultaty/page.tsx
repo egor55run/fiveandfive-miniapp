@@ -28,7 +28,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     title: `Результаты: ${data.event.title}, ${day(data.event.date)}`,
     description: fitDescription([
       `Протокол забега «${data.event.title}», ${day(data.event.date)}, ${data.event.location}: места и время на дистанциях ${labels}, отдельно у мужчин и у женщин.`,
-      'Найдите себя по фамилии или стартовому номеру.',
+      'Найди себя по фамилии или стартовому номеру.',
     ]),
     path: `/starty/${slug}/rezultaty`,
   });

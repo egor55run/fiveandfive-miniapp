@@ -14,7 +14,7 @@ import { normalizePersonName, personNameError, type PersonNameKind } from './per
 export const emailField = z
   .string()
   .trim()
-  .min(1, 'Укажите email')
+  .min(1, 'Укажи email')
   .email('Некорректный email');
 
 /**
@@ -25,7 +25,7 @@ export const emailField = z
 export const phoneField = z
   .string()
   .trim()
-  .min(1, 'Укажите телефон')
+  .min(1, 'Укажи телефон')
   .refine(
     (v) => (v.match(/\d/g) ?? []).length >= 10,
     'В телефоне должно быть минимум 10 цифр',
@@ -47,7 +47,7 @@ export function personNameField(kind: PersonNameKind) {
 
 /** Пол. Значения enum Gender из схемы Prisma. */
 export const genderField = z.enum(['MALE', 'FEMALE'], {
-  error: 'Выберите пол',
+  error: 'Выбери пол',
 });
 
 /**
@@ -67,7 +67,7 @@ export const consentsField = z.object(
     // по возрасту на день старта (lib/eligibility), не схема.
     parent: z.literal(true).optional(),
   },
-  { error: 'Подтвердите оба согласия' },
+  { error: 'Подтверди оба согласия' },
 );
 
 /** Дата рождения в формате input[type=date]. Разбор и границы — в lib/birthDate. */

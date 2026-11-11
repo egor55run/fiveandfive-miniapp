@@ -66,7 +66,7 @@ export async function quotePromo(
       mine.status === 'HELD' &&
       ((input.reuseFor?.registrationId && mine.registrationId === input.reuseFor.registrationId) ||
         (input.reuseFor?.seasonPassId && mine.seasonPassId === input.reuseFor.seasonPassId));
-    if (mine && !same) throw new PromoError('Вы уже использовали этот промокод');
+    if (mine && !same) throw new PromoError('Этот промокод у тебя уже использован');
     if (!same && promo.maxUses !== null && (await usedCount(db, promo.id)) >= promo.maxUses) {
       throw new PromoError('Лимит использований промокода исчерпан');
     }

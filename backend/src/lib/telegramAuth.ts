@@ -107,6 +107,6 @@ export const FAILURE_MESSAGE: Record<InitDataFailure, string> = {
   no_hash: 'initData без подписи',
   bad_hash: 'Подпись initData не совпадает',
   no_auth_date: 'initData без auth_date',
-  stale: 'initData просрочен — переоткройте приложение',
+  stale: 'initData просрочен — переоткрой приложение',
   no_user: 'initData без данных пользователя',
 };

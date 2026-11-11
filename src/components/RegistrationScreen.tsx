@@ -137,11 +137,11 @@ function mapServerError(err: unknown): string {
     if (/[а-яё]/i.test(err.message)) return err.message;
     if (err.status === 409 && /slot/i.test(err.message)) return 'Мест на этот старт больше нет';
     if (err.status === 409 && /already/i.test(err.message))
-      return 'Вы уже зарегистрированы на этот старт';
+      return 'Ты уже есть в списке участников этого старта';
     if (err.status === 400) return 'Проверьте правильность заполнения полей';
     if (err.status === 404) return 'Старт не найден';
   }
-  return 'Не удалось зарегистрироваться. Попробуйте ещё раз';
+  return 'Не удалось зарегистрироваться. Попробуй ещё раз';
 }
 
 function RegistrationScreen({
@@ -277,18 +277,18 @@ function RegistrationScreen({
       const error = personNameError(normalizePersonName(values[name]), name);
       if (error) e[name] = error;
     }
-    if (!values.birthDate) e.birthDate = 'Укажите дату рождения';
+    if (!values.birthDate) e.birthDate = 'Укажи дату рождения';
     else {
       const age = ageFromDob(values.birthDate);
       if (!Number.isFinite(age) || age < 1 || age > 120) e.birthDate = 'Проверьте дату';
       else if (underageText) e.birthDate = underageText;
     }
-    if (!values.gender) e.gender = 'Выберите пол';
-    if (!values.phone.trim()) e.phone = 'Укажите телефон';
-    if (!values.email.trim()) e.email = 'Укажите email';
+    if (!values.gender) e.gender = 'Выбери пол';
+    if (!values.phone.trim()) e.phone = 'Укажи телефон';
+    if (!values.email.trim()) e.email = 'Укажи email';
     else if (!EMAIL_RE.test(values.email.trim())) e.email = 'Некорректный email';
-    if (!consentRules || !consentData) e.consents = 'Подтвердите оба согласия';
-    else if (minor && !consentParent) e.consents = 'Подтвердите согласие родителя';
+    if (!consentRules || !consentData) e.consents = 'Подтверди оба согласия';
+    else if (minor && !consentParent) e.consents = 'Подтверди согласие родителя';
     return e;
   };
 
@@ -446,10 +446,10 @@ function RegistrationScreen({
           {registrationState(event) === 'soon' && (
             // Админ записывается до открытия — например, ради тестового платежа.
             <p className="reg-admin-note">
-              Регистрация закрыта для участников — вы записываетесь как администратор
+              Регистрация закрыта для участников — ты записываешься как администратор
             </p>
           )}
-          <p className="reg-group-label">Ваши данные:</p>
+          <p className="reg-group-label">Твои данные:</p>
 
           <label className={`rfield${errors.lastName ? ' rfield--error' : ''}`}>
             <span className="rfield__label">Фамилия</span>

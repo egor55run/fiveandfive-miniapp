@@ -95,8 +95,8 @@ function upcomingEvents() {
 
 function registrationLine(): string {
   return registrationOpen()
-    ? 'Регистрация открыта — записывайтесь в приложении.'
-    : 'Регистрация скоро откроется. Чтобы узнать первым, нажмите в боте /start → «Сообщить об открытии регистрации».';
+    ? 'Регистрация открыта — записывайся в приложении.'
+    : 'Регистрация скоро откроется. Чтобы узнать первым, нажми в боте /start → «Сообщить об открытии регистрации».';
 }
 
 async function racesAnswer(): Promise<string> {
@@ -137,7 +137,7 @@ async function packAnswer(): Promise<string> {
     faqHtml('fee'),
     '<b>Где и когда получить стартовый пакет</b>',
     ...(pickup.length > 0 ? pickup : ['Даты выдачи появятся вместе с расписанием сезона.']),
-    'Возьмите документ, удостоверяющий личность.',
+    'Возьми документ, удостоверяющий личность.',
   ].join('\n\n');
 }
 
@@ -155,7 +155,7 @@ export const PARTNER_BUTTON: InlineButton = { text: '🤝 Стать партн�
 const WRITE_BUTTON: InlineButton = { text: '✍️ Другой вопрос', callback_data: 'ask:write' };
 const CANCEL_BUTTON: InlineButton = { text: 'Отмена', callback_data: 'support:cancel' };
 
-const MENU_TEXT = '<b>Частые вопросы</b>\n\nВыберите тему — ответим сразу. Не нашли ответа — нажмите «Другой вопрос» и напишите нам.';
+const MENU_TEXT = '<b>Частые вопросы</b>\n\nВыбери тему — ответим сразу. Не нашёл ответа — нажми «Другой вопрос» и напиши нам.';
 
 export async function sendSupportMenu(chatId: number): Promise<void> {
   const rows: InlineButton[][] = [];
@@ -178,10 +178,10 @@ async function sendTopic(chatId: number, key: string): Promise<void> {
 // ---------- Состояние: пишет вопрос / заполняет анкету ----------
 
 const PARTNER_STEPS = [
-  { key: 'name', ask: 'Как вас зовут?' },
-  { key: 'company', ask: 'Какую компанию вы представляете?' },
-  { key: 'phone', ask: 'Ваш телефон для связи?' },
-  { key: 'offer', ask: 'Что вы предлагаете? Расскажите в одном сообщении.' },
+  { key: 'name', ask: 'Как тебя зовут?' },
+  { key: 'company', ask: 'Какую компанию ты представляешь?' },
+  { key: 'phone', ask: 'Твой телефон для связи?' },
+  { key: 'offer', ask: 'Что ты предлагаешь? Расскажи в одном сообщении.' },
 ] as const;
 
 async function setState(telegramId: number, mode: 'question' | 'partner', step = 0, data: object = {}) {
@@ -200,7 +200,7 @@ async function startQuestion(chatId: number, from: TgUser) {
   await setState(from.id, 'question');
   await sendMessage(
     String(chatId),
-    '✍️ Напишите ваш вопрос одним сообщением — можно с фото. Ответим здесь, в этом чате.',
+    '✍️ Напиши свой вопрос одним сообщением — можно с фото. Ответим здесь, в этом чате.',
     [[CANCEL_BUTTON]],
   );
 }
@@ -209,7 +209,7 @@ async function startPartner(chatId: number, from: TgUser) {
   await setState(from.id, 'partner', 0);
   await sendMessage(
     String(chatId),
-    `🤝 Спасибо за интерес к 5&amp;5! Четыре коротких вопроса — и передадим вашу заявку команде.\n\n${PARTNER_STEPS[0].ask}`,
+    `🤝 Спасибо за интерес к 5&amp;5! Четыре коротких вопроса — и передадим твою заявку команде.\n\n${PARTNER_STEPS[0].ask}`,
     [[CANCEL_BUTTON]],
   );
 }
@@ -317,7 +317,7 @@ async function finishPartner(chatId: number, from: TgUser, data: Record<string, 
     }
   }
   log.info({ telegramId: from.id }, 'Поддержка: заявка партнёра');
-  await sendMessage(String(chatId), 'Спасибо! Передали заявку команде 5&amp;5 — мы свяжемся с вами в ближайшее время.');
+  await sendMessage(String(chatId), 'Спасибо! Передали заявку команде 5&amp;5 — мы свяжемся с тобой в ближайшее время.');
 }
 
 /** Ответ админа реплаем → человеку. true — это был ответ поддержки. */
@@ -385,7 +385,7 @@ export async function handleSupportCallback(data: string, chatId: number, from: 
   if (data === 'partner') return startPartner(chatId, from).then(() => true);
   if (data === 'support:cancel') {
     await clearState(from.id);
-    await sendMessage(String(chatId), 'Хорошо, отменили. Если появится вопрос — нажмите «Задать вопрос».', [[ASK_BUTTON]]);
+    await sendMessage(String(chatId), 'Хорошо, отменили. Если появится вопрос — нажми «Задать вопрос».', [[ASK_BUTTON]]);
     return true;
   }
   if (data === 'ask:ok') {
@@ -420,7 +420,7 @@ export async function handleSupportMessage(msg: TgMessage, log: Logger): Promise
   if (state?.mode === 'partner') {
     const answer = (msg.text ?? msg.caption ?? '').trim();
     if (!answer) {
-      await sendMessage(String(chatId), 'Напишите ответ текстом, пожалуйста.', [[CANCEL_BUTTON]]);
+      await sendMessage(String(chatId), 'Напиши ответ текстом, пожалуйста.', [[CANCEL_BUTTON]]);
       return true;
     }
     const step = PARTNER_STEPS[state.step];
@@ -440,7 +440,7 @@ export async function handleSupportMessage(msg: TgMessage, log: Logger): Promise
   if (!asking && !(await threadOpen(from.id))) return false;
 
   if (await tooMany(from.id)) {
-    await sendMessage(String(chatId), 'Слишком много сообщений подряд — подождите немного, мы уже читаем.');
+    await sendMessage(String(chatId), 'Слишком много сообщений подряд — подожди немного, мы уже читаем.');
     return true;
   }
   if (asking) await clearState(from.id);
@@ -448,9 +448,9 @@ export async function handleSupportMessage(msg: TgMessage, log: Logger): Promise
   await sendMessage(
     String(chatId),
     !ok
-      ? 'Не получилось передать сообщение — попробуйте ещё раз чуть позже.'
+      ? 'Не получилось передать сообщение — попробуй ещё раз чуть позже.'
       : asking
-        ? 'Спасибо! Мы свяжемся с вами в ближайшее время.'
+        ? 'Спасибо! Мы свяжемся с тобой в ближайшее время.'
         : '✓ Передали команде.',
   );
   return true;

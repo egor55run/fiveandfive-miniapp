@@ -44,7 +44,7 @@ function RatingScreen({ myGender }: Props) {
     setNotice(null);
     const mine = data ? [...data.men, ...data.women].find((r) => r.me) : null;
     if (!mine) {
-      setNotice('Вас пока нет в рейтинге — он появится после первого этапа с вашим результатом.');
+      setNotice('Тебя пока нет в рейтинге — он появится после первого этапа с твоим результатом.');
       return;
     }
     setQuery('');
@@ -131,7 +131,7 @@ function RatingScreen({ myGender }: Props) {
                 <span className="rt-row__place">{r.place}</span>
                 <span className="rt-row__name">
                   {r.name}
-                  {r.me && <span className="rt-row__you"> · вы</span>}
+                  {r.me && <span className="rt-row__you"> · ты</span>}
                 </span>
                 <span className="rt-row__total">{r.total}</span>
               </button>

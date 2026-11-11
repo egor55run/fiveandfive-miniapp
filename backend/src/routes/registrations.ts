@@ -77,7 +77,7 @@ class RegistrationBlocked extends Error {
 
 const BLOCKED_MESSAGES: Record<RegistrationBlocked['reason'], string> = {
   no_slots: 'Мест на эту дистанцию больше нет',
-  already_registered: 'Вы уже зарегистрированы на этот старт',
+  already_registered: 'Ты уже есть в списке участников этого старта',
   in_season_pass:
     'Этот старт входит в ваш неоплаченный абонемент — оплатите абонемент или дождитесь, пока счёт истечёт',
 };
@@ -123,7 +123,7 @@ export async function registrationsRoutes(app: FastifyInstance) {
 
       const distance = await pickDistance(prisma, event.id, data.distanceId);
       if (!distance) {
-        return reply.code(400).send({ error: 'Выберите дистанцию', reason: 'no_distance' });
+        return reply.code(400).send({ error: 'Выбери дистанцию', reason: 'no_distance' });
       }
 
       // Цена — у дистанции: 5 км и 3 км могут стоить по-разному.

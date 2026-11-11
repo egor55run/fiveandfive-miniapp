@@ -31,7 +31,7 @@ function years(n: number): string {
 }
 
 export function underageMessage(ageOnStart: number): string {
-  return `Участвовать можно с ${MIN_AGE} лет. На день старта вам будет ${years(Math.max(ageOnStart, 0))}`;
+  return `Участвовать можно с ${MIN_AGE} лет. На день старта тебе будет ${years(Math.max(ageOnStart, 0))}`;
 }
 
 /** Текст третьей галочки — тот же записывает сервер (PARENTAL_CONSENT_TEXT). */

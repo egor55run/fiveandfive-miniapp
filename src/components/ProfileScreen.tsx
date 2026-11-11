@@ -120,7 +120,7 @@ function ProfileScreen({
         <Header />
         <div className="glass-card empty">
           <CalendarX2 className="empty__icon" size={44} strokeWidth={1.6} />
-          <p className="empty__text">Вы ещё не зарегистрированы ни на один старт</p>
+          <p className="empty__text">У тебя пока нет регистраций на старты</p>
           <button type="button" className="btn-register" onClick={onViewRaces}>
             Посмотреть старты
             <ArrowRight size={18} strokeWidth={2.4} />
@@ -173,10 +173,10 @@ function ProfileScreen({
   const localError = (key: EditKey, value: string): string | null => {
     if (value === '') {
       return key === 'birthDate'
-        ? 'Укажите дату рождения'
+        ? 'Укажи дату рождения'
         : key === 'phone'
-          ? 'Укажите телефон'
-          : 'Укажите email';
+          ? 'Укажи телефон'
+          : 'Укажи email';
     }
     // now зафиксирован на монтировании (см. выше) — для проверки даты рождения
     // этой точности с запасом, а рендер остаётся чистым.

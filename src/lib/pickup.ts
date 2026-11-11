@@ -47,6 +47,6 @@ export function pickupLines(e: EventDto): string[] {
   return [
     `${pickupWhen(e)} — ${pickupWhere(e)}.`,
     `Иногородним — в день старта ${raceDayPickup(e)}.`,
-    'Возьмите документ, удостоверяющий личность.',
+    'Возьми документ, удостоверяющий личность.',
   ];
 }

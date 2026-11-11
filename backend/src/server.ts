@@ -96,7 +96,7 @@ async function main() {
     allowList: ['127.0.0.1', '::1'],
     errorResponseBuilder: (_req, ctx) => ({
       statusCode: ctx.statusCode,
-      error: 'Слишком много запросов. Подождите немного',
+      error: 'Слишком много запросов. Подожди немного',
       reason: 'rate_limited',
     }),
   });

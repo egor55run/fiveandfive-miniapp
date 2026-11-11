@@ -29,7 +29,7 @@ export default function OpenInTelegramScreen() {
     <Shell>
       <Send className="empty__icon" size={44} strokeWidth={1.6} />
       <p className="empty__text">
-        Приложение работает внутри Telegram — там оно само узнаёт, кто вы,
+        Приложение работает внутри Telegram — там оно само узнаёт, кто ты,
         и вход не нужен.
       </p>
       <a className="btn-register" href={BOT_LINK} target="_blank" rel="noreferrer">

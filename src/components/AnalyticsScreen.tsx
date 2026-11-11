@@ -130,7 +130,7 @@ function AnalyticsScreen({ results, distanceStats, rating, onBack, onViewRaces }
         <div className="glass-card empty">
           <LineChart className="empty__icon" size={44} strokeWidth={1.6} />
           <p className="empty__text">
-            Здесь появится статистика, когда организатор внесёт результаты вашего первого старта
+            Здесь появится статистика, когда организатор внесёт результаты твоего первого старта
           </p>
           <button type="button" className="btn-register" onClick={onViewRaces}>
             Посмотреть старты

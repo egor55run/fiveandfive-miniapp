@@ -16,8 +16,8 @@ export const PERSON_NAME_MAX = 50;
 export type PersonNameKind = 'firstName' | 'lastName';
 
 const MESSAGES: Record<PersonNameKind, { empty: string; latin: string }> = {
-  firstName: { empty: 'Укажите имя', latin: 'Введите имя кириллицей' },
-  lastName: { empty: 'Укажите фамилию', latin: 'Введите фамилию кириллицей' },
+  firstName: { empty: 'Укажи имя', latin: 'Введи имя кириллицей' },
+  lastName: { empty: 'Укажи фамилию', latin: 'Введи фамилию кириллицей' },
 };
 
 /**
