@@ -18,7 +18,7 @@ export const REFUND_WORKING_DAYS = 10;
 export type RefundLine = { eventId: number; title: string; amount: number; percent: number; base: number };
 export type RefundNotice = { kind: 'single' | 'pass'; wholePass: boolean; lines: RefundLine[] };
 
-const money = (n: number) => `${new Intl.NumberFormat('ru-RU').format(n).replace(/ /g, ' ')} ₸`;
+const money = (n: number) => `${new Intl.NumberFormat('ru-RU').format(n).replace(/[\u00a0\u202f]/g, ' ')} ₸`;
 const OFFER = 'по правилам оферты (п. 5.1)';
 
 /** Текст без разметки: абзацы и (для нескольких стартов) список. */
