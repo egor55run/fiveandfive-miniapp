@@ -1809,6 +1809,19 @@ html.site-fonts body {
   margin: -24px -24px 8px;
   border-radius: 24px 24px 0 0;
 }
+/* На странице старта колонка с align-items: flex-start — без stretch баннер
+   сжимался до ширины логотипа. Во всю ширину, чуть выше карточки. */
+.race > .race-banner {
+  align-self: stretch;
+  width: 100%;
+  min-height: 170px;
+  margin-bottom: 0;
+}
+@media (max-width: 639px) {
+  .race > .race-banner {
+    min-height: 150px;
+  }
+}
 .race-banner__logo {
   max-width: 55%;
   max-height: 96px;

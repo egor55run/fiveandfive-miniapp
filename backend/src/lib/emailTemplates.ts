@@ -324,3 +324,26 @@ export function dayBeforeTelegram(e: Event, distance?: string | null): string {
     'До встречи на старте!',
   ].join('\n');
 }
+
+/** Возврат оформлен (тексты собирает refundNotify.refundParts). */
+export function refundEmail(p: {
+  firstName: string | null;
+  parts: { title: string; head: string; list: string[]; tail: string[] };
+}): EmailMessage {
+  const { title, head, list, tail } = p.parts;
+  return {
+    subject: title === 'Возврат оформлен' ? 'Возврат оформлен — 5&5' : 'Регистрация отменена — 5&5',
+    html: layout({
+      preheader: head,
+      title,
+      greeting: hello(p.firstName),
+      blocks: [
+        { kind: 'p', html: esc(head) },
+        ...(list.length > 0 ? [{ kind: 'list' as const, items: list.map(esc) }] : []),
+        ...tail.map((t) => ({ kind: 'p' as const, html: esc(t) })),
+      ],
+      button: { text: 'Правила возврата', url: `${APP_URL}/oferta` },
+    }),
+    text: plain([hello(p.firstName), '', head, ...(list.length ? ['', ...list.map((l) => `— ${l}`)] : []), '', ...tail, '', `Правила возврата: ${APP_URL}/oferta`]),
+  };
+}

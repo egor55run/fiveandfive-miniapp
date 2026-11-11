@@ -301,6 +301,8 @@ enum NotificationKind {
   RESULT
   /// Напоминание за 3 дня до старта.
   RACE_REMINDER
+  /// Организатор оформил возврат (одно сообщение на оформление).
+  REFUND
 }
 
 enum NotificationStatus {

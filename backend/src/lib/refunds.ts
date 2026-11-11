@@ -7,6 +7,7 @@ import { pickupStarted, releaseRegistrationBib } from './bibs';
 import { startOfDayInTz } from './notify';
 import { sendMessage } from './telegramBot';
 import { adminTelegramIds } from './telegramLogin';
+import { notifyRefund } from './refundNotify';
 
 /**
  * Возвраты стартового взноса (оферта, п. 5.1, 5.3).
@@ -186,6 +187,7 @@ export async function applyAdminRefund(input: {
   stages: { registrationId: number; percent: RefundPercent }[];
   wholePass: boolean;
   adminTelegramId: number;
+  log?: { info: (o: object, m: string) => void; warn: (o: object, m: string) => void };
 }): Promise<{ total: number; stages: number }> {
   const preview = await refundPreview(input.registrationId);
   const byId = new Map(preview.stages.map((s) => [s.registrationId, s]));
@@ -258,6 +260,23 @@ export async function applyAdminRefund(input: {
       });
     }
   });
+  // Участнику — в бот и на почту. После транзакции: отправка не должна её откатить.
+  try {
+    const owner = await prisma.registration.findUnique({ where: { id: input.registrationId }, include: { user: true } });
+    if (owner) {
+      await notifyRefund(
+        owner.user,
+        {
+          kind: preview.kind,
+          wholePass: preview.kind === 'pass' && input.wholePass,
+          lines: rows.map(({ stage, percent, amount }) => ({ eventId: stage.eventId, title: stage.eventTitle, amount, percent, base: stage.base })),
+        },
+        input.log,
+      );
+    }
+  } catch (err) {
+    input.log?.warn({ registrationId: input.registrationId, err: err instanceof Error ? err.message : String(err) }, 'Не удалось сообщить участнику о возврате');
+  }
   return { total, stages: rows.length };
 }
 

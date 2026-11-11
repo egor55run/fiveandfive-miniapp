@@ -541,7 +541,7 @@ export async function adminParticipantsRoutes(app: FastifyInstance) {
     const parsed = refundSchema.safeParse(req.body);
     if (!parsed.success) return sendValidationError(reply, parsed.error);
     try {
-      const res = await applyAdminRefund({ registrationId: id, ...parsed.data, adminTelegramId: req.admin!.telegramId });
+      const res = await applyAdminRefund({ registrationId: id, ...parsed.data, adminTelegramId: req.admin!.telegramId, log: req.log });
       req.log.info({ registrationId: id, ...res }, 'Возврат оформлен из админки');
       return { ...res, totalText: money(res.total) };
     } catch (err) {
