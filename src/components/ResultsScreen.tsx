@@ -96,7 +96,7 @@ export default function ResultsScreen({ slug, onBack }: Props) {
             />
           </div>
           {rows.length === 0 ? (
-            <p className="rt__empty">{query.trim() ? 'Никого не нашли. Проверьте написание или номер.' : 'Нет результатов.'}</p>
+            <p className="rt__empty">{query.trim() ? 'Никого не нашли. Проверь написание или номер.' : 'Нет результатов.'}</p>
           ) : (
             <ol className="rt-list">
               {rows.map((r) => (

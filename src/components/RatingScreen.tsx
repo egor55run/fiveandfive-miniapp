@@ -118,7 +118,7 @@ function RatingScreen({ myGender }: Props) {
       ) : !data || all.length === 0 ? (
         <p className="rt__empty">Рейтинг появится после первого этапа</p>
       ) : rows.length === 0 ? (
-        <p className="rt__empty">Никого не нашли. Проверьте написание или номер.</p>
+        <p className="rt__empty">Никого не нашли. Проверь написание или номер.</p>
       ) : (
         <ol className="rt-list" ref={listRef}>
           {rows.map((r) => (

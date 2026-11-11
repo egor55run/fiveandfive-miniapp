@@ -79,7 +79,7 @@ const BLOCKED_MESSAGES: Record<RegistrationBlocked['reason'], string> = {
   no_slots: 'Мест на эту дистанцию больше нет',
   already_registered: 'Ты уже есть в списке участников этого старта',
   in_season_pass:
-    'Этот старт входит в ваш неоплаченный абонемент — оплатите абонемент или дождитесь, пока счёт истечёт',
+    'Этот старт входит в твой неоплаченный абонемент — оплати абонемент или дождись, пока счёт истечёт',
 };
 
 export async function registrationsRoutes(app: FastifyInstance) {

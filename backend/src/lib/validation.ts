@@ -74,7 +74,7 @@ export const consentsField = z.object(
 export const birthDateField = z
   .string()
   .trim()
-  .refine((v) => parseBirthDate(v) !== null, 'Проверьте дату рождения');
+  .refine((v) => parseBirthDate(v) !== null, 'Проверь дату рождения');
 
 /**
  * Ответ 400 в том виде, который фронт умеет показать: `error` — готовая фраза
@@ -90,7 +90,7 @@ export function sendValidationError(reply: FastifyReply, error: z.ZodError) {
     if (first) fields[name] = first;
   }
 
-  const summary = Object.values(fields)[0] ?? flat.formErrors[0] ?? 'Проверьте поля';
+  const summary = Object.values(fields)[0] ?? flat.formErrors[0] ?? 'Проверь поля';
 
   return reply.code(400).send({ error: summary, reason: 'validation', fields });
 }

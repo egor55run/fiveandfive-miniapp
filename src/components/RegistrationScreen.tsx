@@ -138,7 +138,7 @@ function mapServerError(err: unknown): string {
     if (err.status === 409 && /slot/i.test(err.message)) return 'Мест на этот старт больше нет';
     if (err.status === 409 && /already/i.test(err.message))
       return 'Ты уже есть в списке участников этого старта';
-    if (err.status === 400) return 'Проверьте правильность заполнения полей';
+    if (err.status === 400) return 'Проверь, правильно ли заполнены поля';
     if (err.status === 404) return 'Старт не найден';
   }
   return 'Не удалось зарегистрироваться. Попробуй ещё раз';
@@ -280,7 +280,7 @@ function RegistrationScreen({
     if (!values.birthDate) e.birthDate = 'Укажи дату рождения';
     else {
       const age = ageFromDob(values.birthDate);
-      if (!Number.isFinite(age) || age < 1 || age > 120) e.birthDate = 'Проверьте дату';
+      if (!Number.isFinite(age) || age < 1 || age > 120) e.birthDate = 'Проверь дату';
       else if (underageText) e.birthDate = underageText;
     }
     if (!values.gender) e.gender = 'Выбери пол';

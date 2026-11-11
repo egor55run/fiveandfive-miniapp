@@ -102,7 +102,7 @@ function PaymentScreen({ payment: initial, title, seasonPass, onPaid, onBack }: 
         </span>
 
         <h2 className="pay-hero__title u-display">
-          {open || payment.state === 'PAID' ? 'Оплатите в Kaspi' : 'Оплата не прошла'}
+          {open || payment.state === 'PAID' ? 'Оплати в Kaspi' : 'Оплата не прошла'}
         </h2>
 
         <p className="pay-hero__amount">{priceFmt.format(payment.amount)} ₸</p>
@@ -118,8 +118,8 @@ function PaymentScreen({ payment: initial, title, seasonPass, onPaid, onBack }: 
               <li>
                 Счёт отправлен на номер <b>{formatPhone(payment.phone)}</b>
               </li>
-              <li>Откройте приложение Kaspi.kz — счёт придёт уведомлением</li>
-              <li>Подтвердите оплату. Это окно обновится само</li>
+              <li>Открой приложение Kaspi.kz — счёт придёт уведомлением</li>
+              <li>Подтверди оплату. Это окно обновится само</li>
             </ol>
           </section>
 
@@ -141,7 +141,7 @@ function PaymentScreen({ payment: initial, title, seasonPass, onPaid, onBack }: 
         <>
           <div className="form-error" role="alert">
             <AlertCircle size={16} strokeWidth={2.2} />
-            <span>{payment.message ?? 'Оплата не прошла. Попробуйте ещё раз'}</span>
+            <span>{payment.message ?? 'Оплата не прошла. Попробуй ещё раз'}</span>
           </div>
           <motion.button
             type="button"

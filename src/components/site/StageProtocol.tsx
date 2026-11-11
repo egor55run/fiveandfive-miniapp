@@ -63,7 +63,7 @@ export default function StageProtocol({ men, women }: { men: StageRow[]; women: 
         />
       </label>
       {searching && m.length === 0 && w.length === 0 ? (
-        <p className="rating-empty">Никого не нашли. Проверьте написание или номер.</p>
+        <p className="rating-empty">Никого не нашли. Проверь написание или номер.</p>
       ) : (
         <>
           {(!searching || m.length > 0) && <Protocol title="Мужчины" rows={m} />}

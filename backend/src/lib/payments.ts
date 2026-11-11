@@ -104,9 +104,9 @@ function userMessage(p: Payment): string | null {
   switch (p.state) {
     case 'FAILED':
       if (isInvoiceLimitFailure(p)) return INVOICE_LIMIT_MESSAGE;
-      return 'Не удалось выставить счёт в Kaspi. Проверьте, что номер привязан к Kaspi, и попробуйте ещё раз';
+      return 'Не удалось выставить счёт в Kaspi. Проверь, что номер привязан к Kaspi, и попробуй ещё раз';
     case 'CANCELLED':
-      return 'Счёт отменён. Чтобы занять место, зарегистрируйтесь ещё раз';
+      return 'Счёт отменён. Чтобы занять место, зарегистрируйся ещё раз';
     case 'EXPIRED':
       return 'Время на оплату вышло, место освобождено. Можно зарегистрироваться ещё раз';
     default:
