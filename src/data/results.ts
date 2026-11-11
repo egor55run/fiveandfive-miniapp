@@ -30,6 +30,8 @@ export type RaceResult = {
   location: string;
   /** Сравнение с бежавшими ту же дистанцию на том же старте. */
   compare: CompareByGroup | null;
+  /** Адрес старта — открыть протокол. */
+  slug: string | null;
 };
 
 const TZ = 'Asia/Almaty';
@@ -87,6 +89,7 @@ export function toRaceResults(dtos: MeRaceResultDto[]): RaceResult[] {
     distanceKey: r.distance?.key ?? r.event.distance,
     location: r.event.location,
     compare: r.compare ?? null,
+    slug: r.event.slug ?? null,
     time: mmss(r.finishTime),
     timeSeconds: r.finishTime,
     place: r.place,

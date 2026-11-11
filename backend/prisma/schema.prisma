@@ -197,21 +197,24 @@ model Registration {
 /// старта distance / slotsTotal / slotsTaken / price — сводка по дистанциям,
 /// которую lib/distances пересчитывает после каждого изменения.
 model EventDistance {
-  id         Int      @id @default(autoincrement())
-  eventId    Int      @map("event_id")
-  label      String // «5 км»
-  slotsTotal Int      @map("slots_total")
-  slotsTaken Int      @default(0) @map("slots_taken")
-  price      Decimal  @default(0) @db.Decimal(10, 2)
-  sortOrder  Int      @default(0) @map("sort_order")
+  id                 Int       @id @default(autoincrement())
+  eventId            Int       @map("event_id")
+  label              String // «5 км»
+  slotsTotal         Int       @map("slots_total")
+  slotsTaken         Int       @default(0) @map("slots_taken")
+  price              Decimal   @default(0) @db.Decimal(10, 2)
+  sortOrder          Int       @default(0) @map("sort_order")
   /// На эту дистанцию записывает абонемент сезона (одна на старт; пока 5 км).
-  seasonPass Boolean  @default(false) @map("season_pass")
+  seasonPass         Boolean   @default(false) @map("season_pass")
   /// Дистанция из справочника (3 км, 5 км…): по ней фильтруются результаты.
-  catalogId  Int      @map("catalog_id")
+  catalogId          Int       @map("catalog_id")
+  /// Результаты этой дистанции опубликованы (окно протестов — от этого
+  /// момента). Публикуются по каждой дистанции отдельно (2026-11-11).
+  resultsPublishedAt DateTime? @map("results_published_at")
   /// Стартовые номера этой дистанции: выдаются по порядку с bibFrom.
-  bibFrom    Int?     @map("bib_from")
-  bibTo      Int?     @map("bib_to")
-  createdAt  DateTime @default(now()) @map("created_at")
+  bibFrom            Int?      @map("bib_from")
+  bibTo              Int?      @map("bib_to")
+  createdAt          DateTime  @default(now()) @map("created_at")
 
   event         Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
   catalog       Distance       @relation(fields: [catalogId], references: [id])

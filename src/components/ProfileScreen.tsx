@@ -29,6 +29,8 @@ type Props = {
   // Профиль сохранён на сервере — поднять свежего пользователя в состояние приложения.
   onUserUpdated: (user: UserDto) => void;
   onViewRaces: () => void;
+  /** Открыть протокол старта (история забегов). */
+  onOpenResults?: (slug: string) => void;
 };
 
 type EditKey = 'birthDate' | 'phone' | 'email';
@@ -76,6 +78,7 @@ function ProfileScreen({
   nearest,
   onUserUpdated,
   onViewRaces,
+  onOpenResults,
 }: Props) {
   const reduceMotion = useReducedMotion();
   // Правки уходят в PATCH /me сразу по «применить», поэтому локальной копии
@@ -417,7 +420,14 @@ function ProfileScreen({
           <p className="pf-section-label">Пройдено:</p>
           <section className="pf-past">
             {past.map((race) => (
-              <article className="glass-card pf-past__item" key={race.eventId}>
+              <article
+                className="glass-card pf-past__item"
+                key={race.eventId}
+                role={race.slug && onOpenResults ? 'button' : undefined}
+                tabIndex={race.slug && onOpenResults ? 0 : undefined}
+                onClick={() => race.slug && onOpenResults?.(race.slug)}
+                onKeyDown={(e) => e.key === 'Enter' && race.slug && onOpenResults?.(race.slug)}
+              >
                 <div className="pf-past__main">
                   <FitTitle as="h4" className="pf-past__title u-display">
                     {race.title}

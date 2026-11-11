@@ -15,6 +15,7 @@ import RegistrationScreen, {
 import RegistrationSuccessScreen from './components/RegistrationSuccessScreen';
 import PaymentScreen from './components/PaymentScreen';
 import WriteAccessPrompt from './components/WriteAccessPrompt';
+import ResultsScreen from './components/ResultsScreen';
 import TabBar, { type TabId } from './components/TabBar';
 import {
   ApiError,
@@ -29,7 +30,7 @@ import { firstValidName, splitLegacyName } from './lib/personName';
 import { setPricesPublic } from './lib/prices';
 import { canAskWriteAccess, getUnsafeTelegramUser, requestedRaceSlug } from './lib/telegram';
 
-type Screen = 'analytics' | 'home' | 'rating' | 'profile' | 'registration' | 'payment' | 'success';
+type Screen = 'analytics' | 'home' | 'rating' | 'profile' | 'registration' | 'payment' | 'success' | 'results';
 
 // Ближайший старт: самый ранний из будущих; иначе самый недавний из прошедших.
 function pickNearest(events: EventDto[]): EventDto | null {
@@ -47,6 +48,8 @@ const WRITE_ACCESS_ASKED_KEY = 'fivefive.writeAccessAsked';
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
+  // Протокол какого старта открыт (экран «results») и откуда пришли.
+  const [results, setResults] = useState<{ slug: string; back: Screen } | null>(null);
   const [events, setEvents] = useState<EventDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -268,7 +271,9 @@ function App() {
         ? 'profile'
         : currentScreen === 'rating'
           ? 'rating'
-          : 'home';
+          : currentScreen === 'results' && results?.back === 'profile'
+            ? 'profile'
+            : 'home';
 
   // Основные экраны — с нижним таб-баром.
   return (
@@ -293,7 +298,13 @@ function App() {
           nearest={nearest}
           onUserUpdated={setParticipantOverride}
           onViewRaces={() => setCurrentScreen('home')}
+          onOpenResults={(slug) => {
+            setResults({ slug, back: 'profile' });
+            setCurrentScreen('results');
+          }}
         />
+      ) : currentScreen === 'results' && results ? (
+        <ResultsScreen key={results.slug} slug={results.slug} onBack={() => setCurrentScreen(results.back)} />
       ) : (
         <HomeScreen
           events={events}
@@ -301,6 +312,11 @@ function App() {
           loading={loading}
           error={error}
           onRegister={openRegistration}
+          onResults={(e) => {
+            if (!e.slug) return;
+            setResults({ slug: e.slug, back: 'home' });
+            setCurrentScreen('results');
+          }}
           onJoinSeries={() => nearest && openRegistration(nearest)}
           onRetry={loadEvents}
           registrationOpenForMe={registrationOpenForMe}

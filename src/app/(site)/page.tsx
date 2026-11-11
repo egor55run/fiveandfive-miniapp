@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import AnimPause from '../../components/site/home/AnimPause';
 import Countdown from '../../components/site/home/Countdown';
 import StagesStar, { type Stage } from '../../components/site/home/StagesStar';
-import type { EventDto } from '../../lib/api';
+import { apiAsset, type EventDto } from '../../lib/api';
 import type { Lang } from '../../lib/legal';
 import { anyRegistrationOpen, botChatLink, fetchEvents, fetchSeasonPrice } from '../../site/data';
 import { pricesVisible } from '../../site/links';
@@ -171,6 +171,12 @@ export default async function HomePage() {
               const distances = e.distances?.length ? e.distances : [{ id: 0, label: e.distance, price: e.price }];
               return (
                 <li key={e.id} className="hub-stage">
+                  {/* Баннер старта из админки; без него — карточка как была. */}
+                  {e.theme?.bgUrl && (
+                    <div className="race-banner race-banner--card" style={{ backgroundImage: `url("${apiAsset(e.theme.bgUrl)}")` }}>
+                      {e.theme.logoUrl && <img className="race-banner__logo" src={apiAsset(e.theme.logoUrl)} alt="" />}
+                    </div>
+                  )}
                   <span className="race__label">{t.home.otherLabel}</span>
                   <h3 className="hub-stage__title">
                     <a href={e.slug ? sitePath(`/starty/${e.slug}`, lang) : '#drugie-zabegi'}>{e.title}</a>
@@ -186,6 +192,11 @@ export default async function HomePage() {
                   {e.slug && (
                     <a className="hub-stage__more" href={sitePath(`/starty/${e.slug}`, lang)}>
                       {t.home.othersMore}
+                    </a>
+                  )}
+                  {e.slug && e.resultsPublished && (
+                    <a className="hub-stage__more" href={`/starty/${e.slug}/rezultaty`}>
+                      Результаты →
                     </a>
                   )}
                 </li>

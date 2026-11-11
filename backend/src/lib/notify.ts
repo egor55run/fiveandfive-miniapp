@@ -213,14 +213,16 @@ export function seasonPassText(events: Event[]): string {
 
 export function resultText(
   event: Event,
-  result: { finishTime: string; place: number; finishersTotal: number; points?: number; gender?: 'MALE' | 'FEMALE' | null; seasonLine?: string | null },
+  result: { finishTime: string; place: number; finishersTotal: number; points?: number; gender?: 'MALE' | 'FEMALE' | null; seasonLine?: string | null; distance?: string | null },
 ): string {
   // «1 из 1» выглядит издевательски — когда финишёр один, показываем только место.
   const place =
     result.finishersTotal > 1
       ? `<b>${result.place} из ${result.finishersTotal}</b>`
       : `<b>${result.place}</b>`;
-  const among = result.gender === 'FEMALE' ? ' среди женщин' : result.gender === 'MALE' ? ' среди мужчин' : '';
+  const among =
+    (result.gender === 'FEMALE' ? ' среди женщин' : result.gender === 'MALE' ? ' среди мужчин' : '') +
+    (result.distance ? ` на ${escapeHtml(result.distance)}` : '');
 
   return [
     '🏁 <b>Результат готов</b>',

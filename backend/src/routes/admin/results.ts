@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../../prisma';
 import { deliver, formatFinishTime, resultText } from '../../lib/notify';
 import { personLabel, writeAudit } from '../../lib/audit';
+import { syncEventPublished } from '../../lib/results';
 import { protestUntil, recomputePlaces, resultPoints, placesAfterStage, publishedStages, seasonPlaceLine, type SeasonPlace } from '../../lib/rating';
 import { parseTimingCsv } from '../../lib/timingImport';
 import { requireAdmin } from '../../plugins/adminAuth';
@@ -42,7 +43,18 @@ const importSchema = z.object({
   /** Оплаченных, кого нет в файле, отметить «не стартовал». */
   missingAsDns: z.boolean().default(false),
   force: z.boolean().optional(),
+  /** Файл одной дистанции (2026-11-11): номера других дистанций — в отчёт, не в протокол. */
+  distanceId: z.number().int().positive().optional(),
 });
+
+/** Публикация и снятие — дистанции или всего старта (без distanceId). */
+const publishSchema = z.object({ distanceId: z.number().int().positive().optional() }).default({});
+
+/** Окно протестов дистанции; у результата без дистанции — по старту. */
+async function distancePublishedAt(eventId: number, distanceId: number | null): Promise<Date | null> {
+  if (distanceId === null) return (await prisma.event.findUniqueOrThrow({ where: { id: eventId } })).resultsPublishedAt;
+  return (await prisma.eventDistance.findUnique({ where: { id: distanceId } }))?.resultsPublishedAt ?? null;
+}
 
 function parseId(raw: string): number | null {
   const id = Number(raw);
@@ -77,6 +89,7 @@ async function protocolOf(eventId: number) {
     username: r.user.username,
     gender: r.user.gender,
     bib: bibOf.get(r.userId) ?? null,
+    eventDistanceId: r.eventDistanceId,
     status: r.status,
     finishTime: r.finishTime,
     place: r.place,
@@ -87,28 +100,50 @@ async function protocolOf(eventId: number) {
 }
 
 async function eventInfo(eventId: number) {
-  const e = await prisma.event.findUniqueOrThrow({ where: { id: eventId } });
+  const e = await prisma.event.findUniqueOrThrow({ where: { id: eventId }, include: { distances: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] } } });
+  const counts = await prisma.result.groupBy({ by: ['eventDistanceId'], where: { eventId }, _count: { _all: true } });
   return {
     id: e.id,
     title: e.title,
     date: e.date,
     distance: e.distance,
+    seriesStage: e.seasonId !== null,
     resultsPublishedAt: e.resultsPublishedAt,
     protestUntil: protestUntil(e.resultsPublishedAt),
+    // Публикация и окно протестов — по каждой дистанции (2026-11-11).
+    distances: e.distances.map((d) => ({
+      id: d.id,
+      label: d.label,
+      resultsPublishedAt: d.resultsPublishedAt,
+      protestUntil: protestUntil(d.resultsPublishedAt),
+      results: counts.find((c) => c.eventDistanceId === d.id)?._count._all ?? 0,
+    })),
   };
 }
 
 type Logger = { info: (o: object, m: string) => void; warn: (o: object, m: string) => void };
 
 /** Сообщения участникам с результатом — тем, кому ещё не отправляли. */
-async function notifyResults(eventId: number, log: Logger): Promise<{ sent: number }> {
-  const event = await prisma.event.findUniqueOrThrow({ where: { id: eventId } });
-  const results = await prisma.result.findMany({ where: { eventId, status: 'FINISHED' }, include: { user: true } });
+async function notifyResults(eventId: number, log: Logger, distanceIds?: number[]): Promise<{ sent: number }> {
+  const event = await prisma.event.findUniqueOrThrow({ where: { id: eventId }, include: { distances: true } });
+  // Только опубликованные дистанции (или переданные).
+  const published = event.distances.filter((d) => d.resultsPublishedAt !== null).map((d) => d.id);
+  const ids = distanceIds ?? published;
+  const results = await prisma.result.findMany({
+    where: { eventId, status: 'FINISHED', OR: [{ eventDistanceId: { in: ids } }, ...(event.distances.length === 0 ? [{ eventDistanceId: null }] : [])] },
+    include: { user: true },
+  });
+  const labelOf = new Map(event.distances.map((d) => [d.id, d.label]));
+  const multi = event.distances.length > 1;
   const done = new Set(
     (await prisma.notification.findMany({ where: { eventId, kind: 'RESULT', status: 'SENT' }, select: { userId: true } })).map((n) => n.userId),
   );
+  // «N из M» — на своей дистанции среди своего пола.
+  const keyOf = (r: (typeof results)[number], g: string) => `${r.eventDistanceId ?? 0}:${g}`;
   const finishersByGender = new Map<string, number>();
-  for (const r of results) finishersByGender.set(r.user.gender ?? '', (finishersByGender.get(r.user.gender ?? '') ?? 0) + 1);
+  for (const r of results) {
+    for (const g of [r.user.gender ?? '', '*']) finishersByGender.set(keyOf(r, g), (finishersByGender.get(keyOf(r, g)) ?? 0) + 1);
+  }
   // Место в рейтинге сезона до и после этого этапа — строка в сообщении (только этапы серии).
   let after = new Map<number, SeasonPlace>();
   let before = new Map<number, SeasonPlace>();
@@ -135,9 +170,11 @@ async function notifyResults(eventId: number, log: Logger): Promise<{ sent: numb
       text: resultText(event, {
         finishTime: formatFinishTime(r.finishTime),
         place: (gender ? r.genderPlace : r.place) ?? 0,
-        finishersTotal: gender ? finishersByGender.get(gender) ?? 1 : results.length,
-        points: gender ? resultPoints(r, gender) : undefined,
+        finishersTotal: finishersByGender.get(keyOf(r, gender ?? '*')) ?? 1,
+        // Баллы рейтинга — только у этапов серии; у отдельного старта их нет.
+        points: gender && event.seasonId !== null ? resultPoints(r, gender) : undefined,
         gender,
+        distance: multi && r.eventDistanceId ? labelOf.get(r.eventDistanceId) ?? null : null,
         seasonLine: now ? seasonPlaceLine(stageNo, before.get(r.userId)?.place ?? null, now.place, gender) : null,
       }),
       log,
@@ -175,7 +212,6 @@ export async function adminResultsRoutes(app: FastifyInstance) {
 
     const event = await prisma.event.findUnique({ where: { id: eventId } });
     if (!event) return reply.code(404).send({ error: 'Старт не найден' });
-    if (protestClosed(event.resultsPublishedAt) && !force) return reply.code(409).send(PROTEST_CLOSED);
 
     // Результат только зарегистрированному, иначе протокол разойдётся со
     // списком участников. Отменённые регистрации тоже не в счёт.
@@ -189,6 +225,9 @@ export async function adminResultsRoutes(app: FastifyInstance) {
     if (registration.paymentStatus === 'CANCELLED') {
       return reply.code(409).send({ error: 'Регистрация отменена — результат внести нельзя', reason: 'registration_cancelled' });
     }
+    // Окно протестов — своей дистанции (публикуются по дистанциям).
+    const distPublishedAt = await distancePublishedAt(eventId, registration.distanceId);
+    if (protestClosed(distPublishedAt) && !force) return reply.code(409).send(PROTEST_CLOSED);
 
     const before = await prisma.result.findUnique({ where: { userId_eventId: { userId, eventId } } });
     await prisma.$transaction(async (tx) => {
@@ -200,7 +239,7 @@ export async function adminResultsRoutes(app: FastifyInstance) {
       });
       await recomputePlaces(tx, eventId);
       // Правки опубликованных результатов — в журнал (окно протестов).
-      if (event.resultsPublishedAt) {
+      if (distPublishedAt) {
         await writeAudit(tx, {
           adminTelegramId: req.admin!.telegramId,
           action: 'result.update',
@@ -227,11 +266,12 @@ export async function adminResultsRoutes(app: FastifyInstance) {
     if (id === null) return reply.code(400).send({ error: 'Некорректный id' });
     const result = await prisma.result.findUnique({ where: { id }, include: { event: true, user: true } });
     if (!result) return reply.code(404).send({ error: 'Результат не найден' });
-    if (protestClosed(result.event.resultsPublishedAt) && req.query.force !== '1') return reply.code(409).send(PROTEST_CLOSED);
+    const resultPublishedAt = await distancePublishedAt(result.eventId, result.eventDistanceId);
+    if (protestClosed(resultPublishedAt) && req.query.force !== '1') return reply.code(409).send(PROTEST_CLOSED);
     await prisma.$transaction(async (tx) => {
       await tx.result.delete({ where: { id } });
       await recomputePlaces(tx, result.eventId);
-      if (result.event.resultsPublishedAt) {
+      if (resultPublishedAt) {
         await writeAudit(tx, {
           adminTelegramId: req.admin!.telegramId,
           action: 'result.update',
@@ -257,16 +297,27 @@ export async function adminResultsRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: 'Нужен файл', details: parsed.error.flatten() });
     const event = await prisma.event.findUnique({ where: { id: eventId } });
     if (!event) return reply.code(404).send({ error: 'Старт не найден' });
-    if (!parsed.data.dryRun && protestClosed(event.resultsPublishedAt) && !parsed.data.force) return reply.code(409).send(PROTEST_CLOSED);
+    const distanceId = parsed.data.distanceId ?? null;
+    if (distanceId !== null && !(await prisma.eventDistance.findFirst({ where: { id: distanceId, eventId } }))) {
+      return reply.code(400).send({ error: 'Дистанция не найдена', reason: 'no_distance' });
+    }
+    const importPublishedAt = distanceId !== null ? await distancePublishedAt(eventId, distanceId) : event.resultsPublishedAt;
+    if (!parsed.data.dryRun && protestClosed(importPublishedAt) && !parsed.data.force) return reply.code(409).send(PROTEST_CLOSED);
 
     const file = parseTimingCsv(parsed.data.csv);
     if ('error' in file) return reply.code(400).send({ error: file.error, reason: 'bad_file' });
 
-    // Бегут оплаченные (и добавленные вручную) — по номеру.
-    const regs = await prisma.registration.findMany({
+    // Бегут оплаченные (и добавленные вручную) — по номеру. Файл одной
+    // дистанции — только её участники; номера других — в отчёт отдельно.
+    const allRegs = await prisma.registration.findMany({
       where: { eventId, paymentStatus: 'PAID' },
       include: { user: true },
     });
+    const regs = distanceId === null ? allRegs : allRegs.filter((r) => r.distanceId === distanceId);
+    const otherDistanceBibs = new Set(
+      distanceId === null ? [] : allRegs.filter((r) => r.distanceId !== distanceId && r.bibNumber !== null).map((r) => r.bibNumber!),
+    );
+    const otherDistance: number[] = [];
     const byBib = new Map(regs.filter((r) => r.bibNumber !== null).map((r) => [r.bibNumber!, r]));
     const seen = new Set<number>();
     const matched: { bib: number; userId: number; registrationId: number; distanceId: number | null; name: string; status: ResultStatus; finishTime: number | null }[] = [];
@@ -280,7 +331,8 @@ export async function adminResultsRoutes(app: FastifyInstance) {
       seen.add(row.bib);
       const reg = byBib.get(row.bib);
       if (!reg) {
-        unknown.push(row.bib);
+        if (otherDistanceBibs.has(row.bib)) otherDistance.push(row.bib);
+        else unknown.push(row.bib);
         continue;
       }
       matched.push({
@@ -299,6 +351,7 @@ export async function adminResultsRoutes(app: FastifyInstance) {
     const preview = {
       matched: matched.map(({ bib, name, status, finishTime }) => ({ bib, name, status, finishTime })),
       unknown,
+      otherDistance,
       duplicates,
       missing: missing.map(({ bib, name }) => ({ bib, name })),
       warnings: file.warnings,
@@ -343,19 +396,28 @@ export async function adminResultsRoutes(app: FastifyInstance) {
   app.post<{ Params: { id: string } }>('/admin/events/:id/results/publish', async (req, reply) => {
     const eventId = parseId(req.params.id);
     if (eventId === null) return reply.code(400).send({ error: 'Некорректный id' });
-    const event = await prisma.event.findUnique({ where: { id: eventId } });
+    const body = publishSchema.safeParse(req.body ?? {});
+    if (!body.success) return reply.code(400).send({ error: 'Некорректная дистанция' });
+    const event = await prisma.event.findUnique({ where: { id: eventId }, include: { distances: true } });
     if (!event) return reply.code(404).send({ error: 'Старт не найден' });
-    if ((await prisma.result.count({ where: { eventId } })) === 0) {
-      return reply.code(409).send({ error: 'Результатов ещё нет', reason: 'no_results' });
-    }
-    if (!event.resultsPublishedAt) {
+    // Дистанция или (без distanceId) все дистанции старта — как раньше у этапов.
+    const targets = body.data.distanceId ? event.distances.filter((d) => d.id === body.data.distanceId) : event.distances;
+    if (body.data.distanceId && targets.length === 0) return reply.code(404).send({ error: 'Дистанция не найдена' });
+    const ids = targets.map((d) => d.id);
+    const hasResults = await prisma.result.count({ where: { eventId, ...(body.data.distanceId ? { eventDistanceId: body.data.distanceId } : {}) } });
+    if (hasResults === 0) return reply.code(409).send({ error: 'Результатов ещё нет', reason: 'no_results' });
+    const fresh = targets.filter((d) => d.resultsPublishedAt === null);
+    if (fresh.length > 0 || (event.distances.length === 0 && !event.resultsPublishedAt)) {
       await prisma.$transaction(async (tx) => {
-        await tx.event.update({ where: { id: eventId }, data: { resultsPublishedAt: new Date() } });
+        const now = new Date();
+        await tx.eventDistance.updateMany({ where: { id: { in: fresh.map((d) => d.id) } }, data: { resultsPublishedAt: now } });
+        if (event.distances.length === 0) await tx.event.update({ where: { id: eventId }, data: { resultsPublishedAt: now } });
+        else await syncEventPublished(tx, eventId);
         await writeAudit(tx, {
           adminTelegramId: req.admin!.telegramId,
           action: 'result.publish',
           eventId,
-          subject: `Протокол «${event.title}»`,
+          subject: `Протокол «${event.title}»${body.data.distanceId ? `, ${targets[0].label}` : ''}`,
           changes: { published: [null, 'опубликованы'] },
         });
       });
@@ -363,27 +425,35 @@ export async function adminResultsRoutes(app: FastifyInstance) {
     // Сообщения — в фоне: участников может быть много.
     const log = req.log;
     setImmediate(() => {
-      notifyResults(eventId, log)
+      notifyResults(eventId, log, event.distances.length ? ids : undefined)
         .then((r) => log.info({ eventId, ...r }, 'Результаты разосланы участникам'))
         .catch((err) => log.warn({ eventId, err: String(err) }, 'Сбой рассылки результатов'));
     });
-    req.log.info({ eventId }, 'Результаты опубликованы');
+    req.log.info({ eventId, distances: ids }, 'Результаты опубликованы');
     return { event: await eventInfo(eventId) };
   });
 
-  /** POST /admin/events/:id/results/unpublish — снять публикацию (ошибка в протоколе). */
+  /** POST /admin/events/:id/results/unpublish — снять публикацию дистанции или всего старта. */
   app.post<{ Params: { id: string } }>('/admin/events/:id/results/unpublish', async (req, reply) => {
     const eventId = parseId(req.params.id);
     if (eventId === null) return reply.code(400).send({ error: 'Некорректный id' });
-    const event = await prisma.event.findUnique({ where: { id: eventId } });
+    const body = publishSchema.safeParse(req.body ?? {});
+    if (!body.success) return reply.code(400).send({ error: 'Некорректная дистанция' });
+    const event = await prisma.event.findUnique({ where: { id: eventId }, include: { distances: true } });
     if (!event) return reply.code(404).send({ error: 'Старт не найден' });
+    const label = body.data.distanceId ? event.distances.find((d) => d.id === body.data.distanceId)?.label : null;
     await prisma.$transaction(async (tx) => {
-      await tx.event.update({ where: { id: eventId }, data: { resultsPublishedAt: null } });
+      await tx.eventDistance.updateMany({
+        where: { eventId, ...(body.data.distanceId ? { id: body.data.distanceId } : {}) },
+        data: { resultsPublishedAt: null },
+      });
+      if (event.distances.length === 0) await tx.event.update({ where: { id: eventId }, data: { resultsPublishedAt: null } });
+      else await syncEventPublished(tx, eventId);
       await writeAudit(tx, {
         adminTelegramId: req.admin!.telegramId,
         action: 'result.publish',
         eventId,
-        subject: `Протокол «${event.title}»`,
+        subject: `Протокол «${event.title}»${label ? `, ${label}` : ''}`,
         changes: { published: ['опубликованы', 'сняты с публикации'] },
       });
     });

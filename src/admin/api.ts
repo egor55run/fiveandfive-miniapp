@@ -581,6 +581,8 @@ export type ResultRow = {
   username: string | null;
   gender: 'MALE' | 'FEMALE' | null;
   bib: number | null;
+  /** Дистанция результата: места и публикация — по дистанциям. */
+  eventDistanceId: number | null;
   status: ResultStatus;
   /** Время от выстрела, секунды; null — не финишировал. */
   finishTime: number | null;
@@ -596,6 +598,9 @@ export type ResultsEventInfo = {
   title: string;
   date: string;
   distance: string;
+  seriesStage: boolean;
+  /** Публикация и окно протестов по каждой дистанции. */
+  distances: { id: number; label: string; resultsPublishedAt: string | null; protestUntil: string | null; results: number }[];
   resultsPublishedAt: string | null;
   /** До какого момента окно протестов; null — не опубликовано. */
   protestUntil: string | null;
@@ -617,22 +622,24 @@ export const deleteResult = (resultId: number, force = false) =>
 export type ImportPreview = {
   matched: { bib: number; name: string; status: ResultStatus; finishTime: number | null }[];
   unknown: number[];
+  /** Номера участников других дистанций старта (файл одной дистанции). */
+  otherDistance?: number[];
   duplicates: number[];
   missing: { bib: number | null; name: string }[];
   warnings: string[];
 };
 
 /** Файл хронометража: dryRun — только предпросмотр. */
-export const importResults = (eventId: number, body: { csv: string; dryRun: boolean; missingAsDns: boolean; force?: boolean }) =>
+export const importResults = (eventId: number, body: { csv: string; dryRun: boolean; missingAsDns: boolean; force?: boolean; distanceId?: number }) =>
   request<{ preview: ImportPreview; results?: ResultRow[]; event?: ResultsEventInfo }>(`/admin/events/${eventId}/results/import`, {
     method: 'POST',
     body,
   });
 
-export const publishResults = (eventId: number) =>
-  request<{ event: ResultsEventInfo }>(`/admin/events/${eventId}/results/publish`, { method: 'POST', body: {} });
-export const unpublishResults = (eventId: number) =>
-  request<{ event: ResultsEventInfo }>(`/admin/events/${eventId}/results/unpublish`, { method: 'POST', body: {} });
+export const publishResults = (eventId: number, distanceId?: number) =>
+  request<{ event: ResultsEventInfo }>(`/admin/events/${eventId}/results/publish`, { method: 'POST', body: distanceId ? { distanceId } : {} });
+export const unpublishResults = (eventId: number, distanceId?: number) =>
+  request<{ event: ResultsEventInfo }>(`/admin/events/${eventId}/results/unpublish`, { method: 'POST', body: distanceId ? { distanceId } : {} });
 
 // ---------- Двойники ----------
 

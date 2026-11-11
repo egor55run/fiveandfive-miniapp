@@ -118,3 +118,22 @@ export async function fetchSeasonRating(): Promise<SeasonRating | null> {
   if (!res.ok) throw new Error(`Не удалось загрузить рейтинг (${res.status})`);
   return (await res.json()) as SeasonRating;
 }
+
+/** Протокол старта по дистанциям (GET /results/:slug) — любой старт, без баллов. */
+export type ProtocolRow = { place: number | null; name: string; bib: number | null; time: number | null; status: StageRow['status']; me: boolean };
+export type DistanceProtocol = { distanceId: number; label: string; published: boolean; protestUntil: string | null; men: ProtocolRow[]; women: ProtocolRow[] };
+export type EventResults = {
+  event: { id: number; title: string; slug: string | null; date: string; location: string; seriesStage: boolean };
+  distances: DistanceProtocol[];
+};
+
+/** Протокол старта по дистанциям; null — старта нет или ни одна дистанция не опубликована. */
+export async function fetchEventResults(slug: string): Promise<EventResults | null> {
+  const initData = typeof window !== 'undefined' ? getInitData() : '';
+  const res = await fetch(`${API_URL}/results/${encodeURIComponent(slug)}`, {
+    headers: initData ? { Authorization: `tma ${initData}` } : {},
+    cache: 'no-store',
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as EventResults;
+}

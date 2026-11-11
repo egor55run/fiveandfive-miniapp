@@ -169,6 +169,13 @@ export default async function RacePage({ params }: Props) {
         {r.back}
       </a>
 
+      {/* Баннер старта из админки (оформление: фон и логотип) — как в Mini App. */}
+      {event.theme?.bgUrl && (
+        <div className="race-banner" style={{ backgroundImage: `url("${apiAsset(event.theme.bgUrl)}")` }}>
+          {event.theme.logoUrl && <img className="race-banner__logo" src={apiAsset(event.theme.logoUrl)} alt={event.title} />}
+        </div>
+      )}
+
       <header className="race__head">
         {label && <span className="race__label">{label}</span>}
         <h1 className="h-title race__title">
@@ -179,7 +186,12 @@ export default async function RacePage({ params }: Props) {
         </h1>
         {event.resultsPublished && event.slug && (
           <p className="race__results">
-            <a href={`/reiting/${event.slug}`}>Результаты и баллы рейтинга →</a>
+            {/* Этап — протокол с баллами рейтинга; отдельный старт — по дистанциям, без баллов. */}
+            {stage ? (
+              <a href={`/reiting/${event.slug}`}>Результаты и баллы рейтинга →</a>
+            ) : (
+              <a href={`/starty/${event.slug}/rezultaty`}>Результаты по дистанциям →</a>
+            )}
           </p>
         )}
       </header>

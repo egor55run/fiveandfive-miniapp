@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { prisma } from '../prisma';
+import { eventProtocol } from '../lib/results';
 import { verifyInitData } from '../lib/telegramAuth';
 import { CUTOFF_SECONDS, MIN_POINTS, PROTEST_HOURS, RATING_METERS, T0, protestUntil, seasonStandings, stageProtocol } from '../lib/rating';
 
@@ -45,6 +46,16 @@ export async function ratingRoutes(app: FastifyInstance) {
     if (!season) return reply.code(404).send({ error: 'Сезон не найден' });
     const table = await seasonStandings(season.id, { publicOnly: true, meUserId: await meOf(req) });
     return { season: { id: season.id, title: season.title, year: season.year }, formula: FORMULA, ...withoutUserId(table) };
+  });
+
+  /** GET /results/:slug — протокол старта по дистанциям (любой старт; без баллов). */
+  app.get<{ Params: { slug: string } }>('/results/:slug', async (req, reply) => {
+    const event = await prisma.event.findUnique({ where: { slug: req.params.slug } });
+    if (!event || !event.visible) return reply.code(404).send({ error: 'Старт не найден' });
+    return {
+      event: { id: event.id, title: event.title, slug: event.slug, date: event.date, location: event.location, seriesStage: event.seasonId !== null },
+      distances: await eventProtocol(event.id, { publicOnly: true, meUserId: await meOf(req) }),
+    };
   });
 
   /** GET /rating/stage/:slug — протокол этапа (М и Ж) с баллами. */

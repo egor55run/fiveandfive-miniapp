@@ -1,6 +1,6 @@
 import { cache } from 'react';
 import type { EventDto } from '../lib/api';
-import type { SeasonRating, StageRating } from '../lib/rating';
+import type { EventResults, SeasonRating, StageRating } from '../lib/rating';
 
 export { anyRegistrationOpen, botChatLink, botRaceLink } from './links';
 
@@ -59,4 +59,6 @@ export async function fetchSeasonPrice(): Promise<number | null> {
 
 /** Рейтинг сезона и протокол этапа (только опубликованные результаты). */
 export const fetchSeasonRating = cache(() => getJson<SeasonRating>('/rating/season'));
+/** Протокол старта по дистанциям (любой старт). */
+export const fetchEventResults = cache((slug: string) => getJson<EventResults>(`/results/${encodeURIComponent(slug)}`));
 export const fetchStageRating = cache((slug: string) => getJson<StageRating>(`/rating/stage/${encodeURIComponent(slug)}`));

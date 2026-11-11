@@ -55,6 +55,8 @@ export default function ResultsSection() {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [missingAsDns, setMissingAsDns] = useState(true);
   const [busy, setBusy] = useState(false);
+  /** Выбранная дистанция: загрузка файла, публикация, протокол — по ней (2026-11-11). */
+  const [distanceId, setDistanceId] = useState<number | null>(null);
 
   useEffect(() => {
     getEvents()
@@ -74,6 +76,7 @@ export default function ResultsSection() {
       setParticipants(p.participants.filter((x) => x.paymentStatus !== 'CANCELLED'));
       setResults(r.results);
       setInfo(r.event);
+      setDistanceId((prev) => (r.event.distances.some((d) => d.id === prev) ? prev : r.event.distances[0]?.id ?? null));
       setDrafts({});
       setCsv(null);
       setPreview(null);
@@ -92,7 +95,13 @@ export default function ResultsSection() {
     if (eventId !== null) void load(eventId);
   }, [eventId]);
 
-  const protestClosed = info?.protestUntil ? isPast(info.protestUntil) : false;
+  // Публикация и протесты — у выбранной дистанции.
+  const dist = info?.distances.find((d) => d.id === distanceId) ?? null;
+  const multi = (info?.distances.length ?? 0) > 1;
+  const pub = dist ? { at: dist.resultsPublishedAt, until: dist.protestUntil } : { at: info?.resultsPublishedAt ?? null, until: info?.protestUntil ?? null };
+  const protestClosed = pub.until ? isPast(pub.until) : false;
+  const inDist = <T extends { eventDistanceId?: number | null; distanceId?: number | null }>(x: T) =>
+    distanceId === null || (x.eventDistanceId ?? x.distanceId ?? null) === distanceId;
   /** После окна протестов — спросить и повторить с force. */
   const withForce = async <T,>(job: (force: boolean) => Promise<T>): Promise<T | null> => {
     try {
@@ -169,7 +178,7 @@ export default function ResultsSection() {
     setCsv({ name: file.name, text });
     setBusy(true);
     try {
-      const res = await importResults(eventId, { csv: text, dryRun: true, missingAsDns });
+      const res = await importResults(eventId, { csv: text, dryRun: true, missingAsDns, distanceId: distanceId ?? undefined });
       setPreview(res.preview);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось прочитать файл');
@@ -184,7 +193,7 @@ export default function ResultsSection() {
     setBusy(true);
     setError(null);
     try {
-      const res = await withForce((force) => importResults(eventId, { csv: csv.text, dryRun: false, missingAsDns, force }));
+      const res = await withForce((force) => importResults(eventId, { csv: csv.text, dryRun: false, missingAsDns, force, distanceId: distanceId ?? undefined }));
       if (!res) return;
       if (res.results) setResults(res.results);
       if (res.event) setInfo(res.event);
@@ -204,17 +213,18 @@ export default function ResultsSection() {
 
   const publish = async () => {
     if (eventId === null) return;
-    const again = info?.resultsPublishedAt !== null;
+    const again = pub.at !== null;
+    const what = multi && dist ? ` на ${dist.label}` : '';
     const ok = window.confirm(
       again
-        ? 'Результаты уже опубликованы. Дослать сообщения тем, кому ещё не отправляли?'
-        : 'Опубликовать результаты? Они появятся на сайте и в приложении, участникам придёт сообщение с местом и баллами. С этого момента — 48 часов на протесты.',
+        ? `Результаты${what} уже опубликованы. Дослать сообщения тем, кому ещё не отправляли?`
+        : `Опубликовать результаты${what}? Они появятся на сайте и в приложении, участникам придёт сообщение с местом${info?.seriesStage ? ' и баллами' : ''}. С этого момента — 48 часов на протесты.`,
     );
     if (!ok) return;
     setBusy(true);
     setError(null);
     try {
-      const res = await publishResults(eventId);
+      const res = await publishResults(eventId, distanceId ?? undefined);
       setInfo(res.event);
       setNotice(again ? 'Сообщения досылаются в фоне.' : 'Результаты опубликованы, сообщения участникам уходят в фоне.');
     } catch (err) {
@@ -227,7 +237,7 @@ export default function ResultsSection() {
   const unpublish = async () => {
     if (eventId === null || !window.confirm('Снять результаты с публикации? На сайте и в приложении они пропадут до повторной публикации.')) return;
     try {
-      const res = await unpublishResults(eventId);
+      const res = await unpublishResults(eventId, distanceId ?? undefined);
       setInfo(res.event);
       setNotice('Результаты сняты с публикации.');
     } catch (err) {
@@ -238,7 +248,7 @@ export default function ResultsSection() {
   const resultByUser = new Map(results.map((r) => [r.userId, r]));
   const protocol = (g: 'MALE' | 'FEMALE') =>
     results
-      .filter((r) => r.gender === g)
+      .filter((r) => r.gender === g && inDist(r))
       .sort((a, b) => (a.genderPlace ?? Infinity) - (b.genderPlace ?? Infinity));
   const noGender = results.filter((r) => !r.gender);
 
@@ -257,10 +267,20 @@ export default function ResultsSection() {
           <button type="button" className="ad-btn" onClick={() => eventId !== null && void load(eventId)}>
             Обновить
           </button>
-          <button type="button" className="ad-btn ad-btn--primary" disabled={busy || results.length === 0} onClick={() => void publish()}>
-            {info?.resultsPublishedAt ? 'Дослать сообщения' : 'Опубликовать результаты'}
+          {multi && (
+            <select value={distanceId ?? ''} onChange={(e) => setDistanceId(Number(e.target.value))} aria-label="Дистанция">
+              {info!.distances.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.label}
+                  {d.resultsPublishedAt ? ' — опубликованы' : d.results > 0 ? ` — ${d.results} рез.` : ''}
+                </option>
+              ))}
+            </select>
+          )}
+          <button type="button" className="ad-btn ad-btn--primary" disabled={busy || results.filter(inDist).length === 0} onClick={() => void publish()}>
+            {pub.at ? 'Дослать сообщения' : multi && dist ? `Опубликовать ${dist.label}` : 'Опубликовать результаты'}
           </button>
-          {info?.resultsPublishedAt && (
+          {pub.at && (
             <button type="button" className="ad-btn" disabled={busy} onClick={() => void unpublish()}>
               Снять с публикации
             </button>
@@ -269,12 +289,14 @@ export default function ResultsSection() {
       </header>
 
       {info && (
-        <p className={info.resultsPublishedAt ? 'ad-msg ad-msg--ok' : 'ad-hint'}>
-          {info.resultsPublishedAt
+        <p className={pub.at ? 'ad-msg ad-msg--ok' : 'ad-hint'}>
+          {multi && dist ? `${dist.label}: ` : ''}
+          {pub.at
             ? protestClosed
-              ? `Опубликованы ${formatDateTime(info.resultsPublishedAt)}. Окно протестов закрыто — результаты итоговые; правки только с подтверждением.`
-              : `Опубликованы ${formatDateTime(info.resultsPublishedAt)}. Предварительные: протесты до ${formatDateTime(info.protestUntil!)}.`
+              ? `Опубликованы ${formatDateTime(pub.at)}. Окно протестов закрыто — результаты итоговые; правки только с подтверждением.`
+              : `Опубликованы ${formatDateTime(pub.at)}. Предварительные: протесты до ${formatDateTime(pub.until!)}.`
             : 'Не опубликованы — участники и сайт их не видят.'}
+          {multi && ' Каждая дистанция публикуется отдельно, со своим окном протестов.'}
         </p>
       )}
 
@@ -282,7 +304,7 @@ export default function ResultsSection() {
       {notice && <p className="ad-msg ad-msg--ok">{notice}</p>}
 
       <div className="ad-card">
-        <h3>Файл хронометража</h3>
+        <h3>Файл хронометража{multi && dist ? ` — ${dist.label}` : ''}</h3>
         <p className="ad-hint">
           CSV или TSV: колонки «Номер» и «Время» (от выстрела: 22:14, 1:02:30, 22:14.7 — доли округляются вверх),
           по желанию «Статус» (DNF, DNS, DSQ). Сначала покажем, что получится, — потом «Сохранить».
@@ -300,6 +322,11 @@ export default function ResultsSection() {
               В «{csv.name}»: сопоставлено по номеру — <b>{preview.matched.length}</b>
               {preview.matched.filter((m) => m.status !== 'FINISHED').length > 0 &&
                 ` (из них без финиша: ${preview.matched.filter((m) => m.status !== 'FINISHED').length})`}
+              {(preview.otherDistance?.length ?? 0) > 0 && (
+                <>
+                  ; номера другой дистанции — <b>{preview.otherDistance!.length}</b> (не загрузятся)
+                </>
+              )}
               ; номеров нет среди оплативших — <b>{preview.unknown.length}</b>
               {preview.unknown.length > 0 && ` (${preview.unknown.slice(0, 20).join(', ')}${preview.unknown.length > 20 ? '…' : ''})`}
               ; повторы — {preview.duplicates.length}; нет в файле — <b>{preview.missing.length}</b>
@@ -357,7 +384,7 @@ export default function ResultsSection() {
               </tr>
             </thead>
             <tbody>
-              {participants.map((p) => {
+              {participants.filter(inDist).map((p) => {
                 const row = resultByUser.get(p.userId);
                 const d = drafts[p.userId] ?? { status: row?.status ?? 'FINISHED', time: '' };
                 const rowBusy = busyUserId === p.userId;
@@ -423,7 +450,7 @@ export default function ResultsSection() {
 
       {results.length > 0 && (
         <div className="ad-card">
-          <h3>Протокол</h3>
+          <h3>Протокол{multi && dist ? ` — ${dist.label}` : ''}</h3>
           {(['MALE', 'FEMALE'] as const).map((g) => (
             <div key={g}>
               <h4>{g === 'MALE' ? 'Мужчины' : 'Женщины'}</h4>
@@ -436,7 +463,8 @@ export default function ResultsSection() {
                       {fullName(r.lastName, r.firstName)}
                     </span>
                     <span className="num">
-                      {r.finishTime !== null && r.status === 'FINISHED' ? formatSeconds(r.finishTime) : '—'} · {r.points}
+                      {r.finishTime !== null && r.status === 'FINISHED' ? formatSeconds(r.finishTime) : '—'}
+                      {info?.seriesStage ? ` · ${r.points}` : ''}
                     </span>
                   </li>
                 ))}

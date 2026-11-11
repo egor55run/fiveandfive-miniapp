@@ -49,8 +49,8 @@ export function protestUntil(publishedAt: Date | null): Date | null {
 type Tx = Prisma.TransactionClient;
 
 /**
- * Места на старте: среди всех финишировавших (place) и среди своего пола
- * (genderPlace). Равные времена делят место (1, 2, 2, 4). Не финишировавшим —
+ * Места на дистанции старта: среди всех финишировавших (place) и среди своего
+ * пола (genderPlace). Равные времена делят место (1, 2, 2, 4). Не финишировавшим —
  * null. Вызывается после любой правки результатов.
  */
 export async function recomputePlaces(tx: Tx, eventId: number): Promise<void> {
@@ -68,10 +68,15 @@ export async function recomputePlaces(tx: Tx, eventId: number): Promise<void> {
     });
     return out;
   };
-  const overall = rank(finished);
+  // Места — внутри своей дистанции (2026-11-11): 21 км и 5 км не смешиваем.
+  const overall = new Map<number, number>();
   const byGender = new Map<number, number>();
-  for (const g of ['MALE', 'FEMALE'] as const) {
-    for (const [id, p] of rank(finished.filter((r) => r.user.gender === g))) byGender.set(id, p);
+  for (const d of new Set(finished.map((r) => r.eventDistanceId))) {
+    const inDist = finished.filter((r) => r.eventDistanceId === d);
+    for (const [id, p] of rank(inDist)) overall.set(id, p);
+    for (const g of ['MALE', 'FEMALE'] as const) {
+      for (const [id, p] of rank(inDist.filter((r) => r.user.gender === g))) byGender.set(id, p);
+    }
   }
   for (const r of rows) {
     const place = overall.get(r.id) ?? null;

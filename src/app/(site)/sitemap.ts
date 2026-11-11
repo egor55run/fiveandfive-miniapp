@@ -30,6 +30,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     page('/', 1, 'weekly'),
     page(HUB_PATH, 0.9, 'weekly'),
     ...events.filter((e) => e.slug).map((e) => page(`/starty/${e.slug}`, 0.9, 'weekly')),
+    // Результаты отдельных стартов по дистанциям (у этапов — /reiting/<старт>).
+    ...events
+      .filter((e) => e.slug && e.resultsPublished && e.seriesStage === false)
+      .map((e) => page(`/starty/${e.slug}/rezultaty`, 0.6, 'monthly')),
     page('/reiting', 0.7, 'weekly'),
     page('/voprosy', 0.6, 'monthly'),
     ...docs,

@@ -13,6 +13,8 @@ type Props = {
   loading: boolean;
   error: string | null;
   onRegister: (event: EventDto) => void;
+  /** Протокол старта: у прошедших стартов с опубликованными результатами. */
+  onResults?: (event: EventDto) => void;
   onJoinSeries: () => void;
   onRetry: () => void;
   /** Администратор может записаться и при закрытой регистрации. */
@@ -25,6 +27,7 @@ function HomeScreen({
   loading,
   error,
   onRegister,
+  onResults,
   onJoinSeries,
   onRetry,
   registrationOpenForMe,
@@ -77,7 +80,7 @@ function HomeScreen({
           {rest.length > 0 && (
             <div className="races-list">
               {rest.map((e) => (
-                <RaceListItem key={e.id} event={e} onSelect={() => onRegister(e)} />
+                <RaceListItem key={e.id} event={e} onSelect={() => (e.resultsPublished && onResults ? onResults(e) : onRegister(e))} />
               ))}
             </div>
           )}
@@ -88,7 +91,7 @@ function HomeScreen({
               <p className="races-others__text">Вне серии: в звезду и рейтинг сезона не входят, абонемент на них не действует.</p>
               <div className="races-list">
                 {others.map((e) => (
-                  <RaceListItem key={e.id} event={e} onSelect={() => onRegister(e)} />
+                  <RaceListItem key={e.id} event={e} onSelect={() => (e.resultsPublished && onResults ? onResults(e) : onRegister(e))} />
                 ))}
               </div>
             </section>

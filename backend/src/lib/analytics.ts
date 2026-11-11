@@ -1,4 +1,5 @@
-import type { Gender } from '@prisma/client';
+import type { Gender, Prisma } from '@prisma/client';
+import { PUBLISHED_RESULT } from './results';
 import { prisma } from '../prisma';
 
 /**
@@ -29,7 +30,7 @@ export type MyResult = {
 export const distanceKey = (r: Pick<MyResult, 'eventDistance' | 'eventId'>) =>
   r.eventDistance ? `d${r.eventDistance.catalogId}` : `e${r.eventId}`;
 
-const FINISHED = { status: 'FINISHED' as const, finishTime: { not: null }, event: { resultsPublishedAt: { not: null } } };
+const FINISHED: Prisma.ResultWhereInput = { status: 'FINISHED', finishTime: { not: null }, ...PUBLISHED_RESULT };
 
 function compare(mine: number, rows: { time: number; gender: Gender | null }[]): CompareByGroup {
   const of = (list: typeof rows): Compare => ({ others: list.length, slower: list.filter((r) => r.time > mine).length });

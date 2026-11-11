@@ -18,6 +18,7 @@ import { requireTelegramAuth, tgUserOf } from '../plugins/telegramAuth';
 import { serializeEvent } from './events';
 import { placesAfterStage, publishedStages, resultPoints, seasonStandings } from '../lib/rating';
 import { distanceKey, myAnalytics } from '../lib/analytics';
+import { PUBLISHED_RESULT } from '../lib/results';
 
 /**
  * Явная сериализация вместо отдачи модели Prisma напрямую: telegram_id — BigInt
@@ -163,7 +164,8 @@ export async function authRoutes(app: FastifyInstance) {
         // Только опубликованные финиши: до публикации результатов участник их
         // не видит, сошедшие и не стартовавшие в аналитику не идут.
         results: {
-          where: { status: 'FINISHED', finishTime: { not: null }, event: { resultsPublishedAt: { not: null } } },
+          // Опубликована дистанция результата (публикуются по дистанциям).
+          where: { status: 'FINISHED', finishTime: { not: null }, ...PUBLISHED_RESULT },
           include: { event: true, eventDistance: { include: { catalog: true } } },
           orderBy: { event: { date: 'asc' } },
         },

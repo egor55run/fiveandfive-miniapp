@@ -1789,3 +1789,47 @@ html.site-fonts body {
 .h-others .h-price__text {
   margin: 0;
 }
+
+/* Баннер старта и вкладки дистанций в протоколе (2026-11-11). */
+.race-banner {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  min-height: 180px;
+  margin-bottom: 20px;
+  padding: 20px;
+  border-radius: 24px;
+  background-color: var(--ink);
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+}
+.race-banner--card {
+  min-height: 140px;
+  margin: -24px -24px 8px;
+  border-radius: 24px 24px 0 0;
+}
+.race-banner__logo {
+  max-width: 55%;
+  max-height: 96px;
+  object-fit: contain;
+}
+.race-results__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 16px;
+}
+.race-results__tab {
+  padding: 8px 16px;
+  font-weight: 700;
+  color: var(--ink);
+  background: #fff;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.race-results__tab--on {
+  border-color: var(--orange-text);
+  color: var(--orange-text);
+}
