@@ -29,6 +29,7 @@ type TelegramWebApp = {
   openLink?: (url: string) => void;
   /** Опубликовать сторис с картинкой по ссылке (Bot API 7.8+). */
   shareToStory?: (mediaUrl: string, params?: { text?: string; widget_link?: { url: string; name?: string } }) => void;
+  isVersionAtLeast?: (v: string) => boolean;
   /** Скачать файл по ссылке (Bot API 8.0+). */
   downloadFile?: (params: { url: string; file_name: string }, callback?: (accepted: boolean) => void) => void;
   /** Открыть t.me-ссылку внутри Telegram (чат с ботом) — Bot API 6.1+. */
@@ -190,10 +191,21 @@ export function requestedSummaryYear(): number | null {
   return Number.isInteger(y) && y >= 2000 && y <= 2100 ? y : null;
 }
 
-/** Сторис в Telegram, если клиент умеет. false — не умеет. */
+/** Поддерживает ли клиент Telegram эту версию Bot API (метода может не быть в старых клиентах). */
+function supports(v: string): boolean {
+  const app = webApp();
+  if (!app || !isInsideTelegram()) return false;
+  try {
+    return app.isVersionAtLeast ? app.isVersionAtLeast(v) : false;
+  } catch {
+    return false;
+  }
+}
+
+/** Сторис в Telegram (Bot API 7.8+). false — клиент не умеет. */
 export function shareStory(mediaUrl: string, text: string, link: { url: string; name: string }): boolean {
   const app = webApp();
-  if (!app?.shareToStory || !isInsideTelegram()) return false;
+  if (!app?.shareToStory || !supports('7.8')) return false;
   try {
     app.shareToStory(mediaUrl, { text, widget_link: link });
     return true;
@@ -202,17 +214,19 @@ export function shareStory(mediaUrl: string, text: string, link: { url: string; 
   }
 }
 
-/** Сохранить картинку: Telegram downloadFile, иначе — открыть ссылку. */
-export function saveImage(url: string, fileName: string): void {
+/**
+ * Сохранить картинку через Telegram.WebApp.downloadFile (Bot API 8.0+): Telegram
+ * сам спросит «Скачать?» и сохранит в галерею или файлы. false — клиент не
+ * умеет; тогда экран показывает картинку целиком с подсказкой «нажмите и
+ * удерживайте».
+ */
+export function saveImage(url: string, fileName: string): boolean {
   const app = webApp();
-  if (app?.downloadFile && isInsideTelegram()) {
-    try {
-      app.downloadFile({ url, file_name: fileName });
-      return;
-    } catch {
-      // старый клиент — ниже откроем ссылку
-    }
+  if (!app?.downloadFile || !supports('8.0')) return false;
+  try {
+    app.downloadFile({ url, file_name: fileName });
+    return true;
+  } catch {
+    return false;
   }
-  if (app?.openLink && isInsideTelegram()) app.openLink(url);
-  else window.open(url, '_blank', 'noopener');
 }

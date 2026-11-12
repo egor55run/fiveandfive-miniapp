@@ -105,6 +105,8 @@ export type SummaryCard = {
   final: { place: number; of: number; total: number } | null;
   fasterThan: number | null;
   rays: number;
+  /** По порядку этапов: true — пробежал (луч звезды собран). */
+  stagesDone?: boolean[];
   placeMoves: number[];
 };
 

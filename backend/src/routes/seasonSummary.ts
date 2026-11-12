@@ -40,8 +40,8 @@ export async function seasonSummaryRoutes(app: FastifyInstance) {
     const year = yearOf(req.params.year);
     const s = year === null ? null : await summaryByShareToken(year, req.params.token);
     if (!s) return reply.code(404).send({ error: 'Итоги не найдены' });
-    const { shareToken: _t, gender: _g, history, ...card } = s;
-    return { ...card, placeMoves: history.filter((h) => h.place !== null).map((h) => h.place) };
+    const { shareToken: _t, gender: _g, history, stages, ...card } = s;
+    return { ...card, stagesDone: stages.map((x) => x.done), placeMoves: history.filter((h) => h.place !== null).map((h) => h.place) };
   });
 
   /** GET /me/season-summary?year= — личные итоги (Mini App). */

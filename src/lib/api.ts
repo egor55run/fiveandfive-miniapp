@@ -575,7 +575,8 @@ export type SeasonSummaryDto = {
   record: { stage: number; title: string; time: number } | null;
   improvement: number | null;
   final: { place: number; of: number; total: number } | null;
-  history: { stage: number; title: string; place: number | null; of: number }[];
+  history: { stage: number; title: string; date: string; ran: boolean; place: number | null; of: number }[];
+  stages: { stage: number; title: string; date: string; done: boolean }[];
   fasterThan: number | null;
   rays: number;
   shareToken: string;

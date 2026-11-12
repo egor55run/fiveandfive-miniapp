@@ -188,7 +188,10 @@ export type PersonalSummary = {
   /** На сколько секунд лучшее время быстрее первого финиша сезона (null — не улучшали или один финиш). */
   improvement: number | null;
   final: { place: number; of: number; total: number } | null;
-  history: { stage: number; title: string; place: number | null; of: number }[];
+  /** Место после каждого опубликованного этапа; date — дата этапа (подписи графика). ran — бежал ли этот этап. */
+  history: { stage: number; title: string; date: string; ran: boolean; place: number | null; of: number }[];
+  /** Все этапы сезона по порядку: луч звезды i = этап i+1 (верхний — первый, дальше по часовой). */
+  stages: { stage: number; title: string; date: string; done: boolean }[];
   /** Быстрее X% участников сезона своего пола (по лучшему времени). */
   fasterThan: number | null;
   rays: number;
@@ -223,7 +226,8 @@ export async function personalSummary(season: Season, userId: number): Promise<P
   const history: PersonalSummary['history'] = [];
   for (const s of await publishedStages(season.id)) {
     const p = (await placesAfterStage(season.id, s.id)).get(userId);
-    history.push({ stage: s.stage, title: s.title, place: p?.place ?? null, of: p?.of ?? 0 });
+    const e = events.find((x) => x.id === s.id)!;
+    history.push({ stage: s.stage, title: s.title, date: e.date.toISOString(), ran: mine.some((r) => r.eventId === s.id), place: p?.place ?? null, of: p?.of ?? 0 });
   }
 
   // Быстрее X%: лучшее время каждого участника своего пола.
@@ -251,6 +255,7 @@ export async function personalSummary(season: Season, userId: number): Promise<P
     history,
     fasterThan,
     rays: Math.min(new Set(mine.map((r) => r.eventId)).size, 5),
+    stages: events.map((e) => ({ stage: stageNo.get(e.id)!, title: e.title, date: e.date.toISOString(), done: mine.some((r) => r.eventId === e.id) })),
     shareToken: shareToken(season.id, userId),
   };
 }
