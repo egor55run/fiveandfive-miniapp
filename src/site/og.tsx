@@ -23,7 +23,7 @@ const MONTSERRAT = 'Montserrat Cyr, Montserrat';
 
 // Пути — буквально в new URL(…, import.meta.url): только так сборщик видит
 // файлы и кладёт их в сборку (через переменную — не найдёт).
-async function assets() {
+export async function assets() {
   const [unbLat, unbCyr, monLat, monCyr, logo] = await Promise.all([
     readFile(new URL('./og-fonts/unbounded-latin-900-normal.woff', import.meta.url)),
     readFile(new URL('./og-fonts/unbounded-cyrillic-900-normal.woff', import.meta.url)),

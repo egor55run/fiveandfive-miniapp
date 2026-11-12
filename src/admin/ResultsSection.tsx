@@ -17,6 +17,7 @@ import {
   type ResultStatus,
 } from './api';
 import { formatDate, formatDateTime, formatSeconds, fullName, parseTimeToSeconds } from './helpers';
+import SeasonSummaryCard from './SeasonSummaryCard';
 
 /**
  * Результаты старта (решения пользователя 2026-10-23): одно время — от
@@ -254,6 +255,7 @@ export default function ResultsSection() {
 
   return (
     <section className="ad-section">
+      <SeasonSummaryCard />
       <header className="ad-section__head">
         <h2>Результаты</h2>
         <div className="ad-actions">

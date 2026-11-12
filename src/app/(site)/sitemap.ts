@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next';
 import { docPath, KK_ENABLED } from '../../lib/legal';
-import { fetchEvents } from '../../site/data';
+import { fetchEvents, fetchSummarySeasons } from '../../site/data';
 import { HUB_PATH, SITE_URL } from '../../site/seo';
 
 /**
@@ -13,6 +13,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const events = (await fetchEvents()) ?? [];
+  const seasons = (await fetchSummarySeasons()) ?? [];
   // Адрес — ровно как canonical страницы: у главной Next пишет его без слеша
   // («https://fiveandfive.kz»), поэтому и здесь так (Google Search Console, 2026-10-27).
   const page = (path: string, priority: number, changeFrequency: 'weekly' | 'monthly' | 'yearly') => ({
@@ -35,6 +36,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .filter((e) => e.slug && e.resultsPublished && e.seriesStage === false)
       .map((e) => page(`/starty/${e.slug}/rezultaty`, 0.6, 'monthly')),
     page('/reiting', 0.7, 'weekly'),
+    // Итоги сезонов (2026-11-12): до итогов — текущий рейтинг, после — итоги.
+    ...seasons.map((s) => page(`/itogi/${s.year}`, s.published ? 0.7 : 0.5, s.published ? 'yearly' : 'weekly')),
     page('/voprosy', 0.6, 'monthly'),
     ...docs,
   ];

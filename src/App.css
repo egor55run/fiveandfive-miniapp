@@ -2285,3 +2285,225 @@ select.rfield__input {
   font-size: 11px;
   fill: var(--text-muted);
 }
+
+/* ─── Итоги сезона (2026-11-12) ─────────────────────────────────────────── */
+
+.ss {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background: var(--grad-hero);
+  color: var(--text-on-brand);
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 20px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  overflow: hidden;
+}
+.ss-progress {
+  display: flex;
+  gap: 4px;
+  padding-right: 44px;
+}
+.ss-progress__seg {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.28);
+}
+.ss-progress__seg--on {
+  background: #fff;
+}
+.ss-close {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 2px);
+  right: 12px;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 30px;
+  line-height: 1;
+  cursor: pointer;
+}
+.ss-slide {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px 4px;
+  cursor: pointer;
+  animation: ss-in 0.35s ease both;
+  overflow-y: auto;
+}
+@keyframes ss-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ss-slide {
+    animation: none;
+  }
+}
+.ss-kicker {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--brand-highlight);
+}
+.ss-big,
+.ss-huge {
+  margin: 0;
+  font-family: var(--font-display);
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+.ss-big {
+  font-size: clamp(30px, 9vw, 42px);
+}
+.ss-huge {
+  font-size: clamp(56px, 20vw, 96px);
+  font-variant-numeric: tabular-nums;
+}
+.ss-sub {
+  display: block;
+  margin-top: 8px;
+  font-family: var(--font-ui);
+  font-size: 18px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.82);
+}
+.ss-text {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.88);
+}
+.ss-text--accent {
+  color: var(--brand-highlight);
+  font-weight: 600;
+}
+.ss-stat {
+  margin: 0;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+.ss-hint {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+}
+.ss-star {
+  align-self: center;
+}
+.ss-star__ray {
+  fill: rgba(255, 255, 255, 0.16);
+  stroke: rgba(255, 255, 255, 0.35);
+  stroke-width: 0.6;
+}
+.ss-star__ray--on {
+  fill: var(--brand-highlight);
+  stroke: #fff;
+}
+.ss-path {
+  width: 100%;
+  max-width: 340px;
+  align-self: center;
+}
+.ss-path__line {
+  fill: none;
+  stroke: var(--brand-highlight);
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+.ss-path__dot {
+  fill: #fff;
+}
+.ss-path__val {
+  fill: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.ss-path__stage {
+  fill: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+}
+.ss-card {
+  align-self: center;
+  width: min(260px, 70vw);
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  background: rgba(255, 255, 255, 0.1);
+}
+.ss-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  cursor: default;
+}
+.ss-link {
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  padding: 8px;
+  cursor: pointer;
+}
+.ss-link:disabled {
+  opacity: 0.35;
+}
+.ss-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.ss-count {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  font-variant-numeric: tabular-nums;
+}
+.ss-banner {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  align-items: center;
+  width: 100%;
+  margin: 0 0 var(--sp-lg);
+  padding: var(--sp-lg) var(--sp-xl);
+  border: 0;
+  border-radius: var(--r-lg);
+  background: var(--grad-brand-cta);
+  color: #fff;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.ss-banner__kicker {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+.ss-banner__title {
+  grid-column: 1;
+  font-family: var(--font-display);
+  font-size: 20px;
+}
+.ss-banner__go {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  font-size: 26px;
+}

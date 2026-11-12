@@ -1,6 +1,7 @@
 import type { Lang } from '../../lib/legal';
 import { sitePath, siteText } from '../../site/i18n';
 import HeaderCta from './HeaderCta';
+import { SEASON_YEAR } from '../../site/links';
 import SiteLogo from './SiteLogo';
 
 /** Шапка сайта (макет главной, 2026-10-09). */
@@ -18,6 +19,7 @@ export default function SiteHeader({ lang }: { lang: Lang }) {
           <a href={`${home}#zvezda`}>{t.nav.medal}</a>
           <a href={`${home}#cena`}>{t.nav.price}</a>
           <a href={sitePath('/reiting', lang)}>{t.nav.rating}</a>
+          {lang === 'ru' && <a href={`/itogi/${SEASON_YEAR}`}>Итоги</a>}
           <a href={sitePath('/voprosy', lang)}>{t.nav.faq}</a>
         </nav>
         <HeaderCta notify={t.nav.notify} register={t.nav.register} />

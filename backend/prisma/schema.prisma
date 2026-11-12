@@ -54,15 +54,19 @@ model User {
 }
 
 model Season {
-  id            Int       @id @default(autoincrement())
-  title         String
-  year          Int
-  price         Decimal   @default(0) @db.Decimal(10, 2)
-  isActive      Boolean   @default(false) @map("is_active")
+  id                 Int       @id @default(autoincrement())
+  title              String
+  year               Int
+  price              Decimal   @default(0) @db.Decimal(10, 2)
+  isActive           Boolean   @default(false) @map("is_active")
   /// Когда закрывается продажа абонемента. null — вместе с регистрацией на
   /// первый старт сезона (lib/seasonPass). Задаётся в админке.
-  salesClosesAt DateTime? @map("sales_closes_at")
-  createdAt     DateTime  @default(now()) @map("created_at")
+  salesClosesAt      DateTime? @map("sales_closes_at")
+  /// Итоги сезона подведены (кнопка в админке): рейтинг зафиксирован, личные
+  /// итоги и рассылка включены. summary — снимок для /itogi/<год>.
+  summaryPublishedAt DateTime? @map("summary_published_at")
+  summary            Json?
+  createdAt          DateTime  @default(now()) @map("created_at")
 
   events       Event[]
   seasonPasses SeasonPass[]
@@ -304,6 +308,8 @@ enum NotificationKind {
   RACE_REMINDER
   /// Организатор оформил возврат (одно сообщение на оформление).
   REFUND
+  /// «Ваши итоги сезона готовы» (eventId — последний этап сезона).
+  SEASON_SUMMARY
 }
 
 enum NotificationStatus {

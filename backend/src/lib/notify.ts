@@ -275,6 +275,8 @@ export type DeliverInput = {
   eventId: number | null;
   kind: NotificationKind;
   text: string;
+  /** Своя кнопка под сообщением; по умолчанию — «Открыть приложение» на старт. */
+  button?: { text: string; url: string };
   log?: Logger;
 };
 
@@ -337,7 +339,7 @@ export async function deliver(input: DeliverInput): Promise<DeliverStatus> {
 
   let outcome: SendOutcome;
   try {
-    outcome = await sendMessage(telegramId.toString(), text, {
+    outcome = await sendMessage(telegramId.toString(), text, input.button ?? {
       text: 'Открыть приложение',
       url: await appUrlFor(eventId),
     });

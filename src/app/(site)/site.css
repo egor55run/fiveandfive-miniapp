@@ -1846,3 +1846,86 @@ html.site-fonts body {
   border-color: var(--orange-text);
   color: var(--orange-text);
 }
+
+/* ─── Итоги сезона /itogi/<год> (2026-11-12) ────────────────────────────── */
+.itogi-badge {
+  display: inline-block;
+  align-self: flex-start;
+  margin: 0 0 12px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #ff8a3d;
+  font-weight: 700;
+}
+.itogi-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 16px 0 24px;
+}
+.itogi-stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 20px;
+  border-radius: 20px;
+  background: #fff;
+}
+.itogi-stats b {
+  font-family: var(--font-display, inherit);
+  font-size: 32px;
+  font-variant-numeric: tabular-nums;
+}
+.itogi-stats span {
+  color: var(--muted, #5e574d);
+}
+.itogi-records {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.6;
+}
+.itogi-stages {
+  display: grid;
+  gap: 16px;
+}
+.itogi-stage {
+  padding: 16px 20px;
+  border-radius: 20px;
+  background: #fff;
+}
+.itogi-stage h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+.itogi-stage h4 {
+  margin: 8px 0 4px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--orange-text, #c4470a);
+}
+.itogi-stage__date {
+  font-weight: 400;
+  color: var(--muted, #5e574d);
+}
+.itogi-stage__cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px 24px;
+}
+.itogi-podium {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  line-height: 1.7;
+}
+.itogi-podium__place {
+  display: inline-block;
+  width: 1.6em;
+  font-weight: 700;
+}
+.itogi-podium__time {
+  color: var(--muted, #5e574d);
+  font-variant-numeric: tabular-nums;
+}

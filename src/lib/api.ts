@@ -363,6 +363,8 @@ export type MeResult = {
   distanceStats?: DistanceStatDto[];
   seasonPasses: SeasonPassDto[];
   rating?: MeRatingDto | null;
+  /** Итоги сезона подведены и у участника есть финиш. */
+  seasonSummary?: { year: number; title: string } | null;
 };
 
 /**
@@ -556,5 +558,32 @@ export async function subscribeOpening(): Promise<void> {
   await request<{ subscribed: boolean }>('/opening-subscription', {
     method: 'POST',
     fallback: (s) => `Не удалось подписаться (${s})`,
+  });
+}
+
+// ---------- Итоги сезона (2026-11-12) ----------
+
+export type SeasonSummaryDto = {
+  year: number;
+  title: string;
+  firstName: string;
+  gender: Gender | null;
+  stagesRun: number;
+  stagesTotal: number;
+  km: number;
+  bestRace: { stage: number; title: string; place: number | null; of: number; time: number } | null;
+  record: { stage: number; title: string; time: number } | null;
+  improvement: number | null;
+  final: { place: number; of: number; total: number } | null;
+  history: { stage: number; title: string; place: number | null; of: number }[];
+  fasterThan: number | null;
+  rays: number;
+  shareToken: string;
+};
+
+export function getSeasonSummary(year?: number): Promise<SeasonSummaryDto> {
+  return request<SeasonSummaryDto>(`/me/season-summary${year ? `?year=${year}` : ''}`, {
+    preferServerMessage: true,
+    fallback: (s) => `Не удалось загрузить итоги (${s})`,
   });
 }

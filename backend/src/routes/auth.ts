@@ -15,6 +15,7 @@ import {
   sendValidationError,
 } from '../lib/validation';
 import { requireTelegramAuth, tgUserOf } from '../plugins/telegramAuth';
+import { mySummaryAvailable } from '../lib/seasonSummary';
 import { serializeEvent } from './events';
 import { placesAfterStage, publishedStages, resultPoints, seasonStandings } from '../lib/rating';
 import { distanceKey, myAnalytics } from '../lib/analytics';
@@ -268,6 +269,8 @@ export async function authRoutes(app: FastifyInstance) {
       distanceStats: analytics.distances,
       // Рейтинг сезона: свои баллы и место среди своего пола.
       rating: await myRating(user.id, user.gender),
+      // Итоги сезона подведены и у участника есть финиш — баннер и экран в Mini App.
+      seasonSummary: await mySummaryAvailable(user.id),
       seasonPasses: user.seasonPasses.map((p) => ({
         id: p.id,
         seasonId: p.seasonId,

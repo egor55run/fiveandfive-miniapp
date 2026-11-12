@@ -31,6 +31,9 @@ type Props = {
   onViewRaces: () => void;
   /** Открыть протокол старта (история забегов). */
   onOpenResults?: (slug: string) => void;
+  /** Итоги сезона подведены — баннер «Ваши итоги сезона». */
+  seasonSummary?: { year: number; title: string } | null;
+  onOpenSummary?: () => void;
 };
 
 type EditKey = 'birthDate' | 'phone' | 'email';
@@ -89,6 +92,8 @@ function ProfileScreen({
   onUserUpdated,
   onViewRaces,
   onOpenResults,
+  seasonSummary = null,
+  onOpenSummary,
 }: Props) {
   const reduceMotion = useReducedMotion();
   // Правки уходят в PATCH /me сразу по «применить», поэтому локальной копии
@@ -244,6 +249,14 @@ function ProfileScreen({
       transition={{ duration: 0.3 }}
     >
       <Header onBack={onViewRaces} />
+
+      {seasonSummary && onOpenSummary && (
+        <button type="button" className="ss-banner" onClick={onOpenSummary}>
+          <span className="ss-banner__kicker">Сезон {seasonSummary.year} завершён</span>
+          <span className="ss-banner__title">Ваши итоги сезона</span>
+          <span className="ss-banner__go" aria-hidden="true">→</span>
+        </button>
+      )}
 
       {/* Аватар-иконка + имя */}
       <section className="pf-id">

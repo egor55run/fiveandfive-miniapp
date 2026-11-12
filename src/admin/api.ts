@@ -876,3 +876,18 @@ export function getFinance(f: { scope: 'all' | 'season' | 'event'; seasonId: num
   if (f.to) q.set('to', f.to);
   return request<FinanceReport>(`/admin/finance?${q.toString()}`);
 }
+
+// ---------- Итоги сезона ----------
+
+export type SeasonSummaryStatus = {
+  seasonId: number;
+  year: number;
+  title: string;
+  publishedAt: string | null;
+  readiness: { ready: boolean; reason: string | null; stagesPublished: number; stagesTotal: number; protestUntil: string | null };
+  messages: { recipients: number; sent: number; failed: number } | null;
+};
+
+export const getSeasonSummaryStatus = (seasonId: number) => request<SeasonSummaryStatus>(`/admin/seasons/${seasonId}/summary`);
+export const publishSeasonSummary = (seasonId: number) =>
+  request<{ recipients: number; republished: boolean }>(`/admin/seasons/${seasonId}/summary`, { method: 'POST', body: {} });

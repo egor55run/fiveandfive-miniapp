@@ -16,6 +16,7 @@ import RegistrationSuccessScreen from './components/RegistrationSuccessScreen';
 import PaymentScreen from './components/PaymentScreen';
 import WriteAccessPrompt from './components/WriteAccessPrompt';
 import ResultsScreen from './components/ResultsScreen';
+import SeasonSummaryScreen from './components/SeasonSummaryScreen';
 import TabBar, { type TabId } from './components/TabBar';
 import {
   ApiError,
@@ -28,9 +29,9 @@ import { toRaceResults } from './data/results';
 import { useTelegramAuth } from './hooks/useTelegramAuth';
 import { firstValidName, splitLegacyName } from './lib/personName';
 import { setPricesPublic } from './lib/prices';
-import { canAskWriteAccess, getUnsafeTelegramUser, requestedRaceSlug } from './lib/telegram';
+import { canAskWriteAccess, getUnsafeTelegramUser, requestedRaceSlug, requestedSummaryYear } from './lib/telegram';
 
-type Screen = 'analytics' | 'home' | 'rating' | 'profile' | 'registration' | 'payment' | 'success' | 'results';
+type Screen = 'analytics' | 'home' | 'rating' | 'profile' | 'registration' | 'payment' | 'success' | 'results' | 'summary';
 
 // Ближайший старт: самый ранний из будущих; иначе самый недавний из прошедших.
 function pickNearest(events: EventDto[]): EventDto | null {
@@ -50,6 +51,11 @@ function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   // Протокол какого старта открыт (экран «results») и откуда пришли.
   const [results, setResults] = useState<{ slug: string; back: Screen } | null>(null);
+  // Итоги сезона (2026-11-12): из бота — /app?itogi=2027, из профиля — баннер.
+  const [summary, setSummary] = useState<{ year?: number; back: Screen } | null>(() => {
+    const y = requestedSummaryYear();
+    return y ? { year: y, back: 'profile' } : null;
+  });
   const [events, setEvents] = useState<EventDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -216,6 +222,11 @@ function App() {
     outcome?.events ??
     [];
 
+  // Итоги сезона — полноэкранная серия слайдов поверх приложения.
+  if (summary) {
+    return <SeasonSummaryScreen year={summary.year} onClose={() => { setCurrentScreen(summary.back); setSummary(null); }} />;
+  }
+
   // Флоу регистрации — свои экраны без таб-бара.
   if (currentScreen === 'registration' && regEvent) {
     return (
@@ -302,6 +313,8 @@ function App() {
             setResults({ slug, back: 'profile' });
             setCurrentScreen('results');
           }}
+          seasonSummary={me?.seasonSummary ?? null}
+          onOpenSummary={() => me?.seasonSummary && setSummary({ year: me.seasonSummary.year, back: 'profile' })}
         />
       ) : currentScreen === 'results' && results ? (
         <ResultsScreen key={results.slug} slug={results.slug} onBack={() => setCurrentScreen(results.back)} />

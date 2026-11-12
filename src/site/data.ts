@@ -62,3 +62,53 @@ export const fetchSeasonRating = cache(() => getJson<SeasonRating>('/rating/seas
 /** Протокол старта по дистанциям (любой старт). */
 export const fetchEventResults = cache((slug: string) => getJson<EventResults>(`/results/${encodeURIComponent(slug)}`));
 export const fetchStageRating = cache((slug: string) => getJson<StageRating>(`/rating/stage/${encodeURIComponent(slug)}`));
+
+// ---------- Итоги сезона (2026-11-12) ----------
+
+export type SummaryTopRow = { place: number; name: string; total: number; stages: number };
+export type SummaryPodium = { place: number; name: string; time: number | null };
+export type SummaryRecord = { name: string; time: number; stage: number; title: string } | null;
+export type PublicSummary = {
+  year: number;
+  title: string;
+  publishedAt: string;
+  stagesTotal: number;
+  top: { men: SummaryTopRow[]; women: SummaryTopRow[] };
+  stageWinners: { stage: number; title: string; slug: string | null; date: string; men: SummaryPodium[]; women: SummaryPodium[] }[];
+  records: { men: SummaryRecord; women: SummaryRecord };
+  stats: { participants: number; finishes: number; km: number; stars: number };
+};
+export type SeasonSummaryPage =
+  | { season: { year: number; title: string }; published: true; finalDate: string | null; summary: PublicSummary }
+  | {
+      season: { year: number; title: string };
+      published: false;
+      finalDate: string | null;
+      current: {
+        stagesPublished: number;
+        stagesTotal: number;
+        events: { title: string; slug: string | null; date: string; published: boolean }[];
+        men: SummaryTopRow[];
+        women: SummaryTopRow[];
+      };
+    };
+export type SummaryCard = {
+  year: number;
+  title: string;
+  firstName: string;
+  stagesRun: number;
+  stagesTotal: number;
+  km: number;
+  bestRace: { stage: number; title: string; place: number | null; of: number; time: number } | null;
+  record: { stage: number; title: string; time: number } | null;
+  improvement: number | null;
+  final: { place: number; of: number; total: number } | null;
+  fasterThan: number | null;
+  rays: number;
+  placeMoves: number[];
+};
+
+export const fetchSeasonSummary = cache((year: number) => getJson<SeasonSummaryPage>(`/seasons/summary/${year}`));
+export const fetchSummarySeasons = cache(() => getJson<{ year: number; published: boolean }[]>('/seasons/summaries'));
+export const fetchSummaryCard = (year: number, token: string) =>
+  getJson<SummaryCard>(`/seasons/summary/${year}/card/${encodeURIComponent(token)}`);

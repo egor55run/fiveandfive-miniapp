@@ -17,6 +17,7 @@ export default function SiteFooter({ lang }: { lang: Lang }) {
           <a href={botChatLink('ask')}>{t.footer.telegram}</a>
           <a href={sitePath('/voprosy', lang)}>{t.footer.faq}</a>
           {lang === 'ru' && <a href={HUB_PATH}>Забеги в Астане 2027</a>}
+          {lang === 'ru' && <a href={`/itogi/${SEASON_YEAR}`}>Итоги сезона {SEASON_YEAR}</a>}
           {/* Документы — через docPath: у них уже есть казахские версии на staging. */}
           <a href={docPath('oferta', lang)}>{t.footer.oferta}</a>
           <a href={docPath('privacy', lang)}>{t.footer.privacy}</a>

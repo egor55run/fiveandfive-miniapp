@@ -27,6 +27,10 @@ type TelegramWebApp = {
   ready: () => void;
   /** Открыть ссылку во встроенном браузере Telegram поверх Mini App. */
   openLink?: (url: string) => void;
+  /** Опубликовать сторис с картинкой по ссылке (Bot API 7.8+). */
+  shareToStory?: (mediaUrl: string, params?: { text?: string; widget_link?: { url: string; name?: string } }) => void;
+  /** Скачать файл по ссылке (Bot API 8.0+). */
+  downloadFile?: (params: { url: string; file_name: string }, callback?: (accepted: boolean) => void) => void;
   /** Открыть t.me-ссылку внутри Telegram (чат с ботом) — Bot API 6.1+. */
   openTelegramLink?: (url: string) => void;
   /** Попросить у пользователя разрешение боту писать ему (Bot API 6.9+). */
@@ -170,4 +174,45 @@ export function showTelegramBackButton(onBack: () => void): (() => void) | null 
     button.offClick(onBack);
     button.hide();
   };
+}
+
+/**
+ * Какие итоги сезона открыть сразу (2026-11-12): кнопка «Открыть итоги» в боте
+ * → /app?itogi=2027; ссылка t.me/<бот>?startapp=itogi-2027 → start_param.
+ */
+export function requestedSummaryYear(): number | null {
+  const q = new URLSearchParams(window.location.search);
+  const raw = q.get('itogi') ?? (() => {
+    const start = webApp()?.initDataUnsafe?.start_param ?? q.get('tgWebAppStartParam');
+    return start?.startsWith('itogi-') ? start.slice('itogi-'.length) : null;
+  })();
+  const y = Number(raw);
+  return Number.isInteger(y) && y >= 2000 && y <= 2100 ? y : null;
+}
+
+/** Сторис в Telegram, если клиент умеет. false — не умеет. */
+export function shareStory(mediaUrl: string, text: string, link: { url: string; name: string }): boolean {
+  const app = webApp();
+  if (!app?.shareToStory || !isInsideTelegram()) return false;
+  try {
+    app.shareToStory(mediaUrl, { text, widget_link: link });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Сохранить картинку: Telegram downloadFile, иначе — открыть ссылку. */
+export function saveImage(url: string, fileName: string): void {
+  const app = webApp();
+  if (app?.downloadFile && isInsideTelegram()) {
+    try {
+      app.downloadFile({ url, file_name: fileName });
+      return;
+    } catch {
+      // старый клиент — ниже откроем ссылку
+    }
+  }
+  if (app?.openLink && isInsideTelegram()) app.openLink(url);
+  else window.open(url, '_blank', 'noopener');
 }

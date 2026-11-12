@@ -27,6 +27,8 @@ import { processQueue as processBroadcasts } from './lib/broadcasts';
 import { adminPromosRoutes } from './routes/admin/promos';
 import { promoRoutes } from './routes/promo';
 import { ratingRoutes } from './routes/rating';
+import { seasonSummaryRoutes } from './routes/seasonSummary';
+import { processSummaryMessages } from './lib/seasonSummary';
 import { adminSessionRoutes } from './routes/admin/session';
 import { authRoutes } from './routes/auth';
 import { eventsRoutes } from './routes/events';
@@ -151,6 +153,7 @@ async function main() {
   await app.register(seasonsRoutes);
   await app.register(promoRoutes);
   await app.register(ratingRoutes);
+  await app.register(seasonSummaryRoutes);
   await app.register(paymentsRoutes);
   await app.register(openingSubscriptionRoutes);
   // Входящие сообщения боту: подписка «узнать об открытии», /start, /stop.
@@ -180,7 +183,11 @@ async function main() {
 
   // Очередь рассылок из админки: сразу после старта сервера (продолжить
   // прерванную перезапуском) и раз в 30 с — повторы после сбоев.
-  const broadcastTimer = setInterval(() => void processBroadcasts(app.log, { retries: true }), 30_000);
+  const broadcastTimer = setInterval(() => {
+    void processBroadcasts(app.log, { retries: true });
+    // «Ваши итоги сезона готовы» — та же очередь, по 30 сообщений за проход.
+    processSummaryMessages(app.log).catch((err) => app.log.error({ err: String(err) }, 'Итоги сезона: сбой рассылки'));
+  }, 30_000);
   broadcastTimer.unref();
   setTimeout(() => void processBroadcasts(app.log, { retries: true }), 5_000).unref();
 
