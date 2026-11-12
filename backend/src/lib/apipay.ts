@@ -206,6 +206,37 @@ export function getInvoiceRefunds(id: number): Promise<ApiPayInvoiceRefunds> {
   return call<ApiPayInvoiceRefunds>('GET', `/invoices/${id}/refunds`, undefined, { raw: true });
 }
 
+export type CreateRefundResult = {
+  refund?: ApiPayRefund & { idempotency_key?: string | null };
+  invoice?: { id: number; available_for_refund?: number; total_refunded?: string };
+  idempotent_replay?: boolean;
+};
+
+/**
+ * Возврат по оплаченному счёту (POST /invoices/{id}/refund). 201 — принят в
+ * очередь, итог — вебхук invoice.refunded. Повтор после таймаута — только с тем
+ * же ключом: ApiPay вернёт тот же возврат, второго не будет.
+ * hold_for_buyer_confirmation не включаем: ссылку покупателю мы не выпускаем,
+ * а удержание заняло бы счёт и для ручного возврата в кабинете.
+ */
+export function createRefund(invoiceId: number, input: { amount: number; idempotencyKey: string; reason: string; simulate?: { status: 'completed' | 'failed' | 'uncertain'; error_code?: string } }): Promise<CreateRefundResult> {
+  if (!Number.isInteger(input.amount) || input.amount < 1) {
+    throw new ApiPayError('Сумма возврата должна быть целым числом тенге', 0, 'bad_amount');
+  }
+  return call<CreateRefundResult>(
+    'POST',
+    `/invoices/${invoiceId}/refund`,
+    {
+      amount: input.amount,
+      reason: input.reason.slice(0, 255),
+      idempotency_key: input.idempotencyKey,
+      // Только песочница (проверка на staging): у боевого счёта поле ApiPay не читает.
+      ...(input.simulate ? { simulate: input.simulate } : {}),
+    },
+    { raw: true },
+  );
+}
+
 export function cancelInvoice(id: number): Promise<ApiPayInvoice> {
   return call<ApiPayInvoice>('POST', `/invoices/${id}/cancel`, {});
 }

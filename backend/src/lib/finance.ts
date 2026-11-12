@@ -189,6 +189,8 @@ export async function financeReport(f: FinanceFilter) {
   const unassigned = { amount: 0, count: 0 };
   const refundByDay = new Map<string, number>();
   for (const r of refunds) {
+    // Старые метки «неудачный возврат из ApiPay» (0 ₸ без этапа и процента) — не возврат.
+    if (r.source === 'APIPAY' && Number(r.amount) === 0 && r.percent === null) continue;
     const e = r.eventId ? eventById.get(r.eventId) : undefined;
     const passWithoutStage = r.registrationId === null && r.seasonPassId !== null;
     if (passWithoutStage) {

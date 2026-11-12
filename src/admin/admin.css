@@ -963,3 +963,16 @@ select:focus {
   padding-left: 28px !important;
   color: var(--text-muted);
 }
+
+/* Возврат через ApiPay в строке участника (2026-11-12). */
+.ad-refund-req {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 260px;
+}
+.ad-tag--error {
+  background: rgba(229, 72, 72, 0.18);
+  color: #f08a8a;
+  white-space: nowrap;
+}

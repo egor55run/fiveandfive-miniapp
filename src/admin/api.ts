@@ -411,6 +411,8 @@ export type Participant = {
   price: { base: number; discount: number; total: number; promoCode: string | null; pass: boolean } | null;
   /** Оформлен возврат: запись CANCELLED, в списке — «Возврат». */
   refund: { at: string; percent: number | null; amount: number; confirmed: boolean } | null;
+  /** Возврат через ApiPay в работе или не прошёл. */
+  refundRequest: { id: number; status: RefundRequestStatus; amount: number; at: string; error: string | null } | null;
   registeredAt: string;
   result: { id: number; finishTime: number | null; place: number | null; status: ResultStatus } | null;
 };
@@ -493,6 +495,8 @@ export type RefundStage = {
   bibNumber: number | null;
 };
 
+export type RefundRequestStatus = 'SENDING' | 'PENDING' | 'COMPLETED' | 'FAILED' | 'UNCERTAIN' | 'DISMISSED';
+
 export type RefundPreview = {
   kind: 'single' | 'pass';
   subject: string;
@@ -501,6 +505,8 @@ export type RefundPreview = {
   alreadyRefunded: number;
   providerRefunded: number;
   seasonPassId: number | null;
+  /** Возврат через API возможен: ApiPay подключён и у оплаты есть счёт. */
+  viaApi: boolean;
   stages: RefundStage[];
 };
 
@@ -511,10 +517,26 @@ export const applyRefund = (
   registrationId: number,
   body: { stages: { registrationId: number; percent: RefundPercent }[]; wholePass: boolean },
 ) =>
-  request<{ total: number; stages: number; totalText: string }>(`/admin/registrations/${registrationId}/refund`, {
+  request<{
+    total: number;
+    stages: number;
+    totalText: string;
+    mode: 'api' | 'zero';
+    status: RefundRequestStatus | null;
+    requestId: number | null;
+    error: string | null;
+  }>(`/admin/registrations/${registrationId}/refund`, {
     method: 'POST',
     body,
   });
+
+/** «Повторить» возврат, который не прошёл. */
+export const retryRefund = (requestId: number) =>
+  request<{ status: RefundRequestStatus; error: string | null }>(`/admin/refund-requests/${requestId}/retry`, { method: 'POST', body: {} });
+
+/** «Убрать» неудачную попытку, чтобы оформить возврат заново. */
+export const dismissRefund = (requestId: number) =>
+  request<{ ok: true }>(`/admin/refund-requests/${requestId}/dismiss`, { method: 'POST', body: {} });
 
 /** Ручная смена номера — на этом старте. */
 export const setBib = (registrationId: number, bib: number | null) =>

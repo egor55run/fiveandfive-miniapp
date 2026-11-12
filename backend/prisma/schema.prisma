@@ -47,6 +47,7 @@ model User {
   payments         Payment[]
   consents         Consent[]
   refunds          Refund[]
+  refundRequests   RefundRequest[]
   promoRedemptions PromoRedemption[]
 
   @@map("users")
@@ -446,12 +447,13 @@ model Payment {
   createdAt         DateTime       @default(now()) @map("created_at")
   updatedAt         DateTime       @updatedAt @map("updated_at")
 
-  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  registration Registration?     @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-  seasonPass   SeasonPass?       @relation(fields: [seasonPassId], references: [id], onDelete: Cascade)
-  refunds      Refund[]
-  promoCode    PromoCode?        @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
-  redemptions  PromoRedemption[]
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  registration   Registration?     @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  seasonPass     SeasonPass?       @relation(fields: [seasonPassId], references: [id], onDelete: Cascade)
+  refunds        Refund[]
+  refundRequests RefundRequest[]
+  promoCode      PromoCode?        @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+  redemptions    PromoRedemption[]
 
   @@index([state, expiresAt])
   @@index([registrationId])
@@ -592,7 +594,8 @@ model AdminAuditLog {
 }
 
 enum RefundSource {
-  /// Оформлен в админке («Оформить возврат»); деньги владелец возвращает сам в ApiPay/Kaspi.
+  /// Оформлен в админке («Оформить возврат»). С 2026-11-12 деньги уходят через API ApiPay
+  /// (RefundRequest), строка появляется после подтверждения; 0% — сразу, без денег.
   ADMIN
   /// Пришёл вебхук invoice.refunded, а в админке возврат ещё не отмечали.
   APIPAY
@@ -615,13 +618,16 @@ model Refund {
   adminTelegramId  BigInt?      @map("admin_telegram_id")
   /// id возврата в ApiPay, когда пришёл вебхук: по нему не учитываем дважды.
   providerRefundId Int?         @unique @map("provider_refund_id")
+  /// Попытка возврата через API, из которой появилась строка.
+  requestId        Int?         @map("request_id")
   confirmedAt      DateTime?    @map("confirmed_at")
   createdAt        DateTime     @default(now()) @map("created_at")
 
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  payment      Payment?      @relation(fields: [paymentId], references: [id], onDelete: SetNull)
-  registration Registration? @relation(fields: [registrationId], references: [id], onDelete: SetNull)
-  seasonPass   SeasonPass?   @relation(fields: [seasonPassId], references: [id], onDelete: SetNull)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment      Payment?       @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  registration Registration?  @relation(fields: [registrationId], references: [id], onDelete: SetNull)
+  seasonPass   SeasonPass?    @relation(fields: [seasonPassId], references: [id], onDelete: SetNull)
+  request      RefundRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
 
   @@index([paymentId])
   @@index([registrationId])
@@ -874,4 +880,51 @@ model AppSetting {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("app_settings")
+}
+
+/// Статус возврата, отправленного в ApiPay из админки.
+enum RefundRequestStatus {
+  /// Запрос ушёл, ответа нет (сеть) — повтор с тем же ключом безопасен.
+  SENDING
+  /// ApiPay принял, ждём вебхук invoice.refunded.
+  PENDING
+  /// Деньги ушли: этапы переведены в «Возврат», участнику сообщили.
+  COMPLETED
+  /// Не прошёл (причина в error_code) — «Повторить» или вернуть вручную.
+  FAILED
+  /// Исход неизвестен: деньги могли уйти, разбирает ApiPay. Повторять нельзя.
+  UNCERTAIN
+  /// Организатор убрал неудачную попытку, чтобы оформить заново.
+  DISMISSED
+}
+
+/// Возврат через API ApiPay (2026-11-12): одна попытка = один POST
+/// /invoices/{id}/refund на сумму выбранных этапов. stages — что вернуть:
+/// [{ registrationId, eventId, eventTitle, percent, amount, base }].
+model RefundRequest {
+  id               Int                 @id @default(autoincrement())
+  paymentId        Int                 @map("payment_id")
+  userId           Int                 @map("user_id")
+  amount           Decimal             @db.Decimal(10, 2)
+  wholePass        Boolean             @default(false) @map("whole_pass")
+  stages           Json
+  status           RefundRequestStatus @default(SENDING)
+  idempotencyKey   String              @unique @map("idempotency_key")
+  providerRefundId Int?                @unique @map("provider_refund_id")
+  errorCode        String?             @map("error_code")
+  errorMessage     String?             @map("error_message")
+  attempts         Int                 @default(1)
+  adminTelegramId  BigInt?             @map("admin_telegram_id")
+  completedAt      DateTime?           @map("completed_at")
+  notifiedAt       DateTime?           @map("notified_at")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  payment Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refunds Refund[]
+
+  @@index([paymentId, status])
+  @@index([status, updatedAt])
+  @@map("refund_requests")
 }

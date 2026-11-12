@@ -7,6 +7,8 @@ import {
   getParticipants,
   setPaymentStatus,
   updateParticipant,
+  retryRefund,
+  dismissRefund,
   type AdminDistance,
   type AdminEvent,
   type Participant,
@@ -141,6 +143,35 @@ export default function ParticipantsSection() {
     distanceId: p?.distanceId ?? (distances.length === 1 ? distances[0].id : null),
     note: '',
   });
+
+  // Возврат через ApiPay не прошёл: «Повторить» или «Убрать» (оформить заново).
+  const refundAction = async (p: Participant, action: 'retry' | 'dismiss') => {
+    if (!p.refundRequest) return;
+    if (action === 'dismiss' && !window.confirm('Убрать неудачную попытку возврата? Запись останется оплаченной, возврат можно будет оформить заново.')) return;
+    setBusyId(p.registrationId);
+    setError(null);
+    setNotice(null);
+    try {
+      if (action === 'retry') {
+        const r = await retryRefund(p.refundRequest.id);
+        setNotice(
+          r.status === 'FAILED'
+            ? `Возврат снова не прошёл: ${r.error}`
+            : r.status === 'COMPLETED'
+              ? 'ApiPay вернул деньги, участнику отправлено сообщение.'
+              : 'Возврат отправлен в ApiPay повторно, ждём подтверждения.',
+        );
+      } else {
+        await dismissRefund(p.refundRequest.id);
+        setNotice('Попытка возврата убрана — можно оформить возврат заново.');
+      }
+      if (eventId !== null) await loadParticipants(eventId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось выполнить действие');
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const afterSave = async (message: string) => {
     setEditing(null);
@@ -461,6 +492,8 @@ export default function ParticipantsSection() {
                         {p.refund.percent !== null ? ` ${p.refund.percent}%` : ''} · {p.refund.amount.toLocaleString('ru-RU')} ₸
                         {p.refund.confirmed ? ' ✓' : ''}
                       </span>
+                    ) : p.refundRequest ? (
+                      <RefundRequestTag p={p} busy={busyId === p.registrationId} onAction={(a) => void refundAction(p, a)} />
                     ) : (
                     <select
                       value={p.paymentStatus}
@@ -490,7 +523,7 @@ export default function ParticipantsSection() {
                     >
                       Двойники
                     </button>
-                    {p.paymentStatus === 'PAID' && !p.manual && !p.refund && (
+                    {p.paymentStatus === 'PAID' && !p.manual && !p.refund && !p.refundRequest && (
                       <button
                         type="button"
                         className="ad-btn ad-btn--sm"
@@ -509,10 +542,56 @@ export default function ParticipantsSection() {
           </table>
           <p className="ad-hint">
             «Отменено» освобождает слот на старте, возврат из отмены — снова занимает. «Оформить возврат» — по оферте
-            (100 / 50 / 0%): запись станет «Возврат», место освободится; деньги возвращаются вручную в ApiPay или Kaspi Pay.
+            (100 / 50 / 0%): деньги уходят участнику через ApiPay; когда ApiPay подтвердит, запись станет «Возврат», место
+            освободится и участнику придёт сообщение. Ручной возврат в кабинете ApiPay система тоже подхватит.
           </p>
         </div>
       )}
     </section>
+  );
+}
+
+/** Статус возврата через ApiPay в строке участника. */
+function RefundRequestTag({ p, busy, onAction }: { p: Participant; busy: boolean; onAction: (a: 'retry' | 'dismiss') => void }) {
+  const q = p.refundRequest!;
+  const sum = `${q.amount.toLocaleString('ru-RU')} ₸`;
+  if (q.status === 'FAILED') {
+    return (
+      <div className="ad-refund-req">
+        <span className="ad-tag ad-tag--error" title={q.error ?? undefined}>
+          Возврат не прошёл · {sum}
+        </span>
+        {q.error && <div className="ad-hint">{q.error}</div>}
+        <div className="ad-actions">
+          <button type="button" className="ad-btn ad-btn--sm ad-btn--primary" disabled={busy} onClick={() => onAction('retry')}>
+            Повторить
+          </button>
+          <button type="button" className="ad-btn ad-btn--sm" disabled={busy} onClick={() => onAction('dismiss')}>
+            Убрать
+          </button>
+        </div>
+      </div>
+    );
+  }
+  if (q.status === 'UNCERTAIN') {
+    return (
+      <span className="ad-tag ad-tag--refund" title="Деньги могли уйти. Не повторяйте и не возвращайте вручную — ApiPay разберёт по истории Kaspi.">
+        Исход возврата неизвестен · {sum}
+      </span>
+    );
+  }
+  return (
+    <div className="ad-refund-req">
+      <span className="ad-tag ad-tag--refund" title={`Отправлен ${formatDateTime(q.at)}`}>
+        Возврат отправлен, ждём подтверждения · {sum}
+      </span>
+      {q.status === 'SENDING' && (
+        <div className="ad-actions">
+          <button type="button" className="ad-btn ad-btn--sm" disabled={busy} onClick={() => onAction('retry')} title="ApiPay не ответил. Повтор безопасен — второго возврата не будет.">
+            Повторить
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

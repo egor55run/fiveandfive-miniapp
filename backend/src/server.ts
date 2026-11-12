@@ -34,6 +34,7 @@ import { paymentsRoutes } from './routes/payments';
 import { openingSubscriptionRoutes } from './routes/openingSubscription';
 import { telegramWebhookRoutes } from './routes/telegramWebhook';
 import { apiPayConfigured, sweepPayments } from './lib/payments';
+import { sweepRefundRequests } from './lib/refunds';
 import { emailEnabled, processEmailQueue } from './lib/email';
 import { registrationOpen } from './lib/registrationWindow';
 import { loadLegalDocuments } from './lib/legal';
@@ -196,6 +197,8 @@ async function main() {
       try {
         const stats = await sweepPayments(app.log);
         if (stats.expired || stats.checked) app.log.info(stats, 'Сверка оплат');
+        const refunds = await sweepRefundRequests(app.log);
+        if (refunds.checked || refunds.resent) app.log.info(refunds, 'Сверка возвратов');
       } catch (err) {
         app.log.error({ err: String(err) }, 'Сверка оплат: сбой');
       } finally {

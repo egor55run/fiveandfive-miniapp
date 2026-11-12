@@ -3,10 +3,10 @@ import { applyRefund, getRefundPreview, type RefundPercent, type RefundPreview }
 import { formatDate } from './helpers';
 
 /**
- * «Оформить возврат» (оферта, п. 5.1 и 5.3). Деньги владелец возвращает сам в
- * ApiPay или Kaspi Pay; здесь — процент, статус «Возврат», место и журнал.
- * Абонемент: один этап (цена / число стартов) или все оставшиеся, у каждого
- * свой процент по его дате.
+ * «Оформить возврат» (оферта, п. 5.1 и 5.3). С 2026-11-12 деньги уходят через
+ * API ApiPay: запись станет «Возврат» и участнику придёт сообщение, когда
+ * ApiPay подтвердит возврат. 0% — сразу, без денег. Абонемент: один этап
+ * (цена / число стартов) или все оставшиеся, у каждого свой процент по его дате.
  */
 const PERCENTS: RefundPercent[] = [100, 50, 0];
 
@@ -78,11 +78,18 @@ export default function RefundForm({ registrationId, onDone, onCancel }: Props) 
         stages: chosen.map((s) => ({ registrationId: s.registrationId, percent: percents[s.registrationId] ?? s.suggested })),
         wholePass: isPass && wholePass,
       });
-      onDone(
-        `${preview.subject}: возврат оформлен — ${res.totalText}` +
-          (res.stages > 1 ? ` за ${res.stages} старта(ов)` : '') +
-          '. Место освобождено, запись в журнале. Деньги верните в ApiPay или Kaspi Pay.',
-      );
+      if (res.mode === 'zero') {
+        onDone(`${preview.subject}: запись отменена без возврата денег (0%). Участнику отправлено сообщение.`);
+      } else if (res.status === 'FAILED') {
+        onDone(`${preview.subject}: возврат ${res.totalText} не прошёл — ${res.error}. Участнику ничего не отправлено; в списке — «Повторить» или «Убрать».`);
+      } else if (res.status === 'COMPLETED') {
+        onDone(`${preview.subject}: ApiPay вернул ${res.totalText}. Запись — «Возврат», участнику отправлено сообщение.`);
+      } else {
+        onDone(
+          `${preview.subject}: возврат ${res.totalText} отправлен в ApiPay, ждём подтверждения. ` +
+            'Когда ApiPay подтвердит, запись станет «Возврат», место освободится и участнику придёт сообщение.',
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось оформить возврат');
     } finally {
@@ -103,6 +110,16 @@ export default function RefundForm({ registrationId, onDone, onCancel }: Props) 
         По оферте (п. 5.1): за 30 дней и более до старта — 100%, за 7–29 дней — 50%, меньше 7 дней или неявка — без
         возврата. Процент подставлен по дате, его можно поменять.
       </p>
+      {preview.viaApi ? (
+        <p className="ad-hint">
+          Деньги уйдут участнику через ApiPay автоматически (100% и 50%). 0% — только отмена записи, без денег.
+        </p>
+      ) : (
+        <p className="ad-msg ad-msg--warn">
+          Возврат через ApiPay недоступен (не подключён или у оплаты нет счёта ApiPay). Можно оформить только 0%; деньги —
+          вручную в Kaspi Pay, система подхватит возврат сама.
+        </p>
+      )}
 
       {isPass && (
         <div className="ad-actions">
@@ -174,18 +191,20 @@ export default function RefundForm({ registrationId, onDone, onCancel }: Props) 
       </div>
 
       <p className="ad-hint">
-        Итого к возврату: <b>{money(total)}</b>. Запись станет «Возврат», место освободится
-        {isPass && wholePass ? ', абонемент будет отменён' : ''}.
+        Итого к возврату: <b>{money(total)}</b>.{' '}
+        {total > 0
+          ? `Сумма уйдёт в ApiPay. Когда он подтвердит возврат, запись станет «Возврат», место освободится${isPass && wholePass ? ', абонемент будет отменён' : ''} и участнику придёт сообщение.`
+          : `Запись сразу станет «Возврат», место освободится${isPass && wholePass ? ', абонемент будет отменён' : ''}, участнику придёт сообщение.`}
       </p>
       {error && <p className="ad-msg ad-msg--error">{error}</p>}
       <div className="ad-actions">
         <button
           type="button"
           className="ad-btn ad-btn--primary"
-          disabled={busy || chosen.length === 0}
+          disabled={busy || chosen.length === 0 || (total > 0 && !preview.viaApi)}
           onClick={() => void submit()}
         >
-          {busy ? 'Оформляем…' : 'Оформить возврат'}
+          {busy ? 'Отправляем…' : total > 0 ? `Вернуть ${money(total)} через ApiPay` : 'Отменить без возврата'}
         </button>
         <button type="button" className="ad-btn" disabled={busy} onClick={onCancel}>
           Отмена
