@@ -803,3 +803,54 @@ export type FaqItem = { id: string; q: string; a: (string | { list: string[] })[
 export const getFaq = () => request<{ items: FaqItem[]; custom: boolean }>('/admin/faq');
 
 export const saveFaq = (items: FaqItem[]) => request<{ items: FaqItem[]; custom: boolean }>('/admin/faq', { method: 'PUT', body: { items } });
+
+// ---------- Финансы (только просмотр) ----------
+
+export type FinanceReport = {
+  paid: { amount: number; count: number; single: { amount: number; count: number } };
+  passes: { amount: number; count: number };
+  refunds: {
+    amount: number;
+    count: number;
+    byPercent: Record<'100' | '50' | '0' | 'other', { amount: number; count: number }>;
+    unassigned: { amount: number; count: number };
+  };
+  cancellations: { unpaidInvoices: { EXPIRED: number; CANCELLED: number; FAILED: number }; cancelledWithoutRefund: number };
+  revenue: number;
+  chart: { day: string; amount: number; count: number; refunds: number }[];
+  fill: {
+    eventId: number;
+    title: string;
+    date: string;
+    total: number;
+    taken: number;
+    paid: number;
+    distances: { label: string; total: number; taken: number; paid: number }[];
+  }[];
+  promos: { code: string; kind: string; value: number; uses: number; discount: number }[];
+  csv: {
+    date: string;
+    type: 'Оплата' | 'Возврат';
+    participant: string;
+    telegram: string;
+    event: string;
+    distance: string;
+    kind: string;
+    amount: number;
+    share: number | null;
+    discount: number | null;
+    promoCode: string | null;
+    percent: number | null;
+    status: string;
+    invoice: string;
+  }[];
+};
+
+export function getFinance(f: { scope: 'all' | 'season' | 'event'; seasonId: number | null; eventId: number | null; from: string | null; to: string | null }) {
+  const q = new URLSearchParams({ scope: f.scope });
+  if (f.scope === 'season' && f.seasonId) q.set('seasonId', String(f.seasonId));
+  if (f.scope === 'event' && f.eventId) q.set('eventId', String(f.eventId));
+  if (f.from) q.set('from', f.from);
+  if (f.to) q.set('to', f.to);
+  return request<FinanceReport>(`/admin/finance?${q.toString()}`);
+}

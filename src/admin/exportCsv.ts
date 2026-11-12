@@ -76,3 +76,8 @@ function download(rows: (string | number | null)[][], fileName: string): void {
   a.remove();
   URL.revokeObjectURL(url);
 }
+
+/** Произвольная таблица в CSV для Excel (тот же формат: «;» и BOM). */
+export function downloadCsv(rows: (string | number | null)[][], fileName: string): void {
+  download(rows, fileName);
+}

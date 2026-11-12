@@ -20,6 +20,7 @@ import { adminOpeningBroadcastRoutes } from './routes/admin/openingBroadcast';
 import { adminRaceAnnouncementsRoutes } from './routes/admin/raceAnnouncements';
 import { adminBroadcastsRoutes } from './routes/admin/broadcasts';
 import { adminSettingsRoutes } from './routes/admin/settings';
+import { adminFinanceRoutes } from './routes/admin/finance';
 import { startSettings } from './lib/settings';
 import { scheduleIndexNow } from './lib/indexnow';
 import { processQueue as processBroadcasts } from './lib/broadcasts';
@@ -166,6 +167,7 @@ async function main() {
   await app.register(adminPromosRoutes);
   await app.register(adminBroadcastsRoutes);
   await app.register(adminSettingsRoutes);
+  await app.register(adminFinanceRoutes);
 
   // Правка в админке, видимая на сайте, — через минуту изменённые страницы
   // уходят в IndexNow (lib/indexnow). Без выкладки: страницы сайта собираются
