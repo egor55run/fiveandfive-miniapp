@@ -57,6 +57,16 @@ function pluralDays(n: number): string {
   return 'дней';
 }
 
+// «1 этап / 2 этапа / 5 этапов» — как pluralDays.
+function pluralStages(n: number): string {
+  const mod100 = n % 100;
+  const mod10 = n % 10;
+  if (mod100 >= 11 && mod100 <= 14) return 'этапов';
+  if (mod10 === 1) return 'этап';
+  if (mod10 >= 2 && mod10 <= 4) return 'этапа';
+  return 'этапов';
+}
+
 function daysUntil(target: Date, now: number): number {
   const diff = target.getTime() - now;
   return diff <= 0 ? 0 : Math.floor(diff / 86_400_000);
@@ -409,7 +419,7 @@ function ProfileScreen({
           ))}
         </div>
         <p className="pf-series__text">
-          Пробегите все {seasonTotal} этапов и соберите звезду целиком
+          {seasonTotal === 1 ? 'Пробегите этап' : `Пробегите все ${seasonTotal} ${pluralStages(seasonTotal)}`} и соберите звезду целиком
         </p>
       </section>
 
