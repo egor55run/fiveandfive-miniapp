@@ -163,7 +163,7 @@ function packetLine(event: Event, now: Date): string {
   const pickupOver = now.getTime() >= startOfDayInTz(event.date).getTime();
   return pickupOver
     ? `🎒 Основная выдача стартовых пакетов уже прошла. ${raceDay}`
-    : `🎒 Стартовый пакет — ${pickupWhenText(event)}, ${escapeHtml(pickupPlace(event))}. ${raceDay} Возьми документ, удостоверяющий личность.`;
+    : `🎒 Стартовый пакет — ${pickupWhenText(event)}, ${escapeHtml(pickupPlace(event))}. ${raceDay} Возьмите документ, удостоверяющий личность.`;
 }
 
 /**
@@ -182,7 +182,7 @@ function whenWhereLines(event: Event, distance?: string): string {
 
 export function registrationText(event: Event, now: Date = new Date(), distance?: string): string {
   return [
-    '🏃 <b>Ты в деле!</b>',
+    '🏃 <b>Вы в деле!</b>',
     '',
     `Регистрация на «${escapeHtml(event.title)}» принята.`,
     '',
@@ -203,7 +203,7 @@ export function seasonPassText(events: Event[]): string {
   return [
     '🏃 <b>Абонемент 5&amp;5 оформлен</b>',
     '',
-    `Ты в списке участников всех ${events.length} стартов сезона:`,
+    `Вы записаны на все ${events.length} стартов сезона:`,
     '',
     list,
     '',
@@ -234,7 +234,7 @@ export function resultText(
     ...(result.points !== undefined ? [`Баллы рейтинга серии: <b>${result.points}</b>`] : []),
     ...(result.seasonLine ? [escapeHtml(result.seasonLine)] : []),
     '',
-    'Результаты предварительные 48 часов — если заметишь ошибку, напиши в бот «Задать вопрос».',
+    'Результаты предварительные 48 часов — если заметили ошибку, напишите в бот «Задать вопрос».',
     'Подробнее — в приложении, кнопка ниже.',
   ].join('\n');
 }

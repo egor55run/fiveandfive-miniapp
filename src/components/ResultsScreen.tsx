@@ -96,7 +96,7 @@ export default function ResultsScreen({ slug, onBack }: Props) {
             />
           </div>
           {rows.length === 0 ? (
-            <p className="rt__empty">{query.trim() ? 'Никого не нашли. Проверь написание или номер.' : 'Нет результатов.'}</p>
+            <p className="rt__empty">{query.trim() ? 'Никого не нашли. Проверьте написание или номер.' : 'Нет результатов.'}</p>
           ) : (
             <ol className="rt-list">
               {rows.map((r) => (
@@ -106,7 +106,7 @@ export default function ResultsScreen({ slug, onBack }: Props) {
                     <span className="rt-row__name">
                       {r.name}
                       {r.bib ? <span className="rt-row__bib"> · №{r.bib}</span> : null}
-                      {r.me && <span className="rt-row__you"> · ты</span>}
+                      {r.me && <span className="rt-row__you"> · вы</span>}
                     </span>
                     <span className="rt-row__total num">
                       {r.status === 'FINISHED' && r.time !== null ? formatRunTime(r.time) : STATUS_SHORT[r.status]}

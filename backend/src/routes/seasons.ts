@@ -464,11 +464,11 @@ export async function seasonsRoutes(app: FastifyInstance) {
     } catch (err) {
       if (err instanceof SeasonPassBlocked) {
         const messages: Record<SeasonPassBlocked['reason'], string> = {
-          already_has_pass: 'У тебя уже есть абонемент на этот сезон',
+          already_has_pass: 'У вас уже есть абонемент на этот сезон',
           no_slots: `Нет мест на старт «${err.eventTitle}». Абонемент оформляется только на все старты сразу`,
           already_registered: SEASON_PASS_MESSAGES.has_registrations,
           empty_season: 'В сезоне пока нет стартов',
-          no_season_distance: `На старт «${err.eventTitle}» абонемент пока не действует. Запишись на него отдельно`,
+          no_season_distance: `На старт «${err.eventTitle}» абонемент пока не действует. Запишитесь на него отдельно`,
         };
         return reply.code(409).send({ error: messages[err.reason], reason: err.reason });
       }

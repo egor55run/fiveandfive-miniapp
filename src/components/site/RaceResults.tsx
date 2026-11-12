@@ -81,7 +81,7 @@ export default function RaceResults({ distances }: { distances: DistanceProtocol
         />
       </label>
       {searching && men.length === 0 && women.length === 0 ? (
-        <p className="rating-empty">Никого не нашли. Проверь написание или номер.</p>
+        <p className="rating-empty">Никого не нашли. Проверьте написание или номер.</p>
       ) : (
         <>
           {(!searching || men.length > 0) && <Table title={`Мужчины · ${d.label}`} rows={men} />}

@@ -120,7 +120,7 @@ function ProfileScreen({
         <Header />
         <div className="glass-card empty">
           <CalendarX2 className="empty__icon" size={44} strokeWidth={1.6} />
-          <p className="empty__text">У тебя пока нет регистраций на старты</p>
+          <p className="empty__text">Вы ещё не зарегистрированы ни на один старт</p>
           <button type="button" className="btn-register" onClick={onViewRaces}>
             Посмотреть старты
             <ArrowRight size={18} strokeWidth={2.4} />
@@ -173,10 +173,10 @@ function ProfileScreen({
   const localError = (key: EditKey, value: string): string | null => {
     if (value === '') {
       return key === 'birthDate'
-        ? 'Укажи дату рождения'
+        ? 'Укажите дату рождения'
         : key === 'phone'
-          ? 'Укажи телефон'
-          : 'Укажи email';
+          ? 'Укажите телефон'
+          : 'Укажите email';
     }
     // now зафиксирован на монтировании (см. выше) — для проверки даты рождения
     // этой точности с запасом, а рендер остаётся чистым.
@@ -296,7 +296,7 @@ function ProfileScreen({
       {/* Ближайший старт участника */}
       {upcoming && upcomingDate && (
         <section className="hero-card pf-next">
-          <span className="pf-next__label">Тебе предстоит:</span>
+          <span className="pf-next__label">Вам предстоит:</span>
           <FitTitle as="h3" className="pf-next__title u-display">
             {upcoming.title}
           </FitTitle>
@@ -409,7 +409,7 @@ function ProfileScreen({
           ))}
         </div>
         <p className="pf-series__text">
-          Закрой все {seasonTotal} и получи финишёрский мерч сезона
+          Закройте все {seasonTotal} и получите финишёрский мерч сезона
         </p>
       </section>
 

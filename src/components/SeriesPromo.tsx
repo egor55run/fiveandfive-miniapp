@@ -10,11 +10,11 @@ function SeriesPromo({ onJoin }: Props) {
   return (
     <section className="glass-card promo">
       <h2 className="promo__title u-display">
-        Забирай серию <span className="accent">5&5</span>
+        Заберите серию <span className="accent">5&5</span>
       </h2>
       <p className="promo__text">
-        Регистрируйся один раз и беги все пять парков с мая по сентябрь. Мы
-        зарегистрируем тебя на все забеги и отправим напоминания о старте.
+        Зарегистрируйтесь один раз и бегите все пять парков с мая по сентябрь. Мы
+        зарегистрируем вас на все забеги и отправим напоминания о старте.
       </p>
       <motion.button
         type="button"

@@ -19,7 +19,7 @@ export const USER_PER_DAY = 30;
 export const IP_PER_HOUR = 30;
 export const GLOBAL_PER_HOUR = 300;
 
-const LOCKED = 'Слишком много неверных промокодов. Попробуй позже';
+const LOCKED = 'Слишком много неверных промокодов. Попробуйте позже';
 const NOT_FOUND = 'Такого промокода нет';
 
 const hashIp = (ip: string) => createHash('sha256').update(ip).digest('hex');

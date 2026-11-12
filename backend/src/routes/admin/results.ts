@@ -175,7 +175,7 @@ async function notifyResults(eventId: number, log: Logger, distanceIds?: number[
         points: gender && event.seasonId !== null ? resultPoints(r, gender) : undefined,
         gender,
         distance: multi && r.eventDistanceId ? labelOf.get(r.eventDistanceId) ?? null : null,
-        seasonLine: now ? seasonPlaceLine(stageNo, before.get(r.userId)?.place ?? null, now.place, gender) : null,
+        seasonLine: now ? seasonPlaceLine(stageNo, before.get(r.userId)?.place ?? null, now.place) : null,
       }),
       log,
     });

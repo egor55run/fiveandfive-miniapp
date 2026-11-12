@@ -25,7 +25,7 @@ import { adminTelegramIds } from './telegramLogin';
 export const INVOICE_LIMIT_ERROR = 'daily_limit';
 
 export const INVOICE_LIMIT_MESSAGE =
-  'Сейчас не можем выставить счёт в Kaspi — попробуй позже. Место за тобой не закреплено, деньги не списаны';
+  'Сейчас не можем выставить счёт в Kaspi — попробуйте позже. Место за вами не закреплено, деньги не списаны';
 
 /** Лимит и порог — из админки («Настройки», lib/settings), по умолчанию 100 и 80. */
 export function dailyInvoiceLimit(): number {
@@ -94,10 +94,10 @@ export async function checkInvoiceAlerts(log: Logger, opts: { apiPayLimit?: bool
 
     const text =
       kind === 'warn'
-        ? `⚠️ Kaspi: за сегодня выставлено ${count} счетов из ${dailyInvoiceLimit()}. Когда лимит кончится, новые регистрации получат «попробуй позже» до полуночи.`
+        ? `⚠️ Kaspi: за сегодня выставлено ${count} счетов из ${dailyInvoiceLimit()}. Когда лимит кончится, новые регистрации получат «попробуйте позже» до полуночи.`
         : opts.apiPayLimit
-          ? `⛔ Kaspi: ApiPay отказал в новом счёте из-за лимита (у нас за сегодня ${count}). Регистрации получают «попробуй позже». Места не теряются.`
-          : `⛔ Kaspi: дневной лимит ${dailyInvoiceLimit()} счетов выбран. До полуночи новые регистрации получают «попробуй позже». Места не теряются.`;
+          ? `⛔ Kaspi: ApiPay отказал в новом счёте из-за лимита (у нас за сегодня ${count}). Регистрации получают «попробуйте позже». Места не теряются.`
+          : `⛔ Kaspi: дневной лимит ${dailyInvoiceLimit()} счетов выбран. До полуночи новые регистрации получают «попробуйте позже». Места не теряются.`;
     for (const id of adminTelegramIds()) {
       const res = await sendMessage(String(id), text);
       if (!res.ok) log.warn({ telegramId: id, error: res.error }, 'Не удалось сообщить о лимите счетов');

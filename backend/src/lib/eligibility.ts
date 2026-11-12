@@ -41,11 +41,11 @@ function years(n: number): string {
 }
 
 export function underageMessage(ageOnStart: number): string {
-  return `Участвовать можно с ${MIN_AGE} лет. На день старта тебе будет ${years(Math.max(ageOnStart, 0))}`;
+  return `Участвовать можно с ${MIN_AGE} лет. На день старта вам будет ${years(Math.max(ageOnStart, 0))}`;
 }
 
 export const PARENT_CONSENT_REQUIRED =
-  'Участникам 16–17 лет нужно подтвердить, что принесёшь письменное согласие родителя';
+  'Участникам 16–17 лет нужно подтвердить, что принесёте письменное согласие родителя';
 
 /** Когда закрывается регистрация: заданная в админке дата или за 7 дней до старта. */
 export function registrationClosesAt(e: { date: Date; registrationClosesAt: Date | null }): Date {
@@ -75,7 +75,7 @@ export function checkAge(birthDate: Date | null, start: Date, parentConsent: boo
     ok: false,
     body: { error: message, reason: 'validation', fields: { [field]: message } },
   });
-  if (!birthDate) return fail('birthDate', 'Укажи дату рождения');
+  if (!birthDate) return fail('birthDate', 'Укажите дату рождения');
   const age = ageOnStartDay(birthDate, start);
   if (age < MIN_AGE) return fail('birthDate', underageMessage(age));
   const minor = age < ADULT_AGE;

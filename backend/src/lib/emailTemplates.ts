@@ -90,7 +90,7 @@ ${body}${button}
 </td></tr>
 <tr><td style="padding:20px 8px 0;font-size:12px;line-height:1.5;color:${MUTED};">
 Вопросы — в Telegram-боте <a href="${BOT_ASK_URL}" style="color:${MUTED};">@${BOT}</a>.<br>
-Это письмо пришло тебе как участнику серии забегов 5&amp;5.<br>
+Вы получили это письмо, потому что зарегистрировались на забег серии 5&amp;5.<br>
 ИП «5&amp;5» · Астана · <a href="${APP_URL}/privacy" style="color:${MUTED};">Политика обработки персональных данных</a>
 </td></tr>
 </table>
@@ -107,12 +107,12 @@ function plain(lines: (string | null | false)[]): string {
     '',
     '—',
     `Вопросы — в Telegram-боте @${BOT}: ${BOT_ASK_URL}`,
-    'Это письмо пришло тебе как участнику серии забегов 5&5.',
+    'Вы получили это письмо, потому что зарегистрировались на забег серии 5&5.',
     `ИП «5&5» · Астана · ${APP_URL}`,
   ].join('\n');
 }
 
-const hello = (firstName: string | null) => (firstName ? `Привет, ${firstName}!` : 'Привет!');
+const hello = (firstName: string | null) => (firstName ? `Здравствуйте, ${firstName}!` : 'Здравствуйте!');
 
 /** «11 и 12 июня — <где/когда>. Иногородним — в день старта с 07:00 до 08:00. Возьмите документ…» */
 /** Цена, скидка по промокоду и итог — в письме после оплаты (решение 2026-10-21). */
@@ -129,7 +129,7 @@ function priceRows(price: PriceBreakdown | null | undefined): [string, string][]
 }
 
 function pickupLine(e: Event): string {
-  return `${pickupWhenText(e)} — ${pickupPlace(e)}. Иногородним — в день старта ${raceDayPickupText(e.date)}. Возьми документ, удостоверяющий личность.`;
+  return `${pickupWhenText(e)} — ${pickupPlace(e)}. Иногородним — в день старта ${raceDayPickupText(e.date)}. Возьмите документ, удостоверяющий личность.`;
 }
 
 /** Регистрация на старт принята (и, если был счёт, — оплата получена). */
@@ -149,7 +149,7 @@ export function registrationEmail(p: {
     ...facts(p.event, p.distance),
     ...priceRows(p.price),
   ];
-  const subject = `Ты в деле: «${p.event.title}», ${dayMonth(p.event.date)}`;
+  const subject = `Вы в деле: «${p.event.title}», ${dayMonth(p.event.date)}`;
   return {
     subject,
     html: layout({
@@ -157,7 +157,7 @@ export function registrationEmail(p: {
       title: 'Регистрация подтверждена',
       greeting: hello(p.firstName),
       blocks: [
-        { kind: 'p', html: `Ты в списке участников забега <b>«${esc(p.event.title)}»</b>.${paid ? ` ${esc(paid)}` : ''}` },
+        { kind: 'p', html: `Вы зарегистрированы на забег <b>«${esc(p.event.title)}»</b>.${paid ? ` ${esc(paid)}` : ''}` },
         { kind: 'facts', rows },
         { kind: 'p', html: `<b>Стартовый пакет.</b> ${esc(pickupLine(p.event))}` },
         {
@@ -170,7 +170,7 @@ export function registrationEmail(p: {
     text: plain([
       hello(p.firstName),
       '',
-      `Ты в списке участников забега «${p.event.title}».`,
+      `Вы зарегистрированы на забег «${p.event.title}».`,
       paid,
       '',
       ...rows.map(([k, v]) => `${k}: ${v}`),
@@ -202,7 +202,7 @@ export function seasonPassEmail(p: {
   });
   const rows: [string, string][] = [...priceRows(p.price)];
   return {
-    subject: `Абонемент 5&5: ты в списке на всех ${p.events.length} стартах`,
+    subject: `Абонемент 5&5: вы зарегистрированы на все ${p.events.length} стартов`,
     html: layout({
       preheader: 'Абонемент на сезон оформлен',
       title: 'Абонемент оформлен',
@@ -210,7 +210,7 @@ export function seasonPassEmail(p: {
       blocks: [
         {
           kind: 'p',
-          html: `Ты в списке участников всех стартов сезона${p.distance ? `, дистанция ${esc(p.distance)}` : ''}.${paid ? ` ${esc(paid)}` : ''}`,
+          html: `Вы зарегистрированы на все старты сезона${p.distance ? `, дистанция ${esc(p.distance)}` : ''}.${paid ? ` ${esc(paid)}` : ''}`,
         },
         { kind: 'list', items: races.map(esc) },
         ...(rows.length > 0 ? [{ kind: 'facts' as const, rows }] : []),
@@ -224,7 +224,7 @@ export function seasonPassEmail(p: {
     text: plain([
       hello(p.firstName),
       '',
-      `Ты в списке участников всех стартов сезона${p.distance ? `, дистанция ${p.distance}` : ''}.`,
+      `Вы зарегистрированы на все старты сезона${p.distance ? `, дистанция ${p.distance}` : ''}.`,
       paid,
       '',
       ...races,
@@ -319,7 +319,7 @@ export function dayBeforeTelegram(e: Event, distance?: string | null): string {
     `📍 ${escHtml(e.location)}`,
     `📏 ${escHtml(distance ?? e.distance)}`,
     '',
-    `🎒 Стартовый пакет: ${escHtml(pickupWhenText(e))} — ${escHtml(pickupPlace(e))}. Иногородним — завтра ${raceDayPickupText(e.date)}. Возьми документ, удостоверяющий личность.`,
+    `🎒 Стартовый пакет: ${escHtml(pickupWhenText(e))} — ${escHtml(pickupPlace(e))}. Иногородним — завтра ${raceDayPickupText(e.date)}. Возьмите документ, удостоверяющий личность.`,
     '',
     'До встречи на старте!',
   ].join('\n');

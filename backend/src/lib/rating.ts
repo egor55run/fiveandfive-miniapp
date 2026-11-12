@@ -269,14 +269,13 @@ export async function publishedStages(seasonId: number) {
 }
 
 /**
- * Строка о месте в рейтинге сезона после этапа: «После этапа 2 ты поднялся с
- * 84-го на 51-е место», «опустился…», «удержал 51-е место»; на первом своём
- * этапе — «Твоё место в рейтинге сезона — 84».
+ * Строка о месте в рейтинге сезона после этапа: «После этапа 2 вы поднялись с
+ * 84-го на 51-е место», «опустились…», «удержали 51-е место»; на первом своём
+ * этапе — «Ваше место в рейтинге сезона — 84». Без рода.
  */
-export function seasonPlaceLine(stage: number, before: number | null, after: number, gender: Gender | null): string {
-  const f = gender === 'FEMALE';
-  if (before === null) return `Твоё место в рейтинге сезона — ${after}`;
-  if (after < before) return `После этапа ${stage} ты ${f ? 'поднялась' : 'поднялся'} с ${before}-го на ${after}-е место в рейтинге сезона`;
-  if (after > before) return `После этапа ${stage} ты ${f ? 'опустилась' : 'опустился'} с ${before}-го на ${after}-е место в рейтинге сезона`;
-  return `После этапа ${stage} ты ${f ? 'удержала' : 'удержал'} ${after}-е место в рейтинге сезона`;
+export function seasonPlaceLine(stage: number, before: number | null, after: number): string {
+  if (before === null) return `Ваше место в рейтинге сезона — ${after}`;
+  if (after < before) return `После этапа ${stage} вы поднялись с ${before}-го на ${after}-е место в рейтинге сезона`;
+  if (after > before) return `После этапа ${stage} вы опустились с ${before}-го на ${after}-е место в рейтинге сезона`;
+  return `После этапа ${stage} вы удержали ${after}-е место в рейтинге сезона`;
 }

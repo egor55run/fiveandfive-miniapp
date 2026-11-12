@@ -55,7 +55,7 @@ export default async function StageResultsPage({ params }: Params) {
           <p className="rating-lead">
             {final
               ? 'Результаты итоговые.'
-              : `Результаты предварительные: протесты принимаем до ${dateTimeFmt.format(new Date(data.protestUntil!))} — напиши в Telegram-бот.`}
+              : `Результаты предварительные: протесты принимаем до ${dateTimeFmt.format(new Date(data.protestUntil!))} — напишите в Telegram-бот.`}
           </p>
           <StageProtocol men={data.men} women={data.women} />
           <p className="rating-lead">

@@ -52,7 +52,7 @@ function CompareLine({ c, what, whom }: { c: Compare; what: string; whom: string
   const p = percent(c);
   if (p === null) return <p className="an-cmp__none">Пока сравнить не с кем{whom ? ` среди ${whom}` : ''}.</p>;
   // Медленнее всех в группе — не «быстрее 0%», а поддержка (2026-11-11).
-  if (p === 0) return <p className="an-cmp__line">Медаль твоя. На следующем этапе — обгоняй себя</p>;
+  if (p === 0) return <p className="an-cmp__line">Медаль ваша. На следующем этапе — обгоните себя</p>;
   return (
     <p className="an-cmp__line">
       Быстрее <b className="num">{p}%</b> {what} <span className="an-cmp__of">из {nf.format(c.others)}</span>
@@ -60,7 +60,7 @@ function CompareLine({ c, what, whom }: { c: Compare; what: string; whom: string
   );
 }
 
-/** «Среднее время забега — 28:40 · ты на 2:10 быстрее»; медленнее среднего — без второй части. */
+/** «Среднее время забега — 28:40 · вы на 2:10 быстрее»; медленнее среднего — без второй части. */
 function AverageLine({ avg, mine }: { avg?: number; mine: number }) {
   if (avg === undefined) return null;
   return (
@@ -68,7 +68,7 @@ function AverageLine({ avg, mine }: { avg?: number; mine: number }) {
       Среднее время забега — <span className="num">{mmss(avg)}</span>
       {mine < avg && (
         <>
-          {' '}· ты на <span className="num">{mmss(avg - mine)}</span> быстрее
+          {' '}· вы на <span className="num">{mmss(avg - mine)}</span> быстрее
         </>
       )}
     </p>
@@ -77,15 +77,15 @@ function AverageLine({ avg, mine }: { avg?: number; mine: number }) {
 
 type History = NonNullable<MeRatingDto['history']>;
 
-/** «После этапа 2 ты поднялся с 84-го на 51-е место» — как в сообщении бота. */
-function placeLine(h: History, i: number, female: boolean): string | null {
+/** «После этапа 2 вы поднялись с 84-го на 51-е место» — как в сообщении бота. */
+function placeLine(h: History, i: number): string | null {
   const now = h[i].place;
   if (now === null) return null;
   const before = h.slice(0, i).reverse().find((x) => x.place !== null)?.place ?? null;
-  if (before === null) return `Твоё место в рейтинге сезона — ${now}`;
-  if (now < before) return `После этапа ${h[i].stage} ты ${female ? 'поднялась' : 'поднялся'} с ${before}-го на ${now}-е место`;
-  if (now > before) return `После этапа ${h[i].stage} ты ${female ? 'опустилась' : 'опустился'} с ${before}-го на ${now}-е место`;
-  return `После этапа ${h[i].stage} ты ${female ? 'удержала' : 'удержал'} ${now}-е место`;
+  if (before === null) return `Ваше место в рейтинге сезона — ${now}`;
+  if (now < before) return `После этапа ${h[i].stage} вы поднялись с ${before}-го на ${now}-е место`;
+  if (now > before) return `После этапа ${h[i].stage} вы опустились с ${before}-го на ${now}-е место`;
+  return `После этапа ${h[i].stage} вы удержали ${now}-е место`;
 }
 
 /** Небольшой график места по этапам: 1-е место — вверху. */
@@ -130,7 +130,7 @@ function AnalyticsScreen({ results, distanceStats, rating, onBack, onViewRaces }
         <div className="glass-card empty">
           <LineChart className="empty__icon" size={44} strokeWidth={1.6} />
           <p className="empty__text">
-            Здесь появится статистика, когда организатор внесёт результаты твоего первого старта
+            Здесь появится статистика, когда организатор внесёт результаты вашего первого старта
           </p>
           <button type="button" className="btn-register" onClick={onViewRaces}>
             Посмотреть старты
@@ -354,7 +354,7 @@ function AnalyticsScreen({ results, distanceStats, rating, onBack, onViewRaces }
               <p className="an-section-label">Рейтинг сезона</p>
               <article className="glass-card an-cmp">
                 {rating.history.map((_, i) => {
-                  const line = placeLine(rating.history!, i, rating.gender === 'FEMALE');
+                  const line = placeLine(rating.history!, i);
                   return line ? (
                     <p key={i} className={i === rating.history!.length - 1 ? 'an-cmp__line' : 'an-cmp__avg'}>
                       {line}

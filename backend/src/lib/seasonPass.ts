@@ -19,7 +19,7 @@ export type SeasonPassBlockReason = 'sales_closed' | 'has_registrations' | 'alre
 export const SEASON_PASS_MESSAGES: Record<SeasonPassBlockReason, string> = {
   sales_closed: 'Продажа абонемента закрыта',
   has_registrations: 'Абонемент доступен только до регистрации на отдельные старты',
-  already_has_pass: 'У тебя уже есть абонемент на этот сезон',
+  already_has_pass: 'У вас уже есть абонемент на этот сезон',
 };
 
 /** Когда закрывается продажа: задано в админке или как регистрация на 1-й старт. */

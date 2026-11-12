@@ -64,7 +64,7 @@ export function refundTelegramText(n: RefundNotice): string {
     ...(p.list.length ? ['', ...p.list.map((l) => `• ${escapeHtml(l)}`)] : []),
     ...(p.tail.length ? ['', ...p.tail.map(escapeHtml)] : []),
     '',
-    'Вопросы — нажми «Задать вопрос» в меню бота.',
+    'Вопросы — нажмите «Задать вопрос» в меню бота.',
   ].join('\n');
 }
 

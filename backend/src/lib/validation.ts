@@ -14,7 +14,7 @@ import { normalizePersonName, personNameError, type PersonNameKind } from './per
 export const emailField = z
   .string()
   .trim()
-  .min(1, 'Укажи email')
+  .min(1, 'Укажите email')
   .email('Некорректный email');
 
 /**
@@ -25,7 +25,7 @@ export const emailField = z
 export const phoneField = z
   .string()
   .trim()
-  .min(1, 'Укажи телефон')
+  .min(1, 'Укажите телефон')
   .refine(
     (v) => (v.match(/\d/g) ?? []).length >= 10,
     'В телефоне должно быть минимум 10 цифр',
@@ -47,7 +47,7 @@ export function personNameField(kind: PersonNameKind) {
 
 /** Пол. Значения enum Gender из схемы Prisma. */
 export const genderField = z.enum(['MALE', 'FEMALE'], {
-  error: 'Выбери пол',
+  error: 'Выберите пол',
 });
 
 /**
@@ -67,14 +67,14 @@ export const consentsField = z.object(
     // по возрасту на день старта (lib/eligibility), не схема.
     parent: z.literal(true).optional(),
   },
-  { error: 'Подтверди оба согласия' },
+  { error: 'Подтвердите оба согласия' },
 );
 
 /** Дата рождения в формате input[type=date]. Разбор и границы — в lib/birthDate. */
 export const birthDateField = z
   .string()
   .trim()
-  .refine((v) => parseBirthDate(v) !== null, 'Проверь дату рождения');
+  .refine((v) => parseBirthDate(v) !== null, 'Проверьте дату рождения');
 
 /**
  * Ответ 400 в том виде, который фронт умеет показать: `error` — готовая фраза
@@ -90,7 +90,7 @@ export function sendValidationError(reply: FastifyReply, error: z.ZodError) {
     if (first) fields[name] = first;
   }
 
-  const summary = Object.values(fields)[0] ?? flat.formErrors[0] ?? 'Проверь поля';
+  const summary = Object.values(fields)[0] ?? flat.formErrors[0] ?? 'Проверьте поля';
 
   return reply.code(400).send({ error: summary, reason: 'validation', fields });
 }
