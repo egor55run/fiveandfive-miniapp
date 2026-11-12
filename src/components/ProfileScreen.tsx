@@ -409,7 +409,7 @@ function ProfileScreen({
           ))}
         </div>
         <p className="pf-series__text">
-          Закройте все {seasonTotal} и получите финишёрский мерч сезона
+          Пробегите все {seasonTotal} этапов и соберите звезду целиком
         </p>
       </section>
 
