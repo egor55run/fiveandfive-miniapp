@@ -332,7 +332,7 @@ export function refundEmail(p: {
 }): EmailMessage {
   const { title, head, list, tail } = p.parts;
   return {
-    subject: title === 'Возврат оформлен' ? 'Возврат оформлен — 5&5' : 'Регистрация отменена — 5&5',
+    subject: title === 'Возврат проведён' ? 'Возврат проведён — 5&5' : 'Регистрация отменена — 5&5',
     html: layout({
       preheader: head,
       title,

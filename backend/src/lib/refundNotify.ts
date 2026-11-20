@@ -36,11 +36,11 @@ export function refundParts(n: RefundNotice): { title: string; head: string; lis
       : `Регистрация на старты абонемента отменена. Возврат за них ${OFFER} не производится.`;
     if (!one) list = n.lines.map((l) => `«${l.title}»`);
   } else {
+    // Текст пользователя 2026-11-20: сообщение уходит, когда ApiPay подтвердил возврат.
+    head = `Возврат проведён: ${money(total)} отправлены на вашу карту Kaspi. Срок зачисления зависит от Kaspi — обычно до ${REFUND_WORKING_DAYS} рабочих дней.`;
     if (one) {
-      head = `Возврат оформлен: ${money(one.amount)} за «${one.title}».`;
-      if (one.percent < 100) head += ` Это ${one.percent}% ${priceWord} (${money(one.base)}) — ${OFFER}.`;
+      if (one.percent < 100) tail.push(`Это ${one.percent}% ${priceWord} (${money(one.base)}) — ${OFFER}.`);
     } else {
-      head = `Возврат оформлен: ${money(total)} за абонемент.`;
       list = n.lines.map((l) =>
         l.percent === 100
           ? `«${l.title}» — ${money(l.amount)}`
@@ -49,11 +49,10 @@ export function refundParts(n: RefundNotice): { title: string; head: string; lis
             : `«${l.title}» — ${money(l.amount)}: ${l.percent}% от ${money(l.base)}, ${OFFER}`,
       );
     }
-    tail.push(`Деньги вернутся на карту Kaspi в течение ${REFUND_WORKING_DAYS} рабочих дней.`);
   }
-  if (total > 0) tail.push(one ? 'Регистрация на старт отменена.' : 'Регистрация на эти старты отменена.');
+  if (total > 0) tail.push(one ? `Регистрация на «${one.title}» отменена.` : 'Регистрация на эти старты отменена.');
   if (n.wholePass) tail.push('Абонемент отменён.');
-  return { title: total > 0 ? 'Возврат оформлен' : 'Регистрация отменена', head, list, tail };
+  return { title: total > 0 ? 'Возврат проведён' : 'Регистрация отменена', head, list, tail };
 }
 
 /** Сообщение в бот (HTML Telegram). */
